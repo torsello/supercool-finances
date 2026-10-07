@@ -1,0 +1,35 @@
+name: supercool-finances
+
+services:
+  postgres:
+    image: postgres:16.15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      # Local-only superuser password; never used outside Docker Compose.
+      POSTGRES_PASSWORD: postgres_local_only
+    ports:
+      - '127.0.0.1:55432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Init scripts run only on an empty volume: after changing them, run npm run infra:reset.
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # TCP, not the Unix socket: during init scripts the server only listens on the socket,
+      # so this turns healthy only once the init scripts have finished.
+      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U scf -d supercool_test']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:7.4.11-alpine
+    ports:
+      - '127.0.0.1:6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  postgres-data:
