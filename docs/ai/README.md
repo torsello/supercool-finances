@@ -12,10 +12,12 @@ The challenge asks for every prompt used with an AI along with every response. T
 3. I review the output and ask for changes.
 4. `/audit` runs an independent, read-only review in a separate agent that has not seen the conversation.
 5. `/export` saves the transcript to `transcripts/`.
-6. `/ship` runs the quality gates, commits and pushes.
+6. `/ship` runs the quality gates, commits and pushes the phase branch. When a phase closes, it also opens the pull request to `main`, which I merge once CI is green.
 
 ## Sessions
 
 | # | Date | Transcript | Summary |
 |---|---|---|---|
 | pre | 2026-10-07 | [00-planning.md](00-planning.md) | Summary of the planning chat before the repository: risks, key decisions and dry runs of the setup prompts. |
+| 00 | 2026-10-07 | [00-setup.txt](transcripts/00-setup.txt) | Repository setup: problem statement, AGENTS.md, CLAUDE.md, Claude Code permissions, the spec, adr, audit and ship skills, and this log. |
+| 01 | 2026-10-07 | [01-bootstrap.txt](transcripts/01-bootstrap.txt) | Bootstrap: Node 24 and strict TypeScript toolchain, Fastify walking skeleton, Postgres and Redis in Docker Compose, env:sync, GitHub Actions CI with a secret scan, the phase branch and pull request workflow, and four audit rounds. |

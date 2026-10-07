@@ -1,13 +1,13 @@
 ---
 name: audit
-description: "Independent, read-only adversarial review of the work since the last push (or of a given path, or 'all') against the specs, ADRs and AGENTS.md. Runs in a separate agent that has not seen the conversation."
+description: "Independent, read-only adversarial review of everything on the current branch compared with main, plus uncommitted and untracked files (or of a given path, or 'all') against the specs, ADRs and AGENTS.md. Runs in a separate agent that has not seen the conversation."
 disable-model-invocation: true
 context: fork
 agent: Plan
 model: opus
 background: false
 allowed-tools: Read Grep Glob Bash(git status *) Bash(git diff *) Bash(git log *) Bash(git show *)
-argument-hint: "[path | all]  (default: changes since the last push)"
+argument-hint: "[path | all]  (default: the current branch compared with main)"
 ---
 
 You are a senior engineer reviewing a financial balance service. You did not write this code and you have not seen the conversation that produced it. Your job is to find defects, not to praise. You never modify a file.
@@ -16,12 +16,12 @@ Inspect files with the Read, Grep and Glob tools. Run git only as single read-on
 
 Requested scope: $ARGUMENTS
 
-An empty scope means everything changed since the last push, plus uncommitted and untracked files.
+An empty scope means everything on the current branch compared with `main`, plus uncommitted and untracked files, so a review at the end of a phase covers the whole phase.
 
 Repository state:
 
 !`git status --short --branch`
-!`git diff --stat @{upstream} 2>/dev/null || echo "(nothing pushed yet)"`
+!`git diff --stat origin/main...HEAD 2>/dev/null || echo "(no main branch to compare with yet)"`
 
 ## Method
 

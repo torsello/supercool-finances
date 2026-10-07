@@ -1,0 +1,62 @@
+{
+  "name": "supercool-finances",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Balance service for SuperCool Finances: accounts, double-entry ledger and money movements.",
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:all": "vitest run",
+    "test:coverage": "vitest run --project unit --coverage",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm run test",
+    "infra:up": "docker compose up -d --wait postgres redis",
+    "infra:down": "docker compose down",
+    "infra:reset": "docker compose down -v && npm run infra:up",
+    "env:sync": "tsx scripts/env-sync.ts"
+  },
+  "dependencies": {
+    "@fastify/helmet": "^13.1.1",
+    "@fastify/rate-limit": "^11.2.0",
+    "@fastify/swagger": "^9.9.1",
+    "@fastify/swagger-ui": "^6.1.1",
+    "@prometheus-io/client": "^0.16.1",
+    "close-with-grace": "^2.5.0",
+    "fastify": "^5.12.5",
+    "fastify-type-provider-zod": "^7.0.0",
+    "ioredis": "^6.0.0",
+    "jose": "^6.2.12",
+    "kysely": "^0.29.6",
+    "node-pg-migrate": "^9.0.0",
+    "pg": "^8.23.1",
+    "uuid": "^14.0.2",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@redocly/cli": "^2.60.0",
+    "@types/autocannon": "^7.12.7",
+    "@types/node": "^24.19.1",
+    "@types/pg": "^8.23.1",
+    "@vitest/coverage-v8": "^5.0.3",
+    "autocannon": "^8.0.0",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "pino-pretty": "^13.2.0",
+    "prettier": "^3.9.9",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.1",
+    "vitest": "^5.0.3"
+  }
+}

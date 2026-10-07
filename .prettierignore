@@ -1,0 +1,7 @@
+dist
+coverage
+node_modules
+package-lock.json
+.claude/
+docs/ai/
+docs/challenge.md

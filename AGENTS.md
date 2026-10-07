@@ -17,7 +17,7 @@ Rules:
 - No behaviour without an AC. If something is needed and no spec covers it, stop and propose a spec change.
 - If code and spec disagree, the spec wins. Ask before changing a spec's requirements or acceptance criteria. Metadata (Related ADRs, the index) can be updated without asking.
 - If a decision is not covered by an ADR, present the options with trade-offs and ask. Never decide silently.
-- No new dependency without an ADR or the owner's approval.
+- No new dependency without an ADR or the owner's approval recorded in [docs/dependencies.md](docs/dependencies.md).
 - Spec status: `Draft` while writing, `Approved` once the owner accepts it. All specs move to `Implemented` together in the final review phase.
 - After each implementation step, run `npm run trace` and confirm every AC you implemented has a test.
 
@@ -69,14 +69,15 @@ Node 24 LTS, TypeScript 6 (strict), Fastify 5, Zod 4, PostgreSQL 16 with `pg` an
 
 ## 5. Commands
 
-| Command | What it does | From phase |
-|---|---|---|
-| `npm run check` | Typecheck, lint, format check and unit tests. Must pass before any commit. | 01-bootstrap |
-| `npm run infra:up` / `infra:down` | Start / stop local Postgres and Redis. | 01-bootstrap |
-| `npm run test:integration` | Integration tests against real Postgres and Redis. | 01-bootstrap |
-| `npm run env:sync` | Adds variables missing from `.env`, taken from `.env.example`, without printing values. | 01-bootstrap |
-| `npm run trace` | Checks that every AC in `specs/` has a test. | 02-specs |
-| `npm run migrate:up` / `migrate:down` | Apply / roll back database migrations. | 05-schema |
+| Command                               | What it does                                                                            | From phase   |
+| ------------------------------------- | --------------------------------------------------------------------------------------- | ------------ |
+| `npm run check`                       | Typecheck, lint, format check and unit tests. Must pass before any commit.              | 01-bootstrap |
+| `npm run infra:up` / `infra:down`     | Start / stop local Postgres and Redis.                                                  | 01-bootstrap |
+| `npm run infra:reset`                 | Delete the local volumes and start again, so changes in `docker/postgres/init` apply.   | 01-bootstrap |
+| `npm run test:integration`            | Integration tests against real Postgres and Redis.                                      | 01-bootstrap |
+| `npm run env:sync`                    | Adds variables missing from `.env`, taken from `.env.example`, without printing values. | 01-bootstrap |
+| `npm run trace`                       | Checks that every AC in `specs/` has a test.                                            | 02-specs     |
+| `npm run migrate:up` / `migrate:down` | Apply / roll back database migrations.                                                  | 05-schema    |
 
 ## 6. Architecture and repository map
 
@@ -113,6 +114,9 @@ Each phase is a separate session, named in transcripts and commits:
 
 ## 8. Git
 
+- Each phase is developed on a branch named `phase/NN-name`, created from an up-to-date `main`.
+- `/ship` commits and pushes that branch. When the phase closes, `/ship` opens a pull request to `main`, and the owner merges it with a merge commit once CI is green.
+- Nothing is committed to `main` directly.
 - Conventional Commits, with the covered AC IDs in the body.
 - Commit and push only through the `/ship` skill or when the owner asks.
 - Never push failing checks.
