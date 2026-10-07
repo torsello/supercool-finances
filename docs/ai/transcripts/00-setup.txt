@@ -1,0 +1,701 @@
+ ▐▛███▛█   Claude Code v2.1.292
+▝▜██████▀  Opus 5.5 · Claude Max
+ ▝▝   ▝▝   ~/supercool-finances
+
+▎ [✻] [✻] [✻] · Share Claude Code and earn $10 in usage credits · /passes
+
+❯ /clear                                                                        
+
+❯ I received this take-home challenge and I'm starting it from an empty         
+  repository. I make the decisions and direct the work; you implement it under  
+  my direction. This is the problem statement:                                  
+                                                                                
+  ---                                                                           
+  Problem Statement:                                                            
+                                                                                
+  You are an Engineer who has been tasked to create a brand new service for an  
+  innovative FinTech company called SuperCool Finances. This service will be    
+  responsible for managing account balances for customers, so it's reasonable   
+  to assume it's a very important service where all types of measures and       
+  strategies must be implemented to ensure everything works as expected; after  
+  all, making sure customer money is safe is critical for staying in business.  
+                                                                                
+  Instructions:                                                                 
+                                                                                
+  - For the service, it is advised to build a Microservice, however, you may    
+  choose a different architecture style if you thing that would be better; be   
+  sure to explain why you chose the particular style you are using, as much as  
+  you can but with clear concepts and explanations                              
+  - Remember this is a critical service in a financial context; think about     
+  what you have to do to ensure safe concurrency, security, data consistency,   
+  etc.                                                                          
+  - You don't need to have a real database or to integrate with an              
+  authentication service, you can simulate all of this in your code, save       
+  everything in memory, etc.; if you feel like it you can add a real PostgreSQL 
+  instance, use sqlite or anything; you are free to do what you want! this is   
+  not critical; if you add a real service, think how you could simplify running 
+  these services in a local environment, perhaps containers?                    
+  - This is a cloud native application, however, you don't need to deploy it to 
+  the cloud, just consider how it would be deployed to any cloud (e.g. AWS)     
+  and provide an explanation on that; Do however, try to include some sort of   
+  IaaC for your project;                                                        
+  - You can use AI; if you decide to use AI, it is advised that you tell the AI 
+  what to do instead of asking it how you should think; also, you must provide  
+  each and every prompt you used along with every response                      
+  - As previously mentioned, provide a description on what was your thinking    
+  process for making your choices on the architecture, technology stack,        
+  strategies for tackling the important aspects of this critical service, what  
+  are the trade-offs you considered in your decisions and whatever you consider 
+  important to describe your project;                                           
+  - You can deliver the project anyway you want, via GitHub, a ZIP file via     
+  Google Drive or a single PDF file; whatever is easier for you to share it and 
+  f                                                                             
+  ──── (32 lines hidden) ────────────────────────────────────────────────────── 
+  before any commit), npm run infra:up and infra:down (local Postgres and       
+  Redis), npm run test:integration, and npm run env:sync (adds the variables    
+  missing from .env, taken from .env.example, without printing values); from    
+  02-specs, npm run trace (checks that every AC in specs/ has a test); from     
+  05-schema, npm run migrate:up and migrate:down.                               
+  6. Architecture and repository map. Inside the service: hexagonal             
+  architecture (ports and adapters) per module, with tactical DDD, so money     
+  rules are unit-tested without infrastructure and the transaction boundary     
+  stays visible (recorded as ADR 0003 in phase 03). src/modules/<module>/ has   
+  domain/ (value objects, aggregates, domain errors; never imports fastify,     
+  kysely, pg or ioredis), application/ (use cases and the ports they need,      
+  including the unit of work and row locking) and adapters/ (http routes,       
+  Kysely repositories). Modules: accounts, ledger, movements, idempotency,      
+  auth. Shared infrastructure in src/platform/ (db and transactions, http error 
+  handling, config, logging, metrics); src/app.ts is the composition root.      
+  Also: specs/, docs/adr/, docs/api/, docs/runbooks/, docs/ai/, migrations/,    
+  test/unit, test/integration, test/e2e, and infra/terraform/ (never applied    
+  from this repository).                                                        
+  7. Phases, each one a separate session named in transcripts and commits:      
+  00-setup, 01-bootstrap, 02-specs, 03-adrs, 04-plans, 05-schema, 06-domain,    
+  07-idempotency, 08-api, 09-hardening, 10-runtime, 11-e2e, 12-infra,           
+  13-final-review, 14-docs, 15-demo. specs/README.md and                        
+  specs/000-overview/spec.md are created in 02-specs.                           
+  8. Git: Conventional Commits with the covered AC IDs in the body; commit and  
+  push only through the /ship skill or when I ask; never push failing checks;   
+  never force-push, rewrite pushed history, commit .env or skip hooks.          
+  9. AI usage log: every session is exported to docs/ai/transcripts/ and listed 
+  in docs/ai/README.md; transcripts are never edited, except to replace a       
+  secret or token with <redacted>.                                              
+  10. Definition of done: npm run check and npm run test:integration are green; 
+  every touched AC has a passing test with its ID in the name; specs, ADRs,     
+  OpenAPI and README still match the code.                                      
+                                                                                
+  Then create CLAUDE.md whose first line is @AGENTS.md (so Claude Code imports  
+  it), followed by short Claude Code notes: the project skills are /spec, /adr, 
+  /audit and /ship; use the spec and adr skills whenever writing a spec or an   
+  ADR; keep answers short (what changed, what was verified, what is left).      
+  Create nothing else yet.                                                      
+
+⏺ Bash(ls -la && find docs -type f | head -50 && git log --oneline 2>&1 | head)
+  ⎿  total 0
+     drwxr-xr-x    5 matiastorsello  staff   160 Oct  7 14:56 .
+     drwxr-x---+ 128 matiastorsello  staff  4096 Oct  7 14:58 ..
+     … +5 lines (ctrl+o to expand)
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Write(docs/challenge.md)
+  ⎿  Wrote 16 lines to docs/challenge.md
+      1 Problem Statement:
+      3 You are an Engineer who has been tasked to create a brand new ser
+        vice for an innovative FinTech company called SuperCool Finances.
+        or customers, so it's reasonable to assume it's a very important 
+        ented to ensure everything works as expected; after all, making s
+        ure customer money is safe is critical for staying in business.
+      5 Instructions:
+      6 
+        , you may choose a different architecture style if you thing that
+         styl
+     … +44 lines (ctrl+o to expand)
+
+⏺ Write(AGENTS.md)
+  ⎿  Wrote 130 lines to AGENTS.md
+       1 # AGENTS.md — working agreement for AI agents
+       3 ## 1. What this is
+       4 
+         ouble-entry ledger, deposits, withdrawals, transfers and reversa
+         d](docs/challenge.md). Quality over quantity: fewer features, do
+         ne correctly and proven by tests.
+       7 ## 2. Workflow: spec first
+       8 
+          acceptance criteria. AC IDs look like `MOV-AC03` (module prefix
+      10 2. **ADR**: every decision is recorded in `docs/adr/`.
+     … +174 lines (ctrl+o to expand)
+
+⏺ Write(CLAUDE.md)
+  ⎿  Wrote 7 lines to CLAUDE.md
+      1 @AGENTS.md
+      2 
+      3 ## Claude Code notes
+      4 
+      5 - Project skills: `/spec`, `/adr`, `/audit` and `/ship`.
+      6 - Use the `spec` skill whenever writing a spec, and the `adr` ski
+        ll whenever writing an ADR.
+      7 - Keep answers short: what changed, what was verified, what is le
+        ft.
+
+⏺ Bash(wc -l AGENTS.md CLAUDE.md docs/challenge.md && git status --short)
+  ⎿       130 AGENTS.md
+            7 CLAUDE.md
+           16 docs/challenge.md
+     … +4 lines (ctrl+o to expand)
+
+⏺ I created the three files. Nothing else was added and nothing is committed.
+
+  Files:
+  - docs/challenge.md: the problem statement copied word for word, typos
+    included (for example "if you thing").
+  - AGENTS.md (130 lines, under the 150 limit): all ten sections in your order.
+    - Non-negotiables are grouped under Money, Consistency, Concurrency,
+      Idempotency, Security and TypeScript.
+    - Commands are a table that also says which phase creates each one.
+    - The repository map is a tree.
+  - CLAUDE.md: the first line is @AGENTS.md, followed by the skills list, when
+    to use spec and adr, and the short-answer rule.
+
+  Checked: the line counts, and that git status shows only these files plus the
+  docs/ai/00-planning.md that was already there.
+
+  Left to do:
+  - The /spec, /adr, /audit and /ship skills that CLAUDE.md mentions don't exist
+    in .claude/ yet.
+  - The working agreement's commands only exist once later phases create them:
+    check, infra:up/infra:down, test:integration and env:sync come in
+    01-bootstrap, trace in 02-specs, and migrate:up/migrate:down in 05-schema.
+  - This session's transcript still needs exporting to docs/ai/transcripts/ as
+    00-setup.
+
+✻ Baked for 40s · done 2:59 PM
+
+❯ Create .claude/settings.json with "$schema":                                  
+  "https://json.schemastore.org/claude-code-settings.json" and exactly these    
+  project permission rules:                                                     
+  - allow: Bash(npm run *), Bash(npm test *), Bash(npx vitest *), Bash(npx tsc  
+  *), Bash(npx eslint *), Bash(npx prettier *), Bash(docker compose *),         
+  Bash(git status *), Bash(git diff *), Bash(git log *), Bash(git show *)       
+  - ask: Bash(git push *), Bash(npm install *), Bash(npm uninstall *)           
+  - deny: Bash(git push --force*), Bash(git push * --force*), Bash(git push     
+  -f*), Bash(git push * -f), Bash(git push * -f ), Bash(git reset --hard),      
+  Bash(git clean -f*), Bash(rm -rf ), Bash(terraform apply), Bash(terraform     
+  destroy*), Bash(git commit --no-verify*), Bash(git commit * --no-verify*),    
+  Bash(git commit -n ), Bash(git commit * -n ), Bash(git commit * -n), Bash(git 
+  push --no-verify), Bash(git push * --no-verify), Bash(git push * +*),         
+  Bash(rm -fr *), Read(./.env)                                                  
+    Also add "attribution": {"commit": "Co-authored-by: Claude                  
+  <noreply@anthropic.com>"}, so every commit Claude makes credits it as         
+  co-author and the AI's part stays visible in the history.                     
+    Then explain in three lines what these rules protect, and note that they    
+  match command text, so they are guardrails for an AI assistant rather than a  
+  security boundary.                                                            
+
+  Listed 1 directory (ctrl+o to expand)
+
+⏺ Write(.claude/settings.json)
+  ⎿  Wrote 48 lines to .claude/settings.json
+       1 {
+       2   "$schema": "https://json.schemastore.org/claude-code-settings.
+         json",
+       3   "permissions": {
+       4     "allow": [
+       6       "Bash(npm test *)",
+       7       "Bash(npx vitest *)",
+       8       "Bash(npx tsc *)",
+       9       "Bash(npx eslint *)",
+      10       "Bash(npx prettier *)",
+     … +39 lines (ctrl+o to expand)
+
+⏺ Bash(node -e 'const s=require("./.claude/settings.json");console.log(s.permiss
+      ions.allow.length,s.permissions.ask.length,s.permissions.deny.length)')
+  ⎿  Error: Exit code 134
+     dyld[7997]: Library not loaded: 
+     /opt/homebrew/opt/simdjson/lib/libsimdjson.33.dylib
+       Referenced from: <0F1C784F-7097-3CC5-BC8E-1492AE225E4C> 
+     /opt/homebrew/Cellar/node@22/22.22.2_2/bin/node
+       Reason: tried: '/opt/homebrew/opt/simdjson/lib/libsimdjson.33.dylib' (no 
+     such file), '/System/Volumes/Preboot/Cryptexes/OS/opt/homebrew/opt/simdjson
+     /lib/libsimdjson.33.dylib' (no such file), 
+     '/opt/homebrew/opt/simdjson/lib/libsimdjson.33.dylib' (no such file), 
+     '/opt/homebrew/Cellar/simdjson/5.0.2/lib/libsimdjson.33.dylib' (no such 
+     file), '/System/Volumes/Preboot/Cryptexes/OS/opt/homebrew/Cellar/simdjson/5
+     .0.2/lib/libsimdjson.33.dylib' (no such file), 
+     '/opt/homebrew/Cellar/simdjson/5.0.2/lib/libsimdjson.33.dylib' (no such 
+     file)
+
+⏺ Bash(python3 -c 'import
+      json;s=json.load(open(".claude/settings.json"));p=s["permissions"];print(l
+      en(p["allow"]),len(p["ask"]),len(p["deny"]),s["attribution"])')
+  ⎿  11 3 20 {'commit': 'Co-authored-by: Claude <noreply@anthropic.com>'}
+
+⏺ I created .claude/settings.json with exactly your 11 allow, 3 ask and 20 deny
+  rules, plus the commit attribution. Python parses it as valid JSON with those
+  counts. I left .claude/settings.local.json alone.
+
+  What the rules protect:
+  1. Allow: checks, tests, docker compose and read-only git commands run without
+     prompting.
+  2. Ask: pushing and changing dependencies always need your approval, which
+     keeps the "no new dependency without an ADR or approval" rule.
+  3. Deny: blocks history rewrites (force push, +refspec, reset --hard),
+     skipping hooks (--no-verify, -n), mass deletion (rm -rf, git clean -f),
+     real cloud changes (terraform apply/destroy) and reading .env.
+
+  These rules match the text of a command, not what it does, so they are
+  guardrails for an AI assistant, not a security boundary. A different spelling
+  gets past them, for example git -C . push --force, bash -c "…" or cat .env.
+
+  Side issue: I first tried to check the file with node, and Node crashed on
+  launch: Homebrew's node@22 can't find libsimdjson.33.dylib. It's also the
+  wrong version, since the stack is Node 24 LTS. This needs fixing before
+  01-bootstrap; reinstalling node@24 with Homebrew, or using nvm or fnm, should
+  do it.
+
+✻ Sautéed for 17s · done 3:01 PM
+
+❯ Create two project skills for Claude Code.                                    
+                                                                                
+  1. .claude/skills/spec/SKILL.md. YAML frontmatter: name: spec; description:   
+  "Write or update a capability spec at specs/NNN-name/spec.md using the        
+  project template (EARS requirements, Given/When/Then acceptance criteria with 
+  IDs, error catalogue). Use whenever a spec is requested or needs changes.";   
+  argument-hint: "[NNN-name] [ID prefix]".                                      
+  The body starts with "Write or update the spec requested: $ARGUMENTS",        
+  followed by these numbered steps:                                             
+  - Read AGENTS.md, specs/README.md and every existing specs/*/spec.md, so the  
+  glossary, ID prefixes, error types and wording stay consistent across specs.  
+  - Create or edit specs/<NNN-name>/spec.md following                           
+  [template.md](template.md) exactly. New specs start with Status: Draft.       
+  - Requirements use EARS notation, one behaviour per line, with IDs <PFX>-R01, 
+  <PFX>-R02, ...                                                                
+  - Acceptance criteria: one per behaviour and per edge case the user listed,   
+  with IDs <PFX>-AC01, ...; Given/When/Then with concrete values (amounts as    
+  digit strings in minor units, explicit currencies, explicit roles); each      
+  states its test level (unit, integration or e2e); only when no test can prove 
+  an AC (for example Terraform validated in CI) it uses level ci plus a line    
+  "- **Verified by:** <command or CI job>"; no vague words such as "properly",  
+  "correctly" or "gracefully".                                                  
+  - Error catalogue: condition, HTTP status, problem type (/problems/<slug>),   
+  and whether the response is stored for idempotent replay.                     
+  - Never invent business rules: anything not stated by the user, AGENTS.md or  
+  an ADR goes to "Open questions" with a recommended answer.                    
+  - Never write code in this step.                                              
+  - If an ID is renamed or removed, search tests and docs for it and list what  
+  must change.                                                                  
+  - Finish with the number of requirements and ACs, the open questions, and     
+  anything that conflicts with another spec.                                    
+  Also create .claude/skills/spec/template.md: a title "# NNN · Capability      
+  name"; a header list with Status (Draft | Approved | Implemented), ID prefix, 
+  Related ADRs and Depends on specs; then sections "1. Context and goal", "2.   
+  Requirements" (a table ID | Requirement (EARS), with one example of each      
+  pattern: WHEN <trigger> THE SYSTEM SHALL ..., IF <unwanted condition> THEN    
+  THE SYSTEM SHALL ..., THE SYSTEM SHALL ...), "3. Acceptance criteria" (each   
+  AC as a heading "### PFX-AC01 · Short title" with Level, Covers, Given, When  
+  and Then lines, plus a note that only level ci ACs add the Verified by line), 
+  "4. Error catalogue" (table: Condition | HTTP | Problem type | Stored for     
+  idempotent replay), "5. Invariants", "6. Out of scope" and "7. Open           
+  questions" (table: Question | Recommended answer | Decided by).               
+                                                                                
+  2. .claude/skills/adr/SKILL.md. Frontmatter: name: adr; description: "Record  
+  an architecture decision as docs/adr/NNNN-title.md in MADR format and keep    
+  the ADR index up to date. Use whenever a technical decision is made, changed  
+  or superseded."; argument-hint: "[title]".                                    
+  The body starts with "Record the decision: $ARGUMENTS", followed by these     
+  numbered steps:                                                               
+  - Read AGENTS.md, docs/adr/README.md (create it if missing) and the existing  
+  ADRs, to avoid duplicates and pick the next number.                           
+  - Create docs/adr/NNNN-kebab-title.md from [template.md](template.md), with   
+  today's date.                                                                 
+  - Keep the reasoning the user gave: tighten the wording and add technical     
+  detail, but never change the decision or invent a different rationale.        
+  - List at least two real options, each with honest pros and cons, including   
+  the downsides of the chosen one.                                              
+  - Consequences include what becomes harder, what must be monitored, and       
+  follow-ups.                                                                   
+  - Link the specs the decision affects, and add the ADR to the "Related ADRs"  
+  line of each of them.                                                         
+  - A replaced ADR is marked "Superseded by ADR-NNNN" instead of being edited.  
+  - Add a row (number, title, status, date) to the table in docs/adr/README.md. 
+  Also create .claude/skills/adr/template.md in MADR format: title "# ADR-NNNN: 
+  Title in plain words"; Status (Proposed | Accepted | Superseded by            
+  ADR-XXXX), Date and Related specs; sections "Context and problem", "Decision  
+  drivers", "Considered options" (Option A and Option B, each with Pros and     
+  Cons), "Decision", and "Consequences" (Positive, Negative / costs, To         
+  monitor, Follow-ups).                                                         
+
+⏺ Bash(mkdir -p /Users/matiastorsello/supercool-finances/.claude/skills/spec
+      /Users/matiastorsello/supercool-finances/.claude/skills/adr)
+  ⎿  Done
+
+⏺ Write(.claude/skills/spec/SKILL.md)
+  ⎿  Wrote 22 lines to .claude/skills/spec/SKILL.md
+       1 ---
+       3 description: "Write or update a capability spec at specs/NNN-nam
+         e/spec.md using the project template (EARS requirements, Given/W
+         never a spec is requested or needs changes."
+       5 ---
+       6 
+       8 
+       9 1. Read `AGENTS.md`, `specs/README.md` and every existing `specs
+         ng stay consistent across specs.
+         .md](template.md) exactly. New specs start with `Status: Draft`.
+     … +28 lines (ctrl+o to expand)
+
+⏺ Write(.claude/skills/spec/template.md)
+  ⎿  Wrote 50 lines to .claude/skills/spec/template.md
+       1 # NNN · Capability name
+       2 
+       3 - **Status:** Draft | Approved | Implemented
+       4 - **ID prefix:** PFX
+       5 - **Related ADRs:** ADR-NNNN, ...
+       7 
+       8 ## 1. Context and goal
+       9 
+      10 What this capability is for, who uses it, and what problem it so
+         lves. One or two short paragraphs.
+     … +47 lines (ctrl+o to expand)
+
+⏺ Write(.claude/skills/adr/SKILL.md)
+  ⎿  Wrote 16 lines to .claude/skills/adr/SKILL.md
+       1 ---
+       3 description: "Record an architecture decision as docs/adr/NNNN-t
+         itle.md in MADR format and keep the ADR index up to date. Use wh
+       4 argument-hint: "[title]"
+       5 ---
+       7 Record the decision: $ARGUMENTS
+       8 
+          and the existing ADRs, to avoid duplicates and pick the next nu
+         mber.
+         late.md), with today's date.
+     … +17 lines (ctrl+o to expand)
+
+⏺ Write(.claude/skills/adr/template.md)
+  ⎿  Wrote 52 lines to .claude/skills/adr/template.md
+      1 # ADR-NNNN: Title in plain words
+      2 
+      3 - **Status:** Proposed | Accepted | Superseded by ADR-XXXX
+      4 - **Date:** YYYY-MM-DD
+      5 - **Related specs:** NNN-name, ...
+      6 
+      7 ## Context and problem
+      8 
+      9 What forces are at play and what question this decision answers.
+     … +44 lines (ctrl+o to expand)
+
+⏺ I created the spec and adr skills, each with a SKILL.md and a template.md
+  under .claude/skills/. Nothing has run them yet, so they're untested.
+
+  /spec
+  - The frontmatter (name, description, argument hint) is exactly as you gave
+    it.
+  - The body opens with "Write or update the spec requested: $ARGUMENTS" and has
+    your nine numbered steps. I split the acceptance-criteria rules into
+    sub-bullets.
+  - The template follows your layout: the title, a header list (Status, ID
+    prefix, Related ADRs, Depends on specs) and sections 1–7.
+    - The requirements table has one example of each EARS pattern.
+    - The example AC has a heading with Level, Covers, Given, When and Then
+      lines, plus the note that only ci ACs add the Verified by line.
+    - The error catalogue and Open questions are tables.
+  - The example AC's values are amounts as digit strings, EUR and user A, to
+    show what "concrete values" means.
+
+  /adr
+  - The frontmatter is as you gave it, and the body opens with "Record the
+    decision: $ARGUMENTS" and has your eight numbered steps.
+  - The template is in MADR format:
+    - The title is "# ADR-NNNN: Title in plain words".
+    - The header has Status, Date and Related specs.
+    - The sections are Context and problem, Decision drivers, and Considered
+      options (A and B, each with Pros and Cons), then Decision and Consequences
+      (Positive, Negative / costs, To monitor, Follow-ups).
+
+  Still to do:
+  - The /audit and /ship skills that CLAUDE.md lists don't exist yet.
+  - Nothing is committed.
+  - Node is still broken on this machine.
+✻ Crunched for 26s · done 3:04 PM
+
+❯ Create two more project skills and the AI usage log.                          
+                                                                                
+  1. .claude/skills/audit/SKILL.md: an independent, read-only reviewer.         
+  Frontmatter: name: audit; description: "Independent, read-only adversarial    
+  review of the work since the last push (or of a given path, or 'all') against 
+  the specs, ADRs and AGENTS.md. Runs in a separate agent that has not seen     
+  the conversation."; disable-model-invocation: true; context: fork; agent:     
+  Plan; model: opus; background: false; allowed-tools: Read Grep Glob Bash(git  
+  status *) Bash(git diff *) Bash(git log *) Bash(git show *); argument-hint:   
+  "[path | all]  (default: changes since the last push)". The review always     
+  runs on the most capable model, because finding subtle defects is where model 
+  quality matters most.                                                         
+  Body: the reviewer is a senior engineer for a financial balance service who   
+  did not write this code and has not seen the conversation; its job is to find 
+  defects, not to praise; it never modifies a file. It inspects files with the  
+  Read, Grep and Glob tools, and runs git only as single read-only commands     
+  (git status, git diff, git log, git show), never chained with && or | and     
+  never with git -C, because the working directory is already the repository    
+  root; that way the permission rules match them without prompting. "Requested  
+  scope: $ARGUMENTS" (empty means everything changed since the last push, plus  
+  uncommitted and untracked files). Then inject the repository state with these 
+  two lines, exactly as written, each on its own line (the fallbacks matter: a  
+  failing injected command aborts the whole skill):                             
+  !`git status --short --branch`                                                
+  !`git diff --stat @{upstream} 2>/dev/null || echo "(nothing pushed yet)"`     
+  Method: read AGENTS.md and the related specs and ADRs; read every changed     
+  file in full, not only the diff; check in this order:                         
+  (1) spec conformance: each touched AC is implemented and has a test whose     
+  name contains its ID; no behaviour exists that no spec describes;             
+  (2) money: no number or float on amounts; bigint in the domain, digit strings 
+  at the API, currency exponent respected;                                      
+  (3) transactions and concurrency: one database transaction per movement;      
+  customer accounts locked one by one in ascending id order; system accounts    
+  never locked; checks after locks; nothing awaited outside the transaction     
+  that belongs inside it; bounded retries on 40001 and 40P01; no in-process     
+  state;                                                                        
+  (4) idempotency, as specs 003 and 005 define it: the key row is the first     
+  write; a replay returns the stored status and body; a different body is 422;  
+  business rejections are stored; unexpected errors are not; the idempotency    
+  wait timeout answers 409 and the account lock timeout answers 503, as         
+  separate settings;                                                            
+  (5) security: authorization on the source account, roles, 404 for foreign     
+  resources, strict input validation, no secrets or tokens in logs or committed 
+  files, parameterized SQL only;                                                
+  (6) failure handling: timeouts ordered database < service < load balancer,    
+  pool sizing, graceful shutdown, errors as problem+json;                       
+  (7) tests: they assert the invariants, not only the happy path; no sleeps or  
+  timing assumptions that make them flaky;                                      
+  (8) docs drift: specs, ADRs, OpenAPI, runbooks or README contradicting the    
+  code.                                                                         
+  Output: findings numbered and ordered by severity (Critical, High, Medium,    
+  Low), each with file:line, what is wrong, how to trigger it, impact,          
+  suggested fix, and the AC ID it violates (or "missing AC"); one line for each 
+  category without findings; a final line "Verdict: ready to ship" or           
+  "Verdict: fix before shipping".                                               
+                                                                                
+  2. .claude/skills/ship/SKILL.md: runs the quality gates, commits and pushes.  
+  Frontmatter: name: ship; description: "Run the quality gates, commit the      
+  current work as a Conventional Commit and push it to the private GitHub       
+  repository. Only when the user runs /ship."; disable-model-invocation: true;  
+  model: sonnet; effort: low; argument-hint: "[what this checkpoint delivers]"; 
+  allowed-tools: Bash(npm run *) Bash(docker compose *) Bash(git add *)         
+  Bash(git commit *) Bash(git status *) Bash(git diff *) Bash(git log *)        
+  Bash(git restore --staged *) Bash(gitleaks *) Bash(checkov *). Leave git      
+  reset and edits to transcripts out of allowed-tools on purpose, so they       
+  always ask me first.                                                          
+  Body: "Create a checkpoint for: $ARGUMENTS", then the current state injected  
+  with these three lines, exactly as written, each on its own line (the         
+  fallbacks matter: a failing injected command aborts the whole skill):         
+  !`git status --short --branch`                                                
+  !`git diff --stat @{upstream} 2>/dev/null || echo "(nothing pushed yet)"`     
+  !`git log --oneline -5 2>/dev/null || echo "(no commits yet)"`                
+  Then state that this skill runs on a smaller, cheaper model on purpose and    
+  never changes code: it only verifies, commits and pushes. It runs one command 
+  per tool call, never chained with &&, ; or |, so the allowed tools match      
+  without prompting. Then these steps, in order. If any gate fails, stop at     
+  once and report the command and the relevant part of its output, so the fix   
+  happens in the main conversation; never skip, disable or weaken a test, lint  
+  rule or check.                                                                
+  Step 1, gates: npm run check; if compose.yaml exists, npm run infra:up and    
+  then npm run test:integration; npm run trace --if-present; if infra/terraform 
+  exists, checkov -d infra/terraform --quiet --compact; any finding without a   
+  skip comment that references an ADR counts as a failed gate.                  
+  Step 2, docs in sync: the ACs touched still match code and tests; spec        
+  statuses are not changed here; new ADRs are listed in docs/adr/README.md; if  
+  the description starts with "close phase NN" and no file matching             
+  docs/ai/transcripts/NN-* exists, stop and ask me to run /export               
+  docs/ai/transcripts/NN-<phase>.txt first; every transcript in                 
+  docs/ai/transcripts/ has a row in docs/ai/README.md (phase number plus part   
+  if any, date, file link, one-line summary of what the session produced).      
+  Step 3, stage: git add -A, then read git status --short. Unstage with git     
+  restore --staged only what must never be committed (.env, credentials,        
+  node_modules, dist, coverage, large binaries, *.tfstate) and warn about it.   
+  Everything else is committed, even if it seems unrelated to the description;  
+  mention it in the report.                                                     
+  Step 4, commit: subject "type(scope): summary" under 72 characters (types     
+  feat, fix, test, docs, refactor, chore, ci, build); body with what changed    
+  and why in two to five lines, then "Covers: <AC IDs>" when applicable and     
+  "Phase: <NN-name>"; the last line, after a blank line, is exactly one         
+  "Co-authored-by: Claude <noreply@anthropic.com>" trailer (the attribution in  
+  .claude/settings.json), so GitHub shows Claude as co-author.                  
+  Step 5, secret scan of the commits not pushed yet: gitleaks git --no-banner   
+  --redact --log-opts="@{upstream}..HEAD" (without --log-opts when the branch   
+  has no upstream). A finding in a transcript: replace the value with           
+  <redacted>, amend the commit and scan again. Any other finding: git reset     
+  --soft HEAD~1, then stop and report the file and line, without printing the   
+  secret.                                                                       
+  Step 6, push: git push (I will be asked to confirm); if the branch has no     
+  upstream, git push -u origin main; never force-push.                          
+  Step 7, report in five lines or less: commit hash and subject, gates run and  
+  their results, AC IDs covered, anything skipped and why.                      
+                                                                                
+  3. docs/ai/README.md: says that the challenge asks for every prompt and       
+  response and this folder holds them; transcripts/ has one plain-text export   
+  per work session, in order (long phases are split into parts named            
+  NN-name-part1.txt, NN-name-part2.txt); the rules the AI follows are in        
+  AGENTS.md and the project skills in .claude/skills/; how a session works (a   
+  fresh session per phase, prompts, review of the output, /audit for an         
+  independent check, /export of the transcript, /ship to run the gates, commit  
+  and push); and an empty table with the columns #, Date, Transcript, Summary,  
+  where # is the phase number (NN) plus the part when a phase is split. Also    
+  create docs/ai/transcripts/.gitkeep.                                          
+                                                                                
+  Finally, verify that the YAML frontmatter of every SKILL.md parses, that      
+  .claude/settings.json is valid JSON, and list every file created.             
+  ⎿  2 skills available
+
+⏺ Bash(mkdir -p /Users/matiastorsello/supercool-finances/.claude/skills/audit
+      /Users/matiastorsello/supercool-finances/.claude/skills/ship
+      /Users/matiastorsello/superc…)
+  ⎿  Created docs/ai/transcripts/.gitkeep (+0 -0)
+
+⏺ Write(.claude/skills/audit/SKILL.md)
+  ⎿  Wrote 53 lines to .claude/skills/audit/SKILL.md
+       1 ---
+       3 description: "Independent, read-only adversarial review of the w
+         ork since the last push (or of a given path, or 'all') against t
+         not seen the conversation."
+       4 disable-model-invocation: true
+       6 agent: Plan
+       7 model: opus
+       9 allowed-tools: Read Grep Glob Bash(git status *) Bash(git diff *
+         ) Bash(git log *) Bash(git show *)
+         ush)"
+     … +77 lines (ctrl+o to expand)
+
+⏺ Write(.claude/skills/ship/SKILL.md)
+  ⎿  Wrote 63 lines to .claude/skills/ship/SKILL.md
+      1 ---
+      3 description: "Run the quality gates, commit the current work as a
+         Conventional Commit and push it to the private GitHub repository
+        . Only when the user runs /ship."
+      5 model: sonnet
+      6 effort: low
+      8 allowed-tools: Bash(npm run *) Bash(docker compose *) Bash(git ad
+        d *) Bash(git commit *) Bash(git status *) Bash(git diff *) Bash(
+        git log *) Bash(git restore --staged *) Bash(gitleaks *) Bash(che
+      9 ---
+     … +84 lines (ctrl+o to expand)
+
+⏺ Write(docs/ai/README.md)
+  ⎿  Wrote 21 lines to docs/ai/README.md
+      1 # AI usage log
+      3 The challenge asks for every prompt used with an AI along with ev
+        ery response. This folder holds them.
+      5 - [`00-planning.md`](00-planning.md) summarises the planning chat
+         held before this repository existed.
+        rk session, in order. Long phases are split into parts named `NN-
+        name-part1.txt`, `NN-name-part2.txt`, ...
+         and the project skills are in [`.claude/skills/`](../../.claude/
+        skills/).
+      9 ## How a session works
+     … +19 lines (ctrl+o to expand)
+
+⏺ Bash(python3 - <<'EOF'
+      import json, glob…)
+  ⎿  yaml lib: False
+     Traceback (most recent call last):
+       File "<stdin>", line 11, in <module>
+     … +15 lines (ctrl+o to expand)
+
+⏺ No PyYAML; use a throwaway venv in the scratchpad.
+
+⏺ Bash(S=/private/tmp/claude-501/-Users-matiastorsello-supercool-finances/0b4e3e
+      b8-41b9-4751-afa5-399d5828c667/scratchpad; python3 -m venv $S/venv
+      >/dev/null && $S/ven…)
+  ⎿  [notice] A new release of pip is available: 25.0.1 -> 26.2.1
+     [notice] To update, run: /private/tmp/claude-501/-Users-matiastorsello
+     -supercool-finances/0b4e3eb8-41b9-4751-afa5-399d5828c667/scratchpad/ve
+     … +26 lines (ctrl+o to expand)
+
+⏺ I created the /audit and /ship skills and the AI usage log. The front matter
+  of all four skills parses as YAML (checked with PyYAML in a throwaway virtual
+  environment), and .claude/settings.json is valid JSON. None of the skills has
+  been run yet.
+
+  Files created in this session:
+  - docs/challenge.md
+  - AGENTS.md
+  - CLAUDE.md
+  - .claude/settings.json
+  - .claude/skills/spec/SKILL.md and .claude/skills/spec/template.md
+  - .claude/skills/adr/SKILL.md and .claude/skills/adr/template.md
+  - .claude/skills/audit/SKILL.md
+  - .claude/skills/ship/SKILL.md
+  - docs/ai/README.md
+  - docs/ai/transcripts/.gitkeep
+
+  .claude/settings.local.json and docs/ai/00-planning.md were already there, and
+  I didn't change them.
+
+  Things to know:
+  - One addition you didn't ask for: docs/ai/README.md has a line linking
+    00-planning.md, so that file is reachable from the log. Remove it if you'd
+    rather not have it.
+  - /ship will ask you in three places, because those commands are not in its
+    allowed tools: git push, git reset --soft after a secret is found, and
+    editing a transcript to redact it. git commit --amend doesn't ask, since git
+    commit * covers it.
+  - /ship needs two tools that this session never checked are installed:
+    gitleaks and checkov.
+  - /audit refers to specs 003 and 005, which won't exist until 02-specs, so
+    their idempotency rules have to land there.
+  - Node is still broken (the missing libsimdjson library), which will block
+    01-bootstrap.
+
+  Still to do: export this session's transcript as 00-setup, then run /ship to
+  commit it.
+
+✻ Crunched for 43s · done 3:06 PM
+
+※ recap: We're setting up the AI working rules for the SuperCool Finances balance service, and the 00-setup phase is finished but not committed. Next, export this session's transcript to docs/ai/transcripts/00-setup.txt, then run /ship to commit it. (disable recaps in /config)
+
+❯ docs/ai/00-planning.md is my summary of the planning session I held before    
+  creating this repository. List it as the first entry in docs/ai/README.md,    
+  with "pre" in the # column because it is not a session (this session's        
+  transcript will be row 00), today's date and a one-line summary. Do not edit  
+  the file itself.                                                              
+
+⏺ Update(docs/ai/README.md)
+  ⎿  Added 1 line
+      19  
+      20  | # | Date | Transcript | Summary |
+      21  |---|---|---|---|
+      22 +| pre | 2026-10-07 | [00-planning.md](00-planning.md) | Summary
+         + of the planning chat before the repository: risks, key decisio
+         +ns and dry runs of the setup prompts. |                        
+
+⏺ Update(docs/ai/README.md)
+  ⎿  Removed 1 line
+      2  
+      3  The challenge asks for every prompt used with an AI along with e
+         very response. This folder holds them.
+      4  
+      5 -- [`00-planning.md`](00-planning.md) summarises the planning cha
+        -t held before this repository existed.                          
+      5  - [`transcripts/`](transcripts/) has one plain-text export per w
+         ork session, in order. Long phases are split into parts named `N
+         N-name-part1.txt`, `NN-name-part2.txt`, ...
+      6  - The rules the AI follows are in [`AGENTS.md`](../../AGENTS.md)
+         , and the project skills are in [`.claude/skills/`](../../.claud
+         e/skills/).
+      7  
+
+⏺ The planning summary is now the first row of the Sessions table in
+  docs/ai/README.md:
+
+  ┌─────┬────────────┬────────────────┬──────────────────────────────────────┐
+  │  #  │    Date    │   Transcript   │               Summary                │
+  ├─────┼────────────┼────────────────┼──────────────────────────────────────┤
+  │     │            │                │ Summary of the planning chat before  │
+  │ pre │ 2026-10-07 │ 00-planning.md │ the repository: risks, key decisions │
+  │     │            │                │  and dry runs of the setup prompts.  │
+  └─────┴────────────┴────────────────┴──────────────────────────────────────┘
+
+  I also removed the bullet I had added earlier that linked the same file, since
+  the table row replaces it. 00-planning.md itself is untouched.
+
+  Row 00 goes in once you export this session's transcript.
+
+✻ Crunched for 6s · done 3:10 PM
