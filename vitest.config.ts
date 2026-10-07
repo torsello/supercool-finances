@@ -19,12 +19,14 @@ export default defineConfig({
       {
         test: {
           name: 'unit',
+          setupFiles: ['test/setup/forbid-fails.ts'],
           include: ['test/unit/**/*.test.ts', 'src/**/*.test.ts'],
         },
       },
       {
         test: {
           name: 'integration',
+          setupFiles: ['test/setup/forbid-fails.ts'],
           include: ['test/integration/**/*.test.ts'],
           fileParallelism: false,
           testTimeout: 30_000,

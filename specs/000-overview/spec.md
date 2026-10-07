@@ -1,0 +1,396 @@
+# 000 · Overview
+
+- **Status:** Draft
+- **ID prefix:** SYS
+- **Related ADRs:** none yet (phase 03-adrs)
+- **Depends on specs:** none
+
+## 1. Context and goal
+
+SuperCool Finances needs a balance service for its customers' money: customer accounts, a double-entry ledger, deposits, withdrawals, transfers and reversals. Customer money must never be **lost** (every movement is atomic and balanced), **duplicated** (a retried request applies at most once) or **exposed** (a customer can see and move only their own money).
+
+This spec holds what every other spec relies on: the actors and their roles, the glossary, the supported currencies, the global invariants and the non-functional requirements. Each capability spec defines its own behaviour and errors and uses the terms below with exactly these meanings. Error status codes follow one rule for every spec:
+
+- **400**: the request is broken. It cannot be parsed, lacks a required header, or carries an invalid pagination cursor.
+- **409**: the request conflicts with the current state of the resource it acts on, for example closing an account that holds money, changing the status of a closed account, reversing a transaction already reversed, or reusing an idempotency key whose first request is still in progress.
+- **422**: the request was understood and refused. Either its content fails validation, or it is a money movement refused by a business rule, including a movement on a frozen or closed account.
+
+Requirements marked with a question number (for example "(Q4)") follow the recommended answer of that open question until the owner decides.
+
+### 1.1 Actors and roles
+
+| Actor        | Who                                                                                                    |
+| ------------ | ------------------------------------------------------------------------------------------------------ |
+| **Customer** | An authenticated user who owns customer accounts.                                                      |
+| **Operator** | An authenticated staff user. Simulates the payment rails and runs back-office actions.                 |
+| **System**   | The service itself. Owns the system accounts that settle money entering and leaving the service (Q12). |
+
+Each authenticated user has exactly one role, `customer` or `operator` (Q3). Operations by role:
+
+| Operation                                      | Customer               | Operator                                     |
+| ---------------------------------------------- | ---------------------- | -------------------------------------------- |
+| Read an account: details and balance           | Own accounts only      | Any customer account                         |
+| List accounts                                  | Own accounts only      | No (spec 001 Q10)                            |
+| List an account's history (its ledger entries) | Own accounts only      | Any customer account                         |
+| Deposit (simulates money arriving from a rail) | No                     | Any customer account, never a system account |
+| Withdraw                                       | From own accounts only | No                                           |
+| Transfer                                       | Out of own accounts    | No                                           |
+| Reverse a transaction                          | No                     | Yes                                          |
+| Freeze, unfreeze or close an account           | No                     | Yes                                          |
+| Open an account                                | Own accounts           | No (spec 001 Q1)                             |
+
+No caller acts as the system: system accounts are moved only as the other side of a customer movement.
+
+### 1.2 Glossary
+
+| Term                 | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Account**          | A container of money in a single currency, fixed when it is opened (Q4). Either a customer account or a system account.                                                                                                                                                                                                                                                                                                    |
+| **Customer account** | An account owned by exactly one customer. It has a status (active, frozen or closed) and a cached balance. The effect of each status on movements is defined in the accounts spec.                                                                                                                                                                                                                                         |
+| **System account**   | An internal account owned by the service, for example the settlement account of a currency (Q12). It has no owner, no cached balance and may go below zero. No movement locks or updates its row.                                                                                                                                                                                                                          |
+| **Currency**         | An ISO 4217 alphabetic code from the table in 1.3.                                                                                                                                                                                                                                                                                                                                                                         |
+| **Minor units**      | The smallest unit of a currency. A currency's exponent is the number of minor units in one major unit as a power of ten: exponent 2 means 100 cents per dollar, exponent 0 means the major unit is the minor unit.                                                                                                                                                                                                         |
+| **Amount**           | An integer number of minor units together with a currency. `bigint` in the domain; in the API a string of decimal digits plus a currency code, for example `{"amount": "1050", "currency": "EUR"}` for 10.50 EUR and `{"amount": "1050", "currency": "JPY"}` for 1050 yen. Never a float or JSON number. Every amount fits 1 to 9223372036854775807 minor units; the ledger spec adds a configurable maximum per movement. |
+| **Money movement**   | A deposit, withdrawal, transfer or reversal. Each one is recorded as exactly one transaction.                                                                                                                                                                                                                                                                                                                              |
+| **Transaction**      | The atomic, immutable record of one money movement: two or more ledger entries whose amounts sum to zero per currency.                                                                                                                                                                                                                                                                                                     |
+| **Ledger entry**     | One line of a transaction: an account and a signed amount in that account's currency. A positive amount adds to the account's balance, a negative one subtracts from it (Q11). Entries are append-only.                                                                                                                                                                                                                    |
+| **Ledger**           | All transactions and their entries. The source of truth for where money went.                                                                                                                                                                                                                                                                                                                                              |
+| **Balance**          | The sum of an account's ledger entries. For a customer account it is also cached on the account and updated in the same database transaction as its entries. For a system account it is always derived from its entries.                                                                                                                                                                                                   |
+| **Idempotency key**  | A client-chosen value sent in the `Idempotency-Key` header of every money-moving POST. It is scoped to the user and bound to a fingerprint of method, path and canonical body, so a retry returns the original result instead of moving money again. Defined in the idempotency spec.                                                                                                                                      |
+| **Reversal**         | An operator action that corrects a transaction by recording a new, compensating transaction whose entries mirror the original's. The original is never changed. Defined in the movements spec.                                                                                                                                                                                                                             |
+| **Problem details**  | The body of every error response: `application/problem+json` as defined by RFC 9457, with a `type` of the form `/problems/<slug>`.                                                                                                                                                                                                                                                                                         |
+| **Correlation id**   | An identifier for one request, returned in the response, written in every log line of the request and stored with its audit record (Q9).                                                                                                                                                                                                                                                                                   |
+| **Audit record**     | An append-only record of who did which money movement or account status change, when and in which request (Q10).                                                                                                                                                                                                                                                                                                           |
+
+### 1.3 Supported currencies
+
+The minor-unit exponent of every currency comes from this table (AGENTS.md). USD, MXN, EUR and COP are the currencies of the assumed launch markets. JPY is included because it has no minor units, so that case stays covered by tests.
+
+| Code | Currency       | Exponent | Minor unit   |
+| ---- | -------------- | -------- | ------------ |
+| USD  | US dollar      | 2        | cent         |
+| MXN  | Mexican peso   | 2        | centavo      |
+| EUR  | Euro           | 2        | cent         |
+| COP  | Colombian peso | 2        | centavo      |
+| JPY  | Japanese yen   | 0        | none (1 yen) |
+
+## 2. Requirements
+
+| ID      | Requirement (EARS)                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SYS-R01 | THE SYSTEM SHALL authenticate every request to a defined route on its public port, except the health check and API documentation endpoints, and identify the caller as a user with exactly one role, `customer` or `operator` (Q3).                                                                                                                                                                              |
+| SYS-R02 | IF a request that requires authentication carries no credentials, or credentials that fail verification, THEN THE SYSTEM SHALL answer 401 with problem type `/problems/unauthenticated`.                                                                                                                                                                                                                         |
+| SYS-R03 | THE SYSTEM SHALL allow each operation only to the role that table 1.1 permits it to.                                                                                                                                                                                                                                                                                                                             |
+| SYS-R04 | IF an authenticated caller requests an operation its role is not permitted THEN THE SYSTEM SHALL answer 403 with problem type `/problems/forbidden` and change nothing (Q6).                                                                                                                                                                                                                                     |
+| SYS-R05 | IF a customer reads, withdraws from or transfers out of an account that does not exist, is owned by another customer or is a system account, THEN THE SYSTEM SHALL answer 404 with problem type `/problems/not-found`, with bodies that differ only in `requestId`.                                                                                                                                              |
+| SYS-R06 | THE SYSTEM SHALL represent every amount as an integer number of minor units, never as a floating-point number: `bigint` in the domain, and in the API a decimal-digit string with an ISO 4217 code. A leading minus sign is allowed only on amounts the API returns, such as history entries, and never on amounts it accepts.                                                                                   |
+| SYS-R07 | IF a request contains an amount that is not a JSON string of decimal digits without sign, leading zero, separator or exponent, or that is outside 1 to 9223372036854775807, THEN THE SYSTEM SHALL answer 422 with problem type `/problems/validation-error`.                                                                                                                                                     |
+| SYS-R08 | THE SYSTEM SHALL support exactly the currencies in table 1.3 and take each currency's exponent from that table.                                                                                                                                                                                                                                                                                                  |
+| SYS-R09 | IF a request contains a currency code that is not in table 1.3 THEN THE SYSTEM SHALL answer 422 with problem type `/problems/validation-error`.                                                                                                                                                                                                                                                                  |
+| SYS-R10 | THE SYSTEM SHALL record every money movement as exactly one transaction of two or more ledger entries whose amounts sum to zero per currency.                                                                                                                                                                                                                                                                    |
+| SYS-R11 | THE SYSTEM SHALL apply each money movement in a single database transaction, so that the ledger entries, balance changes, idempotency record and audit record of a movement that is applied are either all committed or all absent. What a rejected movement stores for idempotent replay is defined in spec 005.                                                                                                |
+| SYS-R12 | IF a money movement would make the balance of a customer account negative THEN THE SYSTEM SHALL reject it, and the rejected movement has no ledger or balance effects. System account balances may be negative.                                                                                                                                                                                                  |
+| SYS-R13 | THE SYSTEM SHALL keep the sum of the balances of all accounts in each currency, system accounts included, equal to zero.                                                                                                                                                                                                                                                                                         |
+| SYS-R14 | THE SYSTEM SHALL keep the cached balance of every customer account equal to the sum of its ledger entries.                                                                                                                                                                                                                                                                                                       |
+| SYS-R15 | THE SYSTEM SHALL never update or delete a transaction or a ledger entry, and SHALL correct a transaction only by a reversal.                                                                                                                                                                                                                                                                                     |
+| SYS-R16 | THE SYSTEM SHALL keep no state in process memory that affects the result of a request (locks, idempotency, sessions, rate limits), so that any replica behind the load balancer gives the same result for the same request.                                                                                                                                                                                      |
+| SYS-R17 | WHEN money movements run concurrently THE SYSTEM SHALL produce the same balances and ledger as some one-at-a-time execution of the movements it accepted, giving this precedence over throughput.                                                                                                                                                                                                                |
+| SYS-R18 | WHEN the database transaction of a money movement fails with a deadlock (SQLSTATE 40P01) or a serialization failure (40001), THE SYSTEM SHALL retry the whole transaction, up to 3 attempts in total, waiting before retry n a random delay between 0 and min(200 ms, 10 ms × 2^(n−1)).                                                                                                                          |
+| SYS-R19 | IF a money movement still fails with 40P01 or 40001 after the last attempt THEN THE SYSTEM SHALL answer 503 with problem type `/problems/service-unavailable` and the header `Retry-After: 1`, and apply none of its effects.                                                                                                                                                                                    |
+| SYS-R20 | THE SYSTEM SHALL have a repeatable load test that measures and reports the p50, p95 and p99 latency, throughput and error count of single money movements at 200 requests per second, against a target of p99 under 300 ms on a laptop. The target is reported, not guaranteed (Q13).                                                                                                                            |
+| SYS-R21 | WHEN a request is received THE SYSTEM SHALL use the client's `X-Request-Id` header as its correlation id if the value is 1 to 128 characters from `A-Z a-z 0-9 . _ : -`, generate a new one otherwise, and return it in the `X-Request-Id` response header (Q9).                                                                                                                                                 |
+| SYS-R22 | THE SYSTEM SHALL include the correlation id in every log line written while handling a request and in every problem details body, as the member `requestId` (Q9), except in the body of an idempotent replay, which keeps the original `requestId` (SYS-R33).                                                                                                                                                    |
+| SYS-R23 | WHEN a money movement commits THE SYSTEM SHALL write, in the same database transaction, exactly one audit record with the acting user, their role, the kind of movement, the transaction id, the correlation id and the time (Q10).                                                                                                                                                                              |
+| SYS-R24 | THE SYSTEM SHALL answer every error with an `application/problem+json` body (RFC 9457) holding `type`, `title`, `status`, `detail` and `requestId`, and never with a stack trace, SQL text or the message of an underlying error.                                                                                                                                                                                |
+| SYS-R25 | IF a request fails for a reason no other requirement covers THEN THE SYSTEM SHALL answer 500 with problem type `/problems/internal-error`.                                                                                                                                                                                                                                                                       |
+| SYS-R26 | IF a request body is not parseable JSON, a required header such as `Idempotency-Key` is missing or malformed, or a pagination cursor is invalid, THEN THE SYSTEM SHALL answer 400 with problem type `/problems/malformed-request` and change nothing (Q16).                                                                                                                                                      |
+| SYS-R27 | IF a request parses but its content fails validation (a missing, unknown or malformed field, including amount and currency) THEN THE SYSTEM SHALL answer 422 with problem type `/problems/validation-error` and an `errors` member with one entry for each failing field (Q15).                                                                                                                                  |
+| SYS-R28 | IF a money movement is refused by a business rule, including a movement on a frozen or closed account, THEN THE SYSTEM SHALL answer 422 with the problem type that the capability spec defines for that rule.                                                                                                                                                                                                    |
+| SYS-R29 | IF a request conflicts with the current state of the resource it acts on THEN THE SYSTEM SHALL answer 409 with the problem type that the capability spec defines for that conflict, and change nothing.                                                                                                                                                                                                          |
+| SYS-R30 | THE SYSTEM SHALL serve `/metrics` only on a separate internal port, `METRICS_PORT`, without credentials, and never on the public port. The load balancer never routes to `METRICS_PORT` (spec 007).                                                                                                                                                                                                              |
+| SYS-R31 | THE SYSTEM SHALL check every request in this order and answer the first failure: route (an unknown path answers 404), authentication (401), role (403), malformed request (400), validation (422), resource lookup and ownership (404), then business rules (409 or 422). A caller whose role is not permitted an operation gets 403 whatever ids the request names, so a customer cannot learn which ids exist. |
+| SYS-R32 | IF a request names a path that is not a defined route THEN THE SYSTEM SHALL answer 404 with problem type `/problems/not-found`, with or without credentials.                                                                                                                                                                                                                                                     |
+| SYS-R33 | WHEN a request is an idempotent replay THE SYSTEM SHALL answer with the stored status and body unchanged, including the original `requestId`, with the current request's `X-Request-Id` header and the header `Idempotent-Replayed: true` (detailed in spec 005).                                                                                                                                                |
+| SYS-R34 | THE SYSTEM SHALL answer the transient conditions of section 4 as listed there, never with 500: an account lock timeout (spec 003), an idempotency key still in progress after the wait timeout (spec 005), an exhausted connection pool and an exceeded rate limit (spec 007). Their ACs are in those specs.                                                                                                     |
+| SYS-R35 | THE SYSTEM SHALL order its timeouts so that every database timeout (lock and statement) is shorter than the service's request timeout, which is shorter than the load balancer's, so a request is always answered by the service, not cut off by the load balancer. The values and their ACs are in spec 007.                                                                                                    |
+| SYS-R36 | THE SYSTEM SHALL accept only tokens signed with HS256 that carry `exp`, `sub` and a `role` of `customer` or `operator`; IF a token uses any other algorithm, including `none`, lacks `exp`, `sub` or `role`, or carries any other role, THEN THE SYSTEM SHALL answer 401 with problem type `/problems/unauthenticated` (detailed in spec 006).                                                                   |
+| SYS-R37 | THE SYSTEM SHALL register the fault-injection hook and the throwing route that tests use only in the test app, never in the production app.                                                                                                                                                                                                                                                                      |
+| SYS-R38 | IF an operator reads, deposits into, freezes, unfreezes or closes a system account THEN THE SYSTEM SHALL answer 404 with problem type `/problems/not-found`, with the body it gives for an unknown id, and change nothing.                                                                                                                                                                                       |
+| SYS-R39 | WHEN a request carries an `Idempotency-Key` to an endpoint that takes none THE SYSTEM SHALL ignore the header and store no idempotency record.                                                                                                                                                                                                                                                                   |
+| SYS-R40 | IF a credit would make a customer account's cached balance exceed 9223372036854775807 THEN THE SYSTEM SHALL reject the movement as spec 002 defines, with no ledger or balance effects, and never answer 500.                                                                                                                                                                                                    |
+
+## 3. Acceptance criteria
+
+Unless stated otherwise: customer user C1 owns account A1, customer user C2 owns account B1, operator user O1 is an operator, and balances are set up by deposits from O1.
+
+### SYS-AC01 · Each operation is permitted only to its role
+
+- **Level:** integration
+- **Covers:** SYS-R03, SYS-R04, SYS-R31
+- **Given** C1 owns A1 with balance "10000" EUR, C2 owns B1 with "0" EUR and B2 with "0" EUR, O1 is an operator, U is an account id that does not exist, S is the EUR settlement account, and T is a transaction id that does not exist
+- **When** each decided row of table 1.1 is requested once by C1 and once by O1, with a fresh Idempotency-Key for every POST: a read of A1, a deposit of "100" EUR into A1, a withdrawal of "100" EUR from A1, a transfer of "100" EUR from A1 to B1, a reversal of that deposit, and a freeze, unfreeze and close of B2
+- **Then** every request the table permits succeeds; every request it does not permit (for example a deposit by C1, or a withdrawal from A1 by O1) answers 403 with type `/problems/forbidden`, and the ledger, balances and account statuses are unchanged by it; and when C1 also deposits into, freezes, unfreezes and closes U and S, and reverses T, every one of those requests answers 403 with a body equal, except for `requestId`, to C1's 403 for the deposit into A1
+
+### SYS-AC02 · Requests without valid credentials are rejected
+
+- **Level:** integration
+- **Covers:** SYS-R01, SYS-R02, SYS-R30, SYS-R32, SYS-R36
+- **Given** A1 owned by C1 with balance "10000" EUR
+- **When** a read of A1 and a withdrawal of "100" EUR from A1 are sent with no credentials, with an expired token, with a token whose signature does not verify, with a token whose header says `alg: none`, with a token signed with HS256 but without a `role` claim, with one whose `role` is "admin", with one without `exp`, with one without `sub`, and with tokens signed with HS512 and with RS256; and `GET /no-such-path` is sent without credentials and with C1's valid token
+- **Then** each answers 401 with type `/problems/unauthenticated`, the balance of A1 stays "10000" EUR, a request to the health check without credentials answers 200, `/metrics` on `METRICS_PORT` without credentials answers 200, `/metrics` on the public port answers 404, and both requests to `/no-such-path` answer 404 with type `/problems/not-found`
+
+### SYS-AC03 · Foreign, unknown and system accounts look the same to a customer
+
+- **Level:** integration
+- **Covers:** SYS-R05
+- **Given** C1 owns A1 with "10000" EUR, C2 owns B1 with "5000" EUR, S is the EUR settlement system account, and U is an account id that does not exist
+- **When** C1 reads B1, S and U, withdraws "100" EUR from each, and transfers "100" EUR out of each to A1
+- **Then** all nine requests answer 404 with type `/problems/not-found` and bodies that are equal except for `requestId`, and the balances of A1 and B1 stay "10000" EUR and "5000" EUR
+
+### SYS-AC04 · Currency table
+
+- **Level:** unit
+- **Covers:** SYS-R08
+- **Given** the currency table of the domain
+- **When** it is read
+- **Then** it contains exactly USD, MXN, EUR, COP and JPY, with exponents 2, 2, 2, 2 and 0, and looking up "GBP" or "eur" finds no currency
+
+### SYS-AC05 · Unsupported currencies are rejected
+
+- **Level:** integration
+- **Covers:** SYS-R09
+- **Given** A1 owned by C1 with "10000" EUR
+- **When** O1 deposits "100" with currency "GBP", then with "eur", then with "" into A1, each with a fresh Idempotency-Key
+- **Then** each answers 422 with type `/problems/validation-error` and an `errors` entry for the currency field, and the balance of A1 stays "10000" EUR
+
+### SYS-AC06 · Amount format and range
+
+- **Level:** unit
+- **Covers:** SYS-R06, SYS-R07
+- **Given** the shared amount schema of the API
+- **When** it validates "1", "1050" and "9223372036854775807", and then "0", "-5", "+5", "01050", "10.50", "10,50", "1e3", " 1050", "", "9223372036854775808" and the JSON number 1050
+- **Then** the first three are accepted as the `bigint` values 1n, 1050n and 9223372036854775807n, and every other value is rejected
+
+### SYS-AC07 · A currency without minor units
+
+- **Level:** integration
+- **Covers:** SYS-R06, SYS-R08
+- **Given** C1 owns account J1 in JPY with balance "0" JPY
+- **When** O1 deposits "1500" JPY into J1, then deposits "15.00" JPY into J1, each with a fresh Idempotency-Key
+- **Then** the first deposit makes the balance "1500" JPY (1500 yen), the second answers 422 with type `/problems/validation-error`, and the balance stays "1500" JPY
+
+### SYS-AC08 · Every transaction is balanced
+
+- **Level:** integration
+- **Covers:** SYS-R10
+- **Given** A1 with "10000" EUR, B1 with "0" EUR, and J1 owned by C1 with "0" JPY
+- **When** O1 deposits "5000" EUR into A1 and "1500" JPY into J1, C1 withdraws "2000" EUR from A1, C1 transfers "3000" EUR from A1 to B1, and O1 reverses that transfer
+- **Then** each of the five transactions has at least two entries and its entries sum to "0" in every currency; and when a transaction with entries "100" EUR on A1 and "-99" EUR on the EUR settlement account is written directly to the database, the commit is rejected and neither entry is stored
+
+### SYS-AC09 · A failed movement leaves no trace
+
+- **Level:** integration
+- **Covers:** SYS-R11
+- **Given** A1 with "5000" EUR and B1 with "0" EUR
+- **When** C1 transfers "1000" EUR from A1 to B1 with Idempotency-Key k1, and a fault is injected after the first ledger entry is written
+- **Then** A1 stays "5000" EUR, B1 stays "0" EUR, and no transaction, ledger entry, idempotency record or audit record exists for the request; and when C1 retries with k1 and no fault, the transfer is applied once, leaving A1 "4000" EUR and B1 "1000" EUR
+
+### SYS-AC10 · Customer balances never go below zero
+
+- **Level:** integration
+- **Covers:** SYS-R12, SYS-R28
+- **Given** A1 with "1000" EUR
+- **When** C1 sends 10 withdrawals of "300" EUR from A1 at the same time, each with its own Idempotency-Key
+- **Then** exactly 3 succeed, 7 answer 422 with no ledger or balance effects, the balance of A1 is "100" EUR, and no state of A1 below "0" EUR was ever committed; and when the cached balance of A1 is set to "-1" directly in the database, the statement is rejected
+
+### SYS-AC11 · Balances sum to zero in every currency
+
+- **Level:** integration
+- **Covers:** SYS-R13
+- **Given** the five transactions of SYS-AC08 have been applied
+- **When** the balances of all accounts are summed per currency, system accounts included, using cached balances for customer accounts and the sum of entries for system accounts
+- **Then** the sum is "0" EUR and "0" JPY
+
+### SYS-AC12 · Cached balances match the ledger
+
+- **Level:** integration
+- **Covers:** SYS-R14
+- **Given** the five transactions of SYS-AC08 and the concurrent withdrawals of SYS-AC10 have been applied
+- **When** the cached balance of every customer account is compared with the sum of its ledger entries
+- **Then** they are equal for every customer account, and system accounts have no cached balance
+
+### SYS-AC13 · The ledger is append-only
+
+- **Level:** integration
+- **Covers:** SYS-R15
+- **Given** a committed deposit T1 of "1000" EUR into A1
+- **When** the application's database role runs an UPDATE setting an entry of T1 to "2000", a DELETE of that entry, a DELETE of T1 and a TRUNCATE of the ledger tables, and then O1 reverses T1
+- **Then** every statement fails, T1 and its entries are unchanged, and the reversal adds a new transaction T2 whose entries are "-1000" EUR on A1 and "1000" EUR on the EUR settlement account
+
+### SYS-AC14 · Any replica gives the same result
+
+- **Level:** e2e
+- **Covers:** SYS-R16, SYS-R33
+- **Given** two replicas behind the load balancer and A1 with "1000" EUR
+- **When** C1 sends a withdrawal of "100" EUR with Idempotency-Key k1 and `X-Request-Id: r1` to replica 1 and the same request with `X-Request-Id: r2` to replica 2, and then 10 withdrawals of "300" EUR with distinct keys, spread across both replicas at the same time
+- **Then** both k1 requests return the same status and body, and one transaction exists; the second response carries `X-Request-Id: r2` and `Idempotent-Replayed: true`; of the 10 withdrawals exactly 3 succeed; and the balance of A1 is "0" EUR
+
+### SYS-AC15 · Concurrent crossed transfers end as if run one at a time
+
+- **Level:** integration
+- **Covers:** SYS-R17
+- **Given** A1 with "100000" EUR and B1 with "100000" EUR
+- **When** C1 sends 50 transfers of "1000" EUR from A1 to B1 and C2 sends 50 transfers of "1000" EUR from B1 to A1, all at the same time, each with its own Idempotency-Key
+- **Then** all 100 succeed with no 5xx response, 100 transactions exist, the balances of A1 and B1 are both "100000" EUR, and SYS-AC11 and SYS-AC12 hold
+
+### SYS-AC16 · Deadlocks and serialization failures are retried, within a bound
+
+- **Level:** unit
+- **Covers:** SYS-R18, SYS-R19
+- **Given** a transaction runner with an injected random source and an injected sleep that records its delays, a unit of work whose first attempt fails with SQLSTATE 40P01, and another whose every attempt fails with 40001
+- **When** the backoff bound is computed for retries 1 to 7, and each unit of work runs through the runner with the random source returning 0.5
+- **Then** the bounds are 10, 20, 40, 80, 160, 200 and 200 ms; with the random source returning 0 a delay is 0 ms and with 0.999 it stays below its bound; the first unit of work runs twice, after one recorded delay of 5 ms, and returns the result of the second attempt; the second runs exactly 3 times, with recorded delays of 5 and 10 ms, and ends with the typed error that the HTTP error handler maps to 503 with type `/problems/service-unavailable` and the header `Retry-After: 1`; a failure with any other SQLSTATE, such as 23505, is not retried
+
+### SYS-AC17 · Latency is measured and reported
+
+- **Level:** e2e
+- **Covers:** SYS-R20
+- **Given** two replicas behind the load balancer and 1000 pre-funded customer account pairs in EUR
+- **When** the load test sends single deposits, withdrawals and transfers at a constant 200 requests per second for 60 seconds
+- **Then** it writes a report with the machine used, p50, p95 and p99 latency, achieved throughput and the count of non-2xx responses; there are no 5xx responses; SYS-AC11 and SYS-AC12 hold after the run; and a p99 at or above 300 ms is reported as a missed target without failing the test
+
+### SYS-AC18 · Every request has a correlation id
+
+- **Level:** integration
+- **Covers:** SYS-R21, SYS-R22
+- **Given** A1 owned by C1
+- **When** C1 reads A1 with `X-Request-Id: req-123`, then without the header, then with a value of 129 characters, then reads an unknown account with `X-Request-Id: req-456`
+- **Then** the responses carry `X-Request-Id` "req-123", a generated id, and a generated id different from the value sent; every log line of the first request has correlation id "req-123"; and the 404 body has `requestId` "req-456"
+
+### SYS-AC19 · Every committed money movement has one audit record
+
+- **Level:** integration
+- **Covers:** SYS-R23
+- **Given** A1 with "10000" EUR and B1 with "0" EUR
+- **When** C1 transfers "2500" EUR from A1 to B1 with Idempotency-Key k1 and `X-Request-Id: req-42`, retries the same request with k1, and then withdraws "999999" EUR from A1 with a fresh Idempotency-Key
+- **Then** exactly one audit record exists for the transfer, with actor C1, role customer, kind transfer, the transaction id of the response and correlation id "req-42"; the retry adds no audit record; and the rejected withdrawal adds none
+
+### SYS-AC20 · Errors are problem details without internals
+
+- **Level:** integration
+- **Covers:** SYS-R24, SYS-R25, SYS-R27
+- **Given** A1 owned by C1, and a test route that throws an error with message "boom at pg pool"
+- **When** O1 deposits into A1 with a fresh Idempotency-Key and the body `{"amount": 1050, "currency": "EUR"}`, and the test route is called
+- **Then** the first answers 422 with content type `application/problem+json` and a body with `type` "/problems/validation-error", `title`, `status` 422, `detail`, `requestId` and an `errors` member whose only entry is for the amount field; the second answers 500 with `type` "/problems/internal-error"; and neither body contains a stack trace, SQL text or "boom at pg pool"
+
+### SYS-AC21 · A broken request answers 400, a refused one 422
+
+- **Level:** integration
+- **Covers:** SYS-R26, SYS-R27
+- **Given** A1 owned by C1 with "10000" EUR
+- **When** C1 sends withdrawals from A1 with: a body `{"amount": "100", "currency": "EUR"` that does not parse; no Idempotency-Key header; an empty Idempotency-Key; then, each with a fresh Idempotency-Key, the bodies `{"amount": "100", "currency": "EUR", "fee": "1"}` and `{"amount": "10.50"}`; and C1 reads the history of A1 with the cursor "not-a-cursor"
+- **Then** the first three and the history read answer 400 with type `/problems/malformed-request`; the unknown field answers 422 with type `/problems/validation-error` and one `errors` entry, for the field `fee`; the last withdrawal answers 422 with two `errors` entries, for `amount` and the missing `currency`; and the balance of A1 stays "10000" EUR
+
+### SYS-AC22 · A conflict with the current state answers 409
+
+- **Level:** integration
+- **Covers:** SYS-R29
+- **Given** C1 owns A1, `active` with balance "1" EUR, and X1, `closed` with balance "0" EUR
+- **When** O1 closes A1 and freezes X1
+- **Then** both answer 409 with the problem types spec 001 defines (`/problems/account-balance-not-zero` and `/problems/invalid-status-transition`), A1 stays `active` with "1" EUR and X1 stays `closed`
+
+### SYS-AC23 · Checks run in a fixed order
+
+- **Level:** integration
+- **Covers:** SYS-R31
+- **Given** C1 owns A1, `active` with "1000" EUR, and F1, `frozen` with "1000" EUR; U is an account id that does not exist
+- **When** these deposits of "100" EUR are sent: without credentials and with a body that does not parse; by C1 with a body that does not parse; by O1 without Idempotency-Key and with amount "10.50"; by O1 with a fresh key and amount "10.50" into U; by O1 with a fresh key and a valid body into U; and by O1 with a fresh key and a valid body into F1
+- **Then** they answer, in that order, 401 `/problems/unauthenticated`, 403 `/problems/forbidden`, 400 `/problems/malformed-request`, 422 `/problems/validation-error`, 404 `/problems/not-found` and 422 `/problems/account-not-active`, and no balance changes
+
+### SYS-AC24 · Test seams exist only in the test app
+
+- **Level:** integration
+- **Covers:** SYS-R37
+- **Given** the production app, built by the composition root with production configuration, and the test app used by SYS-AC09 and SYS-AC20
+- **When** both apps list their routes and their unit of work is inspected for a fault-injection hook
+- **Then** the test app has the throwing route and the hook; the production app has neither, and a request to the throwing route's path answers 404 there
+
+### SYS-AC25 · An operator cannot reach a system account
+
+- **Level:** integration
+- **Covers:** SYS-R38
+- **Given** S is the EUR settlement account, holding the other side of a deposit of "1000" EUR into A1, and U is an account id that does not exist
+- **When** O1 reads S, deposits "100" EUR into S with a fresh Idempotency-Key, and freezes, unfreezes and closes S; and O1 reads U
+- **Then** every request on S answers 404 with a body equal, except for `requestId`, to the 404 for U; and the balance of S, the sum of its entries, stays "-1000" EUR
+
+### SYS-AC26 · An Idempotency-Key on an endpoint that takes none is ignored
+
+- **Level:** integration
+- **Covers:** SYS-R39
+- **Given** C1 owns A1, `active` with "0" EUR
+- **When** C1 reads A1 with `Idempotency-Key: k9`, and O1 freezes A1 with `Idempotency-Key: k9` twice
+- **Then** the read answers 200 as without the header; both freezes answer 200 with A1 `frozen`; and no idempotency record exists for k9
+
+## 4. Error catalogue
+
+Errors shared by every capability. Each capability spec lists its own errors.
+
+| Condition                                                                                                     | HTTP | Problem type                   | Stored for idempotent replay         |
+| ------------------------------------------------------------------------------------------------------------- | ---- | ------------------------------ | ------------------------------------ |
+| No credentials, or credentials that fail verification (SYS-R36)                                               | 401  | /problems/unauthenticated      | no                                   |
+| The caller's role is not permitted the operation, whatever ids the request names                              | 403  | /problems/forbidden            | no                                   |
+| The account does not exist, belongs to another customer, or is a system account (for operators too)           | 404  | /problems/not-found            | decided in the idempotency spec (Q7) |
+| The body does not parse as JSON, a required header is missing or malformed, or a pagination cursor is invalid | 400  | /problems/malformed-request    | no                                   |
+| The request parses, but a field is missing, unknown or malformed, including amount and currency               | 422  | /problems/validation-error     | no                                   |
+| A money movement is refused by a business rule, including one on a frozen or closed account                   | 422  | defined by the capability spec | decided in the idempotency spec (Q7) |
+| The request conflicts with the current state of the resource it acts on                                       | 409  | defined by the capability spec | defined by the capability spec       |
+| Deadlock or serialization failure still present after the third attempt, answered with `Retry-After: 1`       | 503  | /problems/service-unavailable  | no                                   |
+| A customer account's row lock is not acquired within the lock timeout, answered with `Retry-After` (spec 003) | 503  | /problems/service-unavailable  | no                                   |
+| The first request with the same Idempotency-Key is still in progress after the wait timeout (spec 005)        | 409  | set by spec 005                | no                                   |
+| No database connection is free within the pool's wait timeout, answered with `Retry-After` (spec 007)         | 503  | /problems/service-unavailable  | no                                   |
+| The caller exceeded the rate limit, answered with `Retry-After` (spec 007)                                    | 429  | /problems/rate-limited         | no                                   |
+| A credit would make a cached balance exceed 9223372036854775807 (SYS-R40)                                     | 422  | set by spec 002                | decided in spec 005                  |
+| A path that is not a defined route, with or without credentials                                               | 404  | /problems/not-found            | no                                   |
+| Any failure no other condition covers                                                                         | 500  | /problems/internal-error       | no                                   |
+
+"No" means nothing was committed, so a retry with the same Idempotency-Key runs the request again. Checks run in the order of SYS-R31, so a request with several faults gets the first one's answer.
+
+## 5. Invariants
+
+These hold before and after every operation of every capability. Each one is proven by its acceptance criterion here, and every capability spec that moves money re-checks them in its own tests.
+
+- The entries of every transaction sum to zero per currency (SYS-AC08).
+- No customer account balance is ever below zero; system account balances may be (SYS-AC10).
+- The sum of all balances per currency, system accounts included, is zero (SYS-AC11).
+- The cached balance of every customer account equals the sum of its ledger entries (SYS-AC12).
+- Transactions and ledger entries are never updated or deleted (SYS-AC13).
+
+## 6. Out of scope
+
+- Exchange between currencies (FX): a movement never converts money, and accounts in different currencies never exchange it.
+- Interest and fees.
+- Statements and reports for customers beyond reading an account and its history.
+- KYC and AML checks.
+- Multi-region deployment and cross-region replication.
+- Real payment rails: deposits by an operator simulate money arriving, and withdrawals record money leaving through the settlement account.
+
+## 7. Open questions
+
+| #   | Question                                                                 | Recommended answer                                                                                                                                                                                                                                                                                                                         | Decided by        |
+| --- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------- |
+| Q1  | Who opens customer accounts?                                             | Decided: a customer opens their own accounts, in a currency from table 1.3 (spec 001). Whether an operator may also open one is spec 001 Q1.                                                                                                                                                                                               | owner, 2026-10-07 |
+| Q2  | Can an operator read customer accounts and their history?                | Decided: an operator can read any customer account (spec 001).                                                                                                                                                                                                                                                                             | owner, 2026-10-07 |
+| Q3  | Can one user have both roles?                                            | No. Each identity carries exactly one role; a person who needs both uses two identities, so every action is attributable to one role.                                                                                                                                                                                                      | pending           |
+| Q4  | Does an account hold one currency or several?                            | One currency, fixed when the account is opened. A customer who needs several currencies opens one account per currency.                                                                                                                                                                                                                    | pending           |
+| Q5  | Which amounts can a movement carry?                                      | Decided: every amount must fit 1 to 9223372036854775807 minor units (the PostgreSQL `bigint` maximum); zero and negative amounts answer 422, and the direction comes from the kind of movement, never from the sign. The ledger spec adds a configurable maximum per movement, default "100000000000" minor units, also answered with 422. | owner, 2026-10-07 |
+| Q6  | Which status answers an operation the caller's role is not permitted?    | 403 `/problems/forbidden`. Which operations exist is public, so 403 reveals nothing; 404 stays reserved for resources the caller may not see (AGENTS.md).                                                                                                                                                                                  | pending           |
+| Q7  | Is a 404 on a money-moving POST stored for idempotent replay?            | Decide in the idempotency spec, together with business rejections such as insufficient funds. Recommended: a response is stored only if the movement's transaction reached the point where it is decided.                                                                                                                                  | pending           |
+| Q8  | How many attempts, how much backoff, and what answer when they run out?  | Decided: 3 attempts in total, exponential backoff from 10 ms capped at 200 ms with full jitter, then 503 `/problems/service-unavailable` with `Retry-After: 1`. With ordered locks a deadlock should not happen at all, so the retry is only a safety net, and more attempts would only stretch latency under load.                        | owner, 2026-10-07 |
+| Q9  | Which header carries the correlation id, and is the client's value kept? | `X-Request-Id`. Keep the client's value if it is 1 to 128 characters from `A-Z a-z 0-9 . _ : -`, so it cannot inject into logs; otherwise generate a UUIDv7. Exposed in problem details as `requestId`.                                                                                                                                    | pending           |
+| Q10 | What is an audit record, and what does it cover?                         | A row in an append-only audit table, written in the movement's database transaction. Only committed movements get one (attempts that fail are in the logs). Freeze, unfreeze and close also get one, defined in the accounts spec.                                                                                                         | pending           |
+| Q11 | How are debits and credits stored in ledger entries?                     | A single signed amount per entry: positive adds to the account's balance, negative subtracts. A transaction balances when its amounts sum to zero. Recorded in an ADR in phase 03.                                                                                                                                                         | pending           |
+| Q12 | Which system accounts exist?                                             | One settlement account per supported currency, representing the external payment rails: the other side of every deposit and withdrawal. Created by a migration, never through the API. Reversals mirror the original transaction's accounts.                                                                                               | pending           |
+| Q13 | How is the latency target measured?                                      | Two replicas behind nginx with PostgreSQL in Docker Compose on the developer laptop, 60 s at a constant 200 requests per second over 1000 pre-funded account pairs, reported in `docs/performance.md`.                                                                                                                                     | pending           |
+| Q14 | What does a customer read about an account?                              | Decided: its details, its balance and its history, which is the account's ledger entries, newest first with cursor pagination (spec 001).                                                                                                                                                                                                  | owner, 2026-10-07 |
+| Q15 | What does an entry of the `errors` member look like?                     | An object with `pointer`, a JSON Pointer to the failing field (`/amount`, or `/` for the whole body), and `detail`, a message safe to show the client. One entry per failing field, in a stable order.                                                                                                                                     | pending           |
+| Q16 | Which problem type does a 400 use?                                       | One shared type, `/problems/malformed-request`, with `detail` naming what is broken (body, header or cursor).                                                                                                                                                                                                                              | pending           |

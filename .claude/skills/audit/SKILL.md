@@ -47,7 +47,9 @@ Findings numbered and ordered by severity (Critical, High, Medium, Low). Each on
 - suggested fix
 - the AC ID it violates (or "missing AC")
 
+Do not report as a finding anything a spec, plan or task already assigns to a later phase or to another spec. List those items in a single line, `Deferred, already planned: ...`, after the findings.
+
 Then one line for each category without findings. End with a final line, exactly one of:
 
-- `Verdict: ready to ship`
-- `Verdict: fix before shipping`
+- `Verdict: fix before shipping`, only when there is a Critical or High finding, or a Medium finding about money, concurrency, idempotency or security.
+- `Verdict: ready to ship` otherwise. The remaining findings are follow-ups: list their numbers on the line before the verdict, as `Follow-ups: ...`.

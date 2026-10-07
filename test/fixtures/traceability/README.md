@@ -1,0 +1,9 @@
+# Traceability fixtures
+
+Sample repositories for `test/unit/traceability.test.ts`: each holds `specs/`, and some hold the Vitest JSON reports that `npm run trace` reads from `reports/`. `npm run trace` never reads this folder.
+
+Every fixture AC ID uses a prefix that starts with `ZZ`, so it can never clash with a real spec. If a real test ever named one, the real gate would fail on an AC that no spec defines.
+
+- `passing/`: an Implemented spec proven by passing unit and integration tests, table-driven ones included, and a CI job; a Draft spec with pending ACs; a ticked task whose AC is proven; a heading inside a code fence; and a folder without spec.md that is not a spec folder.
+- `failing/`: an Implemented spec with an AC that has no test, one with only skipped, todo and failed tests, one proven only at the wrong level, CI ACs without a Verified by line, and an e2e AC whose report is absent; a ticked task whose AC has no test; and tests and tasks naming ACs that no spec defines.
+- `invalid/`: an unknown status, a missing status, an AC ID defined twice, mistyped AC headings, a foreign prefix, unknown and missing levels, a Verified by line on a non-ci AC, nested code fences, an unclosed fence, a prefix used by two specs, a folder whose spec.md has the wrong case, AC IDs on a ticked task's continuation line, and a malformed report. Prettier ignores this folder, so the malformed Markdown stays as written.

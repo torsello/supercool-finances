@@ -28,7 +28,7 @@ If the current branch is `main`, stop and ask the user to create the phase branc
 
 1. `npm run check`
 2. If `compose.yaml` exists: `npm run infra:up`, then `npm run test:integration`.
-3. `npm run trace --if-present`
+3. `npm run trace -- --require unit,integration`, the same gate as CI. It reads the JSON reports that steps 1 and 2 just wrote.
 4. If `infra/terraform` exists: `checkov -d infra/terraform --quiet --compact`. Any finding without a skip comment that references an ADR counts as a failed gate.
 
 ## Step 3: docs in sync

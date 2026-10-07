@@ -64,6 +64,9 @@ jobs:
 
       - run: npm run test:integration
 
+      # After both test runs, so their JSON reports exist; a missing one fails the gate.
+      - run: npm run trace -- --require unit,integration
+
       - run: npm run build
 
   secret-scan:

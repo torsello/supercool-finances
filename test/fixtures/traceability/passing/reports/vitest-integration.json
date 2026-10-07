@@ -1,0 +1,29 @@
+{
+  "success": true,
+  "testResults": [
+    {
+      "name": "test/integration/alpha.test.ts",
+      "status": "passed",
+      "assertionResults": [
+        {
+          "fullName": "ZZA-AC03 alpha against a real database",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "name": "test/integration/beta.test.ts",
+      "status": "passed",
+      "assertionResults": [
+        {
+          "fullName": "ZZB-AC02 beta works",
+          "status": "passed"
+        },
+        {
+          "fullName": "ZZB-AC01 not ready yet, but its spec is a draft",
+          "status": "skipped"
+        }
+      ]
+    }
+  ]
+}
