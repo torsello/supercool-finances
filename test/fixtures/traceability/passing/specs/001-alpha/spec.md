@@ -12,7 +12,7 @@
 ### ZZA-AC02 · Proven by a CI job
 
 - **Level:** ci
-- **Verified by:** CI job `terraform` (terraform validate)
+- **Verified by:** CI job `terraform`, step `npm run zz-terraform-validate`
 
 ### ZZA-AC03 · Proven by a passing integration test
 
@@ -21,6 +21,11 @@
 ### ZZA-AC04 · Proven by a table-driven unit test
 
 - **Level:** unit
+
+### ZZA-AC05 · Proven by CI steps that run package scripts
+
+- **Level:** ci
+- **Verified by:** CI job `ci`, step `npm run zz-check`, run after `npm run zz:prepare`.
 
 ## 4. Examples
 

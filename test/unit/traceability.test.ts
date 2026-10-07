@@ -5,12 +5,15 @@ import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   buildReport,
+  ciGapsOf,
   linesOutsideFences,
   listFailures,
+  npmRunScripts,
   parseArgs,
   parseSpec,
   parseTasks,
   run,
+  workflowCommands,
   type Output,
 } from '../../scripts/traceability.js';
 
@@ -44,10 +47,16 @@ describe('traceability: spec parsing', () => {
             id: 'ZZA-AC02',
             spec: '001-alpha',
             level: 'ci',
-            verifiedBy: 'CI job `terraform` (terraform validate)',
+            verifiedBy: 'CI job `terraform`, step `npm run zz-terraform-validate`',
           },
           { id: 'ZZA-AC03', spec: '001-alpha', level: 'integration', verifiedBy: undefined },
           { id: 'ZZA-AC04', spec: '001-alpha', level: 'unit', verifiedBy: undefined },
+          {
+            id: 'ZZA-AC05',
+            spec: '001-alpha',
+            level: 'ci',
+            verifiedBy: 'CI job `ci`, step `npm run zz-check`, run after `npm run zz:prepare`.',
+          },
         ],
       },
       problems: [],
@@ -79,6 +88,8 @@ describe('traceability: spec parsing', () => {
       'line 8: "#### ZZI-AC02 · a level-4 heading" looks like an AC heading but is not "### PFX-ACnn · Title"',
       'line 10: "### ZZI-AC3 · one digit" looks like an AC heading but is not "### PFX-ACnn · Title"',
       'line 12: "###ZZI-AC04 · no space after the hashes" looks like an AC heading but is not "### PFX-ACnn · Title"',
+      'line 51: "### zzi-ac11 · lowercase" looks like an AC heading but is not "### PFX-ACnn · Title"',
+      'line 53: "### ZZI-AC12 · indented by four spaces, a code block" looks like an AC heading but is not "### PFX-ACnn · Title"',
       "ZZJ-AC05 does not use the spec's ID prefix ZZI",
       'ZZI-AC06 has level "integraton"; expected unit, integration, e2e, ci',
       'ZZI-AC07 has no "- **Level:**" line',
@@ -86,10 +97,22 @@ describe('traceability: spec parsing', () => {
     ]);
   });
 
+  it('parses AC headings indented by up to three spaces, and reports AC-like headings in any case or deeper indent', () => {
+    const parsed = parseSpec('003-three', read(INVALID, 'specs/003-three/spec.md'));
+
+    expect(parsed.spec.acs.find((ac) => ac.id === 'ZZI-AC10')).toMatchObject({ level: 'unit' });
+    expect(parsed.problems).toEqual(
+      expect.arrayContaining([
+        'line 51: "### zzi-ac11 · lowercase" looks like an AC heading but is not "### PFX-ACnn · Title"',
+        'line 53: "### ZZI-AC12 · indented by four spaces, a code block" looks like an AC heading but is not "### PFX-ACnn · Title"',
+      ]),
+    );
+  });
+
   it('ignores headings in code fences, closing a fence only with the same character, at least as long', () => {
     expect(
       parseSpec('003-three', read(INVALID, 'specs/003-three/spec.md')).spec.acs.map((ac) => ac.id),
-    ).toEqual(['ZZJ-AC05', 'ZZI-AC06', 'ZZI-AC07', 'ZZI-AC08', 'ZZI-AC09']);
+    ).toEqual(['ZZJ-AC05', 'ZZI-AC06', 'ZZI-AC07', 'ZZI-AC08', 'ZZI-AC09', 'ZZI-AC10']);
     expect(
       parseSpec('001-alpha', read(PASSING, 'specs/001-alpha/spec.md')).spec.acs.map((ac) => ac.id),
     ).not.toContain('ZZA-AC99');
@@ -164,6 +187,7 @@ describe('traceability: report', () => {
       ['ZZA-AC02', 'covered', []],
       ['ZZA-AC03', 'covered', ['test/integration/alpha.test.ts']],
       ['ZZA-AC04', 'covered', ['test/unit/alpha.test.ts']],
+      ['ZZA-AC05', 'covered', []],
       ['ZZB-AC01', 'pending', []],
       ['ZZB-AC02', 'covered', ['test/integration/beta.test.ts']],
       ['ZZB-AC03', 'pending', []],
@@ -190,6 +214,14 @@ describe('traceability: report', () => {
       'FAIL ZZC-AC03 (specs/001-gamma, Implemented, level ci) has no "- **Verified by:**" line',
       'FAIL ZZC-AC04 (specs/001-gamma, Implemented) has no passing unit test whose name contains its ID',
       'FAIL ZZC-AC06 (specs/001-gamma, Implemented) has no passing integration test whose name contains its ID',
+      'FAIL ZZC-AC09 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-absent is not a script in package.json; npm run zz-absent is not run by a step of .github/workflows/ci.yml that can fail the build',
+      'FAIL ZZC-AC10 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-commented is not run by a step of .github/workflows/ci.yml that can fail the build',
+      'FAIL ZZC-AC11 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-step-only is not a script in package.json',
+      'FAIL ZZC-AC12 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: it names no npm run script that a step of .github/workflows/ci.yml runs',
+      'FAIL ZZC-AC13 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-or-true is not run by a step of .github/workflows/ci.yml that can fail the build',
+      'FAIL ZZC-AC14 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-continue is not run by a step of .github/workflows/ci.yml that can fail the build',
+      'FAIL ZZC-AC15 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-if-false is not run by a step of .github/workflows/ci.yml that can fail the build',
+      'FAIL ZZC-AC16 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-job-off is not run by a step of .github/workflows/ci.yml that can fail the build',
       'FAIL ZZD-AC01 (specs/002-delta, ticked in specs/002-delta/tasks.md) has no passing unit test whose name contains its ID',
       'FAIL ZZC-AC04 (specs/001-gamma, Implemented) is named by a test that did not pass: "ZZC-AC04 is skipped" (skipped, test/unit/gamma.test.ts)',
       'FAIL ZZC-AC04 (specs/001-gamma, Implemented) is named by a test that did not pass: "ZZC-AC04 is todo" (todo, test/unit/gamma.test.ts)',
@@ -221,6 +253,8 @@ describe('traceability: report', () => {
       'FAIL specs/003-three/spec.md line 8: "#### ZZI-AC02 · a level-4 heading" looks like an AC heading but is not "### PFX-ACnn · Title"',
       'FAIL specs/003-three/spec.md line 10: "### ZZI-AC3 · one digit" looks like an AC heading but is not "### PFX-ACnn · Title"',
       'FAIL specs/003-three/spec.md line 12: "###ZZI-AC04 · no space after the hashes" looks like an AC heading but is not "### PFX-ACnn · Title"',
+      'FAIL specs/003-three/spec.md line 51: "### zzi-ac11 · lowercase" looks like an AC heading but is not "### PFX-ACnn · Title"',
+      'FAIL specs/003-three/spec.md line 53: "### ZZI-AC12 · indented by four spaces, a code block" looks like an AC heading but is not "### PFX-ACnn · Title"',
       "FAIL specs/003-three/spec.md ZZJ-AC05 does not use the spec's ID prefix ZZI",
       'FAIL specs/003-three/spec.md ZZI-AC06 has level "integraton"; expected unit, integration, e2e, ci',
       'FAIL specs/003-three/spec.md ZZI-AC07 has no "- **Level:**" line',
@@ -261,12 +295,123 @@ describe('traceability: report', () => {
 
     expect(read(dir, 'docs/traceability.md')).toBe(first);
     expect(first).toContain(
-      '| ZZA-AC02 | 001-alpha | Implemented | ci | covered | Verified by: CI job `terraform` (terraform validate) |',
+      '| ZZA-AC02 | 001-alpha | Implemented | ci | covered | Verified by: CI job `terraform`, step `npm run zz-terraform-validate` |',
     );
     expect(first).toContain(
       '| ZZB-AC02 | 002-beta | Draft, task ticked | integration | covered | test/integration/beta.test.ts |',
     );
-    expect(first).toContain('7 ACs in 2 specs: 5 covered, 2 pending, 0 missing, 0 unverified.');
+    expect(first).toContain('8 ACs in 2 specs: 6 covered, 2 pending, 0 missing, 0 unverified.');
+  });
+});
+
+describe('traceability: ci-level proof', () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'trace-ci-'));
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('reads the commands of run steps, inline and in block scalars, without comments', () => {
+    const workflow = [
+      'steps:',
+      '  # - run: npm run commented-out',
+      '  - run: npm run inline # npm run trailing-comment',
+      '  - name: Block',
+      '    run: |',
+      '      # npm run shell-comment',
+      '      DATABASE_URL=x npm run in-block',
+      '',
+      '      npm run after-blank-line',
+      '      npm run ignored-failure || true',
+      '      npm run ignored-failure-colon ||:',
+      '  - name: Next step',
+      '    env:',
+      '      NOTE: npm run not-a-command',
+      '  - run: npm run step-continue',
+      '    continue-on-error: true',
+      '  - if: ${{ false }}',
+      '    run: npm run step-if-false',
+      '  - if: "false"',
+      '    run: npm run step-if-false-quoted',
+      '  - if: success()',
+      '    continue-on-error: false',
+      '    run: npm run step-kept',
+    ].join('\n');
+
+    expect(workflowCommands(workflow)).toEqual([
+      'npm run inline',
+      'DATABASE_URL=x npm run in-block',
+      'npm run after-blank-line',
+      'npm run step-kept',
+    ]);
+  });
+
+  it('leaves out every step of a job that may fail or never runs', () => {
+    const workflow = [
+      'jobs:',
+      '  optional:',
+      '    continue-on-error: true',
+      '    steps:',
+      '      - run: npm run in-optional-job',
+      '  off:',
+      '    if: false',
+      '    steps:',
+      '      - run: npm run in-disabled-job',
+      '  required:',
+      '    runs-on: ubuntu-latest',
+      '    steps:',
+      '      - run: npm run in-required-job',
+    ].join('\n');
+
+    expect(workflowCommands(workflow)).toEqual(['npm run in-required-job']);
+  });
+
+  it('finds every npm run script in a line, without a trailing full stop', () => {
+    expect(
+      npmRunScripts('step `npm run reconcile` after `npm run test:integration`, then npm run x.y.'),
+    ).toEqual(['reconcile', 'test:integration', 'x.y']);
+    expect(npmRunScripts('pnpm run other and CI job `terraform`')).toEqual([]);
+  });
+
+  it('proves a ci AC only when each script it names is in package.json and run by a CI step', () => {
+    const context = {
+      packageScripts: new Set(['both', 'package-only']),
+      workflowScripts: new Set(['both', 'step-only']),
+    };
+
+    expect(ciGapsOf('`npm run both`; CI job `terraform`', context)).toEqual([]);
+    expect(ciGapsOf('CI job `terraform` (terraform validate)', context)).toEqual([
+      'it names no npm run script that a step of .github/workflows/ci.yml runs',
+    ]);
+    expect(ciGapsOf('npm run package-only, npm run step-only, npm run neither', context)).toEqual([
+      'npm run package-only is not run by a step of .github/workflows/ci.yml that can fail the build',
+      'npm run step-only is not a script in package.json',
+      'npm run neither is not a script in package.json',
+      'npm run neither is not run by a step of .github/workflows/ci.yml that can fail the build',
+    ]);
+  });
+
+  it('fails a required ci AC once a script it names leaves package.json, and shows why', () => {
+    const output = capture();
+    cpSync(PASSING, dir, { recursive: true });
+    writeFileSync(join(dir, 'package.json'), '{"scripts": {"zz-check": "true"}}');
+
+    expect(buildReport(dir).rows.find((row) => row.id === 'ZZA-AC05')).toMatchObject({
+      coverage: 'missing',
+      ciGaps: ['npm run zz:prepare is not a script in package.json'],
+    });
+    expect(run(['--write'], dir, output)).toBe(1);
+    expect(read(dir, 'docs/traceability.md')).toContain(
+      '(npm run zz:prepare is not a script in package.json) |',
+    );
+
+    writeFileSync(join(dir, 'package.json'), '{"scripts": ');
+    expect(run([], dir, output)).toBe(1);
+    expect(output.errors).toContain('FAIL package.json is not valid JSON with a "scripts" object');
   });
 });
 

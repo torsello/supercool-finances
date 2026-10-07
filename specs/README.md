@@ -54,8 +54,8 @@ Use the `spec` skill (`/spec NNN-name PFX`). It follows [the template](../.claud
 ```
 
 - `Level` is exactly `unit`, `integration`, `e2e` or `ci`.
-- Only when no test can prove an AC (for example Terraform validated in CI), the level is `ci` and the AC adds `- **Verified by:** <command or CI job>`. Any other AC with a `Verified by` line fails the check.
-- A heading that starts like an AC ID but is not exactly `### PFX-ACnn` followed by a space or the end of the line (for example `### MOV-AC3`, `#### MOV-AC03` or `### MOV-AC03:`) fails the check, and so does an AC ID whose prefix is not the spec's `ID prefix`.
+- Only when no test can prove an AC (for example Terraform validated in CI), the level is `ci` and the AC adds `- **Verified by:** <CI job and the npm run script its step runs>`. Any other AC with a `Verified by` line fails the check. The line must name at least one `npm run <script>`, and every script it names must be in `package.json` and run by a step of `.github/workflows/ci.yml` that can fail the build: a `run:` command, comments excluded, not ending in `|| true` or `|| :`, in a step and a job without `continue-on-error` (other than `false`) or `if: false`. Until all of that holds, the AC is not covered.
+- An AC heading may be indented by up to three spaces, as any Markdown heading. A heading that starts like an AC ID, in any case and at any indent, but is not exactly `### PFX-ACnn` followed by a space or the end of the line (for example `### MOV-AC3`, `#### MOV-AC03`, `### MOV-AC03:`, `### mov-ac03` or a heading indented by four spaces) fails the check, and so does an AC ID whose prefix is not the spec's `ID prefix`.
 - Headings inside fenced code blocks are examples, not ACs. A fence closes only with the same character (backtick or tilde) repeated at least as many times.
 
 ## Tests name the AC they prove
@@ -84,12 +84,12 @@ npm run trace -- --write               # also write docs/traceability.md
 
 The check prints every AC with its spec, status, level, coverage and proof (test files, or the `Verified by` command). An AC is **required** when its spec is `Implemented` or a ticked task in any `specs/*/tasks.md` names it. A task is a `- [ ]` or `- [x]` line, and it names its AC IDs on that line. Coverage is one of:
 
-| Coverage     | Meaning                                                                                      |
-| ------------ | -------------------------------------------------------------------------------------------- |
-| `covered`    | A passing test of its level names it, or, for level `ci`, it has a `Verified by` line.       |
-| `pending`    | Not proven, and not required yet.                                                            |
-| `missing`    | Required and not proven. Fails the check.                                                    |
-| `unverified` | The report of its level is absent, so that project was not run. Fails only with `--require`. |
+| Coverage     | Meaning                                                                                                                                                                                                                                |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `covered`    | A passing test of its level names it, or, for level `ci`, it has a `Verified by` line naming at least one `npm run <script>`, each a script in `package.json` and run by a step of `.github/workflows/ci.yml` that can fail the build. |
+| `pending`    | Not proven, and not required yet.                                                                                                                                                                                                      |
+| `missing`    | Required and not proven. Fails the check.                                                                                                                                                                                              |
+| `unverified` | The report of its level is absent, so that project was not run. Fails only with `--require`.                                                                                                                                           |
 
 The check exits with code 1 when:
 
@@ -109,7 +109,9 @@ Tick a task in `tasks.md` as soon as it is done, so its ACs are enforced from th
 
 Keep this table up to date whenever a spec is added or its status changes.
 
-| #   | Spec                             | Prefix | Status |
-| --- | -------------------------------- | ------ | ------ |
-| 000 | [overview](000-overview/spec.md) | SYS    | Draft  |
-| 001 | [accounts](001-accounts/spec.md) | ACC    | Draft  |
+| #   | Spec                                           | Prefix | Status |
+| --- | ---------------------------------------------- | ------ | ------ |
+| 000 | [overview](000-overview/spec.md)               | SYS    | Draft  |
+| 001 | [accounts](001-accounts/spec.md)               | ACC    | Draft  |
+| 002 | [ledger](002-ledger/spec.md)                   | LED    | Draft  |
+| 003 | [money movements](003-money-movements/spec.md) | MOV    | Draft  |

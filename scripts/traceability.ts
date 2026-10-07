@@ -14,11 +14,13 @@ const OUTPUT_FILE = 'docs/traceability.md';
 const SPEC_FOLDER = /^\d{3}-/;
 
 const AC_ID = /\b[A-Z][A-Z0-9]*-AC\d{2}\b/g;
-const AC_HEADING = /^###\s+([A-Z][A-Z0-9]*-AC\d{2})(?=\s|$)/;
-// Any heading that starts like an AC ID, so a mistyped one is reported instead of dropped.
-const AC_LIKE_HEADING = /^#{1,6}\s*[A-Z][A-Z0-9]*-AC\d/;
+// A Markdown heading may be indented by up to three spaces.
+const AC_HEADING = /^ {0,3}###\s+([A-Z][A-Z0-9]*-AC\d{2})(?=\s|$)/;
+// Anything that starts like an AC heading, in any case and at any indent, so a mistyped one is
+// reported instead of dropped.
+const AC_LIKE_HEADING = /^\s*#{1,6}\s*[a-z][a-z0-9]*-ac\d/i;
 // An AC block ends at the next heading of level 1 to 3.
-const BLOCK_END = /^#{1,3}\s/;
+const BLOCK_END = /^ {0,3}#{1,3}\s/;
 // CommonMark fences: up to three spaces of indent, then three or more backticks or tildes.
 const FENCE_LINE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 const STATUS_LINE = /^-\s+\*\*Status:\*\*(.*)$/;
@@ -28,6 +30,21 @@ const VERIFIED_BY_LINE = /^-\s+\*\*Verified by:\*\*(.*)$/;
 // Tasks are "- [ ]" or "- [x]" lines; any other list item holding a checkbox is a problem.
 const TASK_LINE = /^\s*- \[( |x)\](?:\s|$)/;
 const CHECKBOX_LINE = /^\s*(?:[-*+]|\d+[.)])\s*\[[^\]]?\]/;
+
+const PACKAGE_FILE = 'package.json';
+const CI_WORKFLOW = '.github/workflows/ci.yml';
+// "npm run <script>"; a trailing full stop of the surrounding sentence is not part of the name.
+const NPM_RUN = /\bnpm run ([\w:-]+(?:\.[\w:-]+)*)/g;
+// A "key: value" line of a workflow, as "key: ..." or "- key: ...".
+const WORKFLOW_KEY = /^( *)(- +)?([\w-]+):(?:\s(.*)|$)/;
+// A command whose failure is ignored, so it can never fail the build.
+const CANNOT_FAIL = /\|\|\s*(?:true|:)$/;
+// A block scalar header such as "|", ">" or "|-": the command is on the more indented lines below.
+const BLOCK_SCALAR = /^[|>][+-]?\d*$/;
+// A comment: "#" at the start or after whitespace, to the end of the line.
+const COMMENT = /(?:^|\s)#.*$/;
+
+const PackageJson = z.object({ scripts: z.record(z.string(), z.string()).optional() });
 
 /** The parts of a Vitest JSON report the gate reads. */
 const VitestReport = z.object({
@@ -73,7 +90,8 @@ export interface TestResult {
 }
 
 /**
- * covered: proven by a passing test of the AC's level, or a Verified by line for level ci.
+ * covered: proven by a passing test of the AC's level or, for level ci, by a Verified by line
+ * whose every "npm run <script>" is a script in package.json and a step of the CI workflow.
  * pending: not proven and not required yet. missing: required and not proven.
  * unverified: the report of the AC's project is absent, so its project was not run.
  */
@@ -88,6 +106,11 @@ export interface AcRow extends AcDefinition {
   tests: string[];
   /** Tests in any report that name this AC and did not pass: skipped, todo or failed. */
   notPassed: { fullName: string; status: string; file: string }[];
+  /**
+   * Level ci only: why its Verified by line does not prove it, one entry per "npm run <script>"
+   * that is not a script in package.json or not run by a step of the CI workflow.
+   */
+  ciGaps: string[];
 }
 
 export interface TraceReport {
@@ -330,10 +353,160 @@ export function loadReports(root: string): {
   return { results, found, problems };
 }
 
+/** One "key: value" line of a workflow, with the lines of its block scalar if it has one. */
+interface WorkflowEntry {
+  /** Column of the key; for "- key: value" the column after the dash. */
+  column: number;
+  /** True for the first key of a list item ("- key: value"). */
+  itemStart: boolean;
+  key: string;
+  value: string;
+  block: string[];
+}
+
+function parseWorkflow(content: string): WorkflowEntry[] {
+  const entries: WorkflowEntry[] = [];
+  const lines = content.split(/\r?\n/);
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = WORKFLOW_KEY.exec(lines[index] ?? '');
+    if (match === null) continue;
+    const [, indent = '', dash = '', key = '', rest = ''] = match;
+    const column = indent.length + dash.length;
+    const value = rest.replace(COMMENT, '').trim();
+    const block: string[] = [];
+    if (BLOCK_SCALAR.test(value)) {
+      // The block ends at the first non-blank line that is not indented past the key.
+      while (index + 1 < lines.length) {
+        const next = lines[index + 1] ?? '';
+        if (next.trim() !== '' && next.length - next.trimStart().length <= column) break;
+        index += 1;
+        block.push(next);
+      }
+    }
+    entries.push({ column, itemStart: dash !== '', key, value, block });
+  }
+  return entries;
+}
+
+/** The keys of the mapping that holds entries[index], and the index of the mapping's parent. */
+function mappingOf(
+  entries: WorkflowEntry[],
+  index: number,
+): { keys: Map<string, string>; parent: number | undefined } {
+  const column = entries[index]?.column ?? 0;
+  const keys = new Map<string, string>();
+  let first = index;
+  for (let at = index; at >= 0; at -= 1) {
+    const entry = entries[at];
+    if (entry === undefined || entry.column < column) break;
+    if (entry.column > column) continue;
+    keys.set(entry.key, entry.value);
+    first = at;
+    if (entry.itemStart) break;
+  }
+  for (let at = index + 1; at < entries.length; at += 1) {
+    const entry = entries[at];
+    if (entry === undefined || entry.column < column) break;
+    if (entry.column > column) continue;
+    if (entry.itemStart) break;
+    keys.set(entry.key, entry.value);
+  }
+  for (let at = first - 1; at >= 0; at -= 1) {
+    if ((entries[at]?.column ?? 0) < column) return { keys, parent: at };
+  }
+  return { keys, parent: undefined };
+}
+
+function isFalse(value: string | undefined): boolean {
+  const bare = (value ?? '').replace(/^\$\{\{(.*)\}\}$/, '$1').replace(/^(['"])(.*)\1$/, '$2');
+  return bare.trim().toLowerCase() === 'false';
+}
+
+/**
+ * The commands of every "run:" step of a GitHub Actions workflow that can fail the build, one
+ * per line, without comments. A step is left out when it, or the job holding it, has
+ * "continue-on-error" set to anything but false or "if: false"; a command line ending in
+ * "|| true" or "|| :" is left out too.
+ */
+export function workflowCommands(content: string): string[] {
+  const entries = parseWorkflow(content);
+  const commands: string[] = [];
+  entries.forEach((entry, index) => {
+    if (entry.key !== 'run') return;
+    for (let at: number | undefined = index; at !== undefined;) {
+      const { keys, parent } = mappingOf(entries, at);
+      const continueOnError = keys.get('continue-on-error');
+      if ((continueOnError !== undefined && !isFalse(continueOnError)) || isFalse(keys.get('if'))) {
+        return;
+      }
+      at = parent;
+    }
+    const lines = entry.block.length > 0 ? entry.block : [entry.value];
+    for (const line of lines) {
+      const command = line.replace(COMMENT, '').trim();
+      if (command !== '' && !CANNOT_FAIL.test(command)) commands.push(command);
+    }
+  });
+  return commands;
+}
+
+/** The script names of every "npm run <script>" in a text. */
+export function npmRunScripts(text: string): string[] {
+  return [...new Set([...text.matchAll(NPM_RUN)].map(([, name]) => name ?? ''))];
+}
+
+/** Scripts defined in package.json, and scripts that a step of the CI workflow runs. */
+export function loadCiContext(root: string): {
+  packageScripts: Set<string>;
+  workflowScripts: Set<string>;
+  problems: string[];
+} {
+  const problems: string[] = [];
+  let packageScripts = new Set<string>();
+  const packagePath = join(root, PACKAGE_FILE);
+  if (existsSync(packagePath)) {
+    try {
+      const parsed = PackageJson.parse(JSON.parse(readFileSync(packagePath, 'utf8')));
+      packageScripts = new Set(Object.keys(parsed.scripts ?? {}));
+    } catch {
+      problems.push(`${PACKAGE_FILE} is not valid JSON with a "scripts" object`);
+    }
+  }
+  const workflowPath = join(root, CI_WORKFLOW);
+  const workflowScripts = new Set(
+    existsSync(workflowPath)
+      ? workflowCommands(readFileSync(workflowPath, 'utf8')).flatMap(npmRunScripts)
+      : [],
+  );
+  return { packageScripts, workflowScripts, problems };
+}
+
+/**
+ * Why a ci AC's Verified by line does not prove it; empty when it names at least one
+ * "npm run <script>" and every one it names is a script in package.json and run by a CI step.
+ */
+export function ciGapsOf(
+  verifiedBy: string,
+  context: Pick<ReturnType<typeof loadCiContext>, 'packageScripts' | 'workflowScripts'>,
+): string[] {
+  const names = npmRunScripts(verifiedBy);
+  if (names.length === 0) return [`it names no npm run script that a step of ${CI_WORKFLOW} runs`];
+  return names.flatMap((name) => [
+    ...(context.packageScripts.has(name)
+      ? []
+      : [`npm run ${name} is not a script in ${PACKAGE_FILE}`]),
+    ...(context.workflowScripts.has(name)
+      ? []
+      : [`npm run ${name} is not run by a step of ${CI_WORKFLOW} that can fail the build`]),
+  ]);
+}
+
 export function buildReport(root: string): TraceReport {
   const { specs, tasks, problems } = loadSpecs(root);
   const reports = loadReports(root);
   problems.push(...reports.problems);
+  const ciContext = loadCiContext(root);
+  problems.push(...ciContext.problems);
 
   const levelOf = new Map<string, string | undefined>();
   const definedIn = new Map<string, string>();
@@ -384,9 +557,12 @@ export function buildReport(root: string): TraceReport {
       const ticked = [...(tickedIn.get(ac.id) ?? [])].sort();
       const required = spec.status === 'Implemented' || ticked.length > 0;
       const level = ac.level ?? '';
+      const ciGaps =
+        isCiLevel(ac) && ac.verifiedBy !== undefined ? ciGapsOf(ac.verifiedBy, ciContext) : [];
       let coverage: Coverage;
       if (isCiLevel(ac)) {
-        coverage = ac.verifiedBy !== undefined ? 'covered' : required ? 'missing' : 'pending';
+        const proven = ac.verifiedBy !== undefined && ciGaps.length === 0;
+        coverage = proven ? 'covered' : required ? 'missing' : 'pending';
       } else if (isProject(level) && !reports.found.includes(level)) {
         coverage = 'unverified';
       } else {
@@ -399,6 +575,7 @@ export function buildReport(root: string): TraceReport {
         coverage,
         tests,
         notPassed: notPassed.get(ac.id) ?? [],
+        ciGaps,
       };
     }),
   );
@@ -426,7 +603,9 @@ export function listFailures(report: TraceReport, required: readonly Project[] =
     .filter((row) => row.coverage === 'missing')
     .map((row) =>
       isCiLevel(row)
-        ? `${row.id} (specs/${row.spec}, ${reasonOf(row)}, level ci) has no "- **Verified by:**" line`
+        ? row.ciGaps.length > 0
+          ? `${row.id} (specs/${row.spec}, ${reasonOf(row)}, level ci) is not proven by its Verified by line: ${row.ciGaps.join('; ')}`
+          : `${row.id} (specs/${row.spec}, ${reasonOf(row)}, level ci) has no "- **Verified by:**" line`
         : `${row.id} (specs/${row.spec}, ${reasonOf(row)}) has no passing ${row.level ?? '?'} test whose name contains its ID`,
     );
   const notPassed = report.rows
@@ -448,7 +627,10 @@ function cell(value: string): string {
 }
 
 function proofOf(row: AcRow): string {
-  if (isCiLevel(row)) return `Verified by: ${row.verifiedBy ?? '-'}`;
+  if (isCiLevel(row)) {
+    const gaps = row.ciGaps.length > 0 ? ` (${row.ciGaps.join('; ')})` : '';
+    return `Verified by: ${row.verifiedBy ?? '-'}${gaps}`;
+  }
   if (row.coverage === 'unverified') return `not run (${reportPath(row.level as Project)} missing)`;
   return row.tests.length > 0 ? row.tests.join(', ') : '-';
 }

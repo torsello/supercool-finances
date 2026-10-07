@@ -43,3 +43,11 @@
 ### ZZI-AC09 · valid, after a tilde fence that holds backticks
 
 - **Level:** unit
+
+  ### ZZI-AC10 · indented by two spaces, still a heading
+
+- **Level:** unit
+
+### zzi-ac11 · lowercase
+
+    ### ZZI-AC12 · indented by four spaces, a code block

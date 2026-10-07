@@ -1,0 +1,24 @@
+name: CI
+on: push
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      # - run: npm run zz-commented
+      - run: echo hi # npm run zz-commented
+      - run: |
+          # npm run zz-commented
+          npm run zz-step-only
+          npm run zz-or-true || true
+      - name: Allowed to fail
+        continue-on-error: true
+        run: npm run zz-continue
+      - run: npm run zz-if-false
+        if: ${{ false }}
+    env:
+      NOTE: npm run zz-commented is not a step
+  optional:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - run: npm run zz-job-off

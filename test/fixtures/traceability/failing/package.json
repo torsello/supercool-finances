@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "scripts": {
+    "zz-commented": "true",
+    "zz-or-true": "true",
+    "zz-continue": "true",
+    "zz-if-false": "true",
+    "zz-job-off": "true"
+  }
+}

@@ -1,0 +1,20 @@
+name: CI
+on: push
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    continue-on-error: false
+    steps:
+      - name: Prepare
+        run: |
+          echo preparing
+          DATABASE_URL=postgres://localhost/zz npm run zz:prepare
+      - run: npm run zz-check # the check
+        continue-on-error: false
+  terraform:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate
+        if: ${{ success() }}
+        run: npm run zz-terraform-validate

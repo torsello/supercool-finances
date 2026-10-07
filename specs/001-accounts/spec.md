@@ -3,11 +3,11 @@
 - **Status:** Draft
 - **ID prefix:** ACC
 - **Related ADRs:** none yet (phase 03-adrs)
-- **Depends on specs:** 000-overview, 002-ledger, 003-movements, 005-idempotency
+- **Depends on specs:** 000-overview, 002-ledger, 003-money-movements, 004-reversals, 005-idempotency
 
 ## 1. Context and goal
 
-Customer accounts hold customers' money. This spec covers how a customer creates and reads accounts, how operators read them and move them through their lifecycle (active, frozen, closed), how the status of an account limits the movements on it, and how the history of an account is read. The movements themselves are defined in the movements spec; this spec defines only the effect of an account's status on them.
+Customer accounts hold customers' money. This spec covers how a customer creates and reads accounts, how operators read them and move them through their lifecycle (active, frozen, closed), how the status of an account limits the movements on it, and how the history of an account is read. Deposits, withdrawals and transfers are defined in spec 003 and reversals in spec 004; this spec defines only the effect of an account's status on them.
 
 Terms (account, customer account, system account, balance, ledger entry, problem details) have the meanings in the glossary of spec 000. Requirements marked with a question number, for example "(Q3)", follow the recommended answer of that open question until the owner decides; "(000 Q10)" refers to an open question of spec 000.
 
@@ -81,7 +81,7 @@ Operators also see `ownerId`, the id of the owning customer (Q10).
 | ACC-R06 | IF an operator requests to create an account THEN THE SYSTEM SHALL answer 403 with problem type `/problems/forbidden` and create no account (Q1).                                                                                                                                                                                     |
 | ACC-R07 | WHEN a customer reads one of their own accounts THE SYSTEM SHALL answer 200 with the representation of section 1.3.                                                                                                                                                                                                                   |
 | ACC-R08 | WHEN a customer lists their accounts THE SYSTEM SHALL return only the customer accounts they own, in every status, newest first by (`createdAt`, `id`), one page at a time with an opaque cursor for the next page (Q3).                                                                                                              |
-| ACC-R09 | IF a customer reads, or lists the history of, an account that does not exist, is owned by another customer or is a system account, THEN THE SYSTEM SHALL answer 404 with problem type `/problems/not-found`, with bodies that differ only in `requestId`, and never 403.                                                              |
+| ACC-R09 | IF a customer reads, or lists the history of, an account that does not exist, is owned by another customer, is a system account, or whose id in the path is not a UUID (SYS-R42), THEN THE SYSTEM SHALL answer 404 with problem type `/problems/not-found`, with bodies that differ only in `requestId`, and never 403.               |
 | ACC-R10 | WHEN an operator reads any customer account, or lists its history, THE SYSTEM SHALL answer 200 with the same representation a customer gets, plus `ownerId` (Q10).                                                                                                                                                                    |
 | ACC-R11 | WHEN an operator freezes an `active` account THE SYSTEM SHALL set its status to `frozen`.                                                                                                                                                                                                                                             |
 | ACC-R12 | WHEN an operator unfreezes a `frozen` account THE SYSTEM SHALL set its status to `active`.                                                                                                                                                                                                                                            |
@@ -100,6 +100,8 @@ Operators also see `ownerId`, the id of the owning customer (Q10).
 | ACC-R25 | THE SYSTEM SHALL never return a system account, or an entry of a system account, through a customer endpoint.                                                                                                                                                                                                                         |
 | ACC-R26 | WHEN an operator changes the status of an account THE SYSTEM SHALL write, in the same database transaction, one audit record with the operator, their role, the account id, the old and new status, the correlation id and the time (000 Q10). A status request that changes nothing (ACC-R15) writes no audit record.                |
 | ACC-R27 | IF an operator lists accounts (`GET /accounts`) THEN THE SYSTEM SHALL answer 403 with problem type `/problems/forbidden` (Q10).                                                                                                                                                                                                       |
+| ACC-R28 | WHEN an operator freezes, unfreezes or closes an account THE SYSTEM SHALL wait for that account's row lock at most `ACCOUNT_LOCK_TIMEOUT_MS` (spec 003).                                                                                                                                                                              |
+| ACC-R29 | IF the row lock of a freeze, unfreeze or close is not acquired within `ACCOUNT_LOCK_TIMEOUT_MS` THEN THE SYSTEM SHALL answer 503 with problem type `/problems/service-unavailable` and the header `Retry-After: 1`, and leave the account unchanged with no audit record.                                                             |
 
 ## 3. Acceptance criteria
 
@@ -174,8 +176,8 @@ Unless stated otherwise: customer user C1 owns account A1 (EUR), customer user C
 - **Level:** integration
 - **Covers:** ACC-R09
 - **Given** C1 owns A1, C2 owns B1, and U is an account id that does not exist
-- **When** C1 reads B1 and U, and lists the history of B1 and U
-- **Then** all four answer 404 with type `/problems/not-found`, and the two reads, like the two history lists, have bodies that differ only in `requestId`
+- **When** C1 reads B1, U and the account "not-a-uuid", and lists the history of B1, U and "not-a-uuid"
+- **Then** all six answer 404 with type `/problems/not-found`, and the three reads, like the three history lists, have bodies that differ only in `requestId`
 
 ### ACC-AC10 · An operator reads any customer account
 
@@ -278,8 +280,8 @@ Unless stated otherwise: customer user C1 owns account A1 (EUR), customer user C
 - **Level:** integration
 - **Covers:** ACC-R25
 - **Given** C1 owns A1 with "1000" EUR after a deposit, so S holds the other entry of that deposit
-- **When** C1 lists their accounts, reads S, and lists the history of S; and O1 reads S
-- **Then** the list holds only A1; the read and the history of S answer 404 with type `/problems/not-found` for C1; and O1's read of S answers 404 too (SYS-R38)
+- **When** C1 lists their accounts, reads S, and lists the history of S; and O1 reads S and lists the history of S
+- **Then** the list holds only A1; the read and the history of S answer 404 with type `/problems/not-found` for C1; and O1's read and history of S answer 404 too (SYS-R38)
 
 ### ACC-AC23 · Every status change has an audit record
 
@@ -297,18 +299,27 @@ Unless stated otherwise: customer user C1 owns account A1 (EUR), customer user C
 - **When** O1 lists accounts
 - **Then** the answer is 403 with type `/problems/forbidden` and no account is returned
 
+### ACC-AC25 · A status change waits for the row lock at most the account lock timeout
+
+- **Level:** integration
+- **Covers:** ACC-R28, ACC-R29
+- **Given** the service started with `ACCOUNT_LOCK_TIMEOUT_MS` "200"; C1 owns A1, `active` with balance "0" EUR; and a separate database session that holds `SELECT ... FOR UPDATE` on A1's row
+- **When** O1 freezes A1 and then closes A1 while that session keeps its lock; then the session releases it and O1 freezes A1 again
+- **Then** the first freeze and the close each answer 503 with type `/problems/service-unavailable` and `Retry-After: 1`, in less than 1 second; A1 stays `active` with no audit record for either; and the last freeze answers 200 with A1 `frozen`
+
 ## 4. Error catalogue
 
 Errors shared by every capability (401, 403, 404, 400 malformed request, 422 validation error, 500, 503) are in spec 000. This spec adds:
 
-| Condition                                                                                      | HTTP | Problem type                        | Stored for idempotent replay                     |
-| ---------------------------------------------------------------------------------------------- | ---- | ----------------------------------- | ------------------------------------------------ |
-| Account creation with a missing, unsupported or malformed currency                             | 422  | /problems/validation-error          | no                                               |
-| A cursor that was altered, not issued by the service, or issued for another list or user       | 400  | /problems/malformed-request         | n/a: list requests take no Idempotency-Key       |
-| `limit` not an integer from 1 to 100                                                           | 422  | /problems/validation-error          | n/a: list requests take no Idempotency-Key       |
-| Freezing or unfreezing a `closed` account                                                      | 409  | /problems/invalid-status-transition | n/a: status changes take no Idempotency-Key (Q5) |
-| Closing an account whose balance is not "0"                                                    | 409  | /problems/account-balance-not-zero  | n/a: status changes take no Idempotency-Key (Q5) |
-| A deposit, withdrawal or transfer on the caller's side involves a `frozen` or `closed` account | 422  | /problems/account-not-active        | decided in spec 005 (000 Q7)                     |
+| Condition                                                                                                                        | HTTP | Problem type                        | Stored for idempotent replay                     |
+| -------------------------------------------------------------------------------------------------------------------------------- | ---- | ----------------------------------- | ------------------------------------------------ |
+| Account creation with a missing, unsupported or malformed currency                                                               | 422  | /problems/validation-error          | no                                               |
+| A cursor that was altered, not issued by the service, or issued for another list or user                                         | 400  | /problems/malformed-request         | n/a: list requests take no Idempotency-Key       |
+| `limit` not an integer from 1 to 100                                                                                             | 422  | /problems/validation-error          | n/a: list requests take no Idempotency-Key       |
+| Freezing or unfreezing a `closed` account                                                                                        | 409  | /problems/invalid-status-transition | n/a: status changes take no Idempotency-Key (Q5) |
+| A freeze, unfreeze or close does not get the account's row lock within `ACCOUNT_LOCK_TIMEOUT_MS`, answered with `Retry-After: 1` | 503  | /problems/service-unavailable       | n/a: status changes take no Idempotency-Key (Q5) |
+| Closing an account whose balance is not "0"                                                                                      | 409  | /problems/account-balance-not-zero  | n/a: status changes take no Idempotency-Key (Q5) |
+| A deposit, withdrawal or transfer on the caller's side involves a `frozen` or `closed` account                                   | 422  | /problems/account-not-active        | decided in spec 005 (000 Q7)                     |
 
 ## 5. Invariants
 
@@ -320,7 +331,7 @@ Errors shared by every capability (401, 403, 404, 400 malformed request, 422 val
 
 ## 6. Out of scope
 
-- Moving money: deposits, withdrawals, transfers and reversals are defined in the movements spec; this spec only fixes how an account's status limits them.
+- Moving money: deposits, withdrawals and transfers are defined in spec 003 and reversals in spec 004; this spec only fixes how an account's status limits them.
 - Reopening a closed account, and deleting accounts. A closed account stays readable for good.
 - Account names, nicknames or other customer-editable fields.
 - Operators listing or searching all accounts, and reading system accounts (Q10, Q11).
@@ -337,7 +348,7 @@ Errors shared by every capability (401, 403, 404, 400 malformed request, 422 val
 | Q4  | How is a cursor made opaque and tamper-evident?                                                                                    | Decided: base64url of a small payload (which list, the id of the user it was issued to, the account id for a history, `createdAt` at its stored precision, microseconds, and `id`) followed by an HMAC-SHA256 tag keyed with `CURSOR_SECRET`. That secret is separate from `JWT_SECRET`, so that one key never serves two purposes, and shared by all replicas, so any replica accepts any cursor. A cursor presented by another user, on another list, altered, or that fails to decode answers 400. | owner, 2026-10-07 |
 | Q5  | What does a status change answer when the account already has the requested status, and do status changes take an Idempotency-Key? | 200 with the account unchanged, so an operator can retry safely; for the same reason status changes take no Idempotency-Key, and one sent anyway is ignored (SYS-R39). Only freezing or unfreezing a `closed` account is a 409.                                                                                                                                                                                                                                                                       | pending           |
 | Q6  | Which status applies when a status change conflicts with the account's state?                                                      | Decided: one rule for every spec, written in section 1 of spec 000. 409 when the request conflicts with the current state of the resource it acts on (closing an account that holds money, changing the status of a closed account); 422 for a money movement refused by a business rule, including a movement on a frozen or closed account.                                                                                                                                                         | owner, 2026-10-07 |
-| Q7  | Which movements does a non-active status block, and what about reversals?                                                          | Deposits, withdrawals and transfers are blocked on either side for `frozen` and `closed` accounts. A reversal is allowed on a `frozen` account, because an operator may freeze an account in order to correct it, and rejected with 422 `/problems/account-not-active` on a `closed` one. Defined with the reversal in the movements spec.                                                                                                                                                            | pending           |
+| Q7  | Which movements does a non-active status block, and what about reversals?                                                          | Deposits, withdrawals and transfers are blocked on either side for `frozen` and `closed` accounts. A reversal is allowed on a `frozen` account, because an operator may freeze an account in order to correct it, and rejected with 422 `/problems/account-not-active` on a `closed` one. Defined with the reversal in spec 004.                                                                                                                                                                      | pending           |
 | Q8  | When a customer transfers to another customer's `frozen` or `closed` account, does the answer reveal that status?                  | Decided: no. A destination that does not exist, is a system account, or is another customer's frozen or closed account gets one 422 with an identical body (SYS-R41, type defined in spec 003), so a sender learns nothing about another customer's account.                                                                                                                                                                                                                                          | owner, 2026-10-07 |
 | Q9  | What does a history entry show?                                                                                                    | The fields of section 1.4, with a signed `amount` string (spec 000 Q11). No counterparty account and no running balance in this version, so a history never exposes another customer's account id.                                                                                                                                                                                                                                                                                                    | pending           |
 | Q10 | What can an operator read?                                                                                                         | Any customer account and its history, with `ownerId` added. Operators do not list accounts (`GET /accounts` by an operator answers 403); they look accounts up by id.                                                                                                                                                                                                                                                                                                                                 | pending           |
