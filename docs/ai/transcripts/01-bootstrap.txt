@@ -3048,3 +3048,116 @@
     close phase 01 ….
 
 ✻ Brewed for 29s · done 4:11 PM
+
+❯ /export docs/ai/transcripts/01-bootstrap.txt                                  
+  ⎿  Conversation exported to: /Users/matiastorsello/supercool-finances/docs/ai/
+     transcripts/01-bootstrap.txt
+
+❯ /ship close phase 01: bootstrap toolchain, walking skeleton and CI            
+
+⏺ Bash(npm run check)
+  ⎿  > supercool-finances@0.1.0 check
+     > npm run typecheck && npm run lint && npm run format:check && npm run
+      test
+     … +27 lines (ctrl+o to expand)
+  ⎿  (timeout 5m)
+
+⏺ Bash(npm run infra:up)
+  ⎿  > supercool-finances@0.1.0 infra:up
+     > docker compose up -d --wait postgres redis
+     … +6 lines (ctrl+o to expand)
+
+⏺ Bash(npm run test:integration)
+  ⎿  > supercool-finances@0.1.0 test:integration
+     > vitest run --project integration
+     … +8 lines (ctrl+o to expand)
+
+⏺ Bash(npm run trace --if-present)
+  ⎿  (No output)
+
+⏺ Gates pass. Step 3: the transcript exists, so I need to check that
+  docs/ai/README.md has a row for it.
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ There's no row for 01-bootstrap.txt. Step 3 requires one, so I'm adding it.
+  It's a docs-only table row, not code, and the transcript itself isn't touched.
+
+⏺ Update(docs/ai/README.md)
+  ⎿  Added 1 line
+      20  |---|---|---|---|
+      21  | pre | 2026-10-07 | [00-planning.md](00-planning.md) | Summary
+           of the planning chat before the repository: risks, key decisio
+          ns and dry runs of the setup prompts. |
+      22  | 00 | 2026-10-07 | [00-setup.txt](transcripts/00-setup.txt) | 
+          Repository setup: problem statement, AGENTS.md, CLAUDE.md, Clau
+          de Code permissions, the spec, adr, audit and ship skills, and 
+          this log. |
+      23 +| 01 | 2026-10-07 | [01-bootstrap.txt](transcripts/01-bootstrap
+         +.txt) | Bootstrap: Node 24 and strict TypeScript toolchain, Fas
+         +tify walking skeleton, Postgres and Redis in Docker Compose, en
+         +v:sync, GitHub Actions CI with a secret scan, the phase branch 
+         +and pull request workflow, and four audit rounds. |            
+
+⏺ Bash(npm run format:check)
+  ⎿  > supercool-finances@0.1.0 format:check
+     > prettier --check .
+     … +2 lines (ctrl+o to expand)
+
+⏺ Bash(git add -A)
+  ⎿  (No output)
+
+⏺ Bash(git status --short)
+  ⎿  M  docs/ai/README.md
+     A  docs/ai/transcripts/01-bootstrap.txt
+
+⏺ Only the transcript and its log row are staged. Committing:
+
+⏺ Bash(git commit -m "docs: add phase 01 transcript and AI log row" -m "Exported
+      session transcript for 01-bootstrap and its row in docs/ai/README.md,
+      closing the phas…)
+  ⎿  [phase/01-bootstrap d3d6b68] docs: add phase 01 transcript and AI log
+     row
+      2 files changed, 3051 insertions(+)
+      create mode 100644 docs/ai/transcripts/01-bootstrap.txt
+
+⏺ Bash(gitleaks git --no-banner --redact --log-opts="origin/main..HEAD")  ⎿  4:12PM INF 4 commits scanned.
+     4:12PM INF scanned ~404714 bytes (404.71 KB) in 179ms
+     4:12PM INF no leaks found
+
+⏺ Bash(git push -u origin HEAD)
+  ⎿  To https://github.com/torsello/supercool-finances.git
+        1098ded..d3d6b68  HEAD -> phase/01-bootstrap
+     branch 'phase/01-bootstrap' set up to track 'origin/phase/01-bootstrap
+     '.
+
+⏺ Pushed. Step 8: check whether a pull request already exists.
+
+⏺ Bash(gh pr view)
+  ⎿  Error: Exit code 1
+     no pull requests found for branch "phase/01-bootstrap"
+
+⏺ Bash(gh pr create --base main --title "Phase 01-bootstrap: toolchain, walking
+      skeleton and CI" --body-file - <<'EOF'
+      ## What the phase delivered…)
+  ⎿  https://github.com/torsello/supercool-finances/pull/1
+
+⏺ Pull request opened: https://github.com/torsello/supercool-finances/pull/1
+
+  - Commit: d3d6b68 (docs: add phase 01 transcript and AI log row), pushed to
+    origin/phase/01-bootstrap.
+  - Gates: npm run check (10 unit tests) and npm run test:integration (3 tests)
+    pass. npm run trace was skipped because the script doesn't exist until
+    phase 02. gitleaks found no leaks in the 4 commits scanned.
+  - AC IDs: none; no specs yet.
+  - Added beyond the commit message: docs/ai/README.md had no row for
+    01-bootstrap.txt, so I added one. Step 3 requires it.
+  - Error in the pull request: the body calls the last /audit "the fifth review
+    round". It was the fourth. The verdict quoted, "ready to ship", is correct.
+    I didn't fix it because /ship can't edit pull requests (gh pr edit isn't in
+    its allowed tools). You can change that sentence on GitHub, or I can do it
+    from the main conversation.
+  - Not merged. Wait for CI to go green, then merge with a merge commit. This
+    will be the first CI run, including on the new secret-scan job.
+
+✻ Crunched for 54s · done 4:12 PM
