@@ -66,11 +66,13 @@ export function syncEnv(
 
   if (created) {
     writeFileSync(envPath, lines.length > 0 ? `${lines.join('\n')}\n` : '', { mode: 0o600 });
-  } else if (lines.length > 0) {
-    // Restrict the file before appending, so new secrets are never readable by other users.
+  } else {
+    // Restrict the file on every run, and before appending, so secrets are never readable by others.
     chmodSync(envPath, 0o600);
-    const separator = current.length > 0 && !current.endsWith('\n') ? '\n' : '';
-    appendFileSync(envPath, `${separator}${lines.join('\n')}\n`);
+    if (lines.length > 0) {
+      const separator = current.length > 0 && !current.endsWith('\n') ? '\n' : '';
+      appendFileSync(envPath, `${separator}${lines.join('\n')}\n`);
+    }
   }
 
   return { created, added, placeholders };

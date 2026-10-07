@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -76,6 +76,16 @@ describe('env:sync', () => {
     const before = readFileSync(envPath, 'utf8');
 
     expect(syncEnv(examplePath, envPath)).toEqual({ created: false, added: [], placeholders: [] });
+    expect(readFileSync(envPath, 'utf8')).toBe(before);
+  });
+
+  it('restricts an existing .env to 0600 even when it already has every key', () => {
+    syncEnv(examplePath, envPath, () => 'generated');
+    chmodSync(envPath, 0o644);
+    const before = readFileSync(envPath, 'utf8');
+
+    expect(syncEnv(examplePath, envPath).added).toEqual([]);
+    expect(statSync(envPath).mode & 0o777).toBe(0o600);
     expect(readFileSync(envPath, 'utf8')).toBe(before);
   });
 
