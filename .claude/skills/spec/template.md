@@ -45,6 +45,6 @@ What this capability is for, who uses it, and what problem it solves. One or two
 
 ## 7. Open questions
 
-| Question | Recommended answer | Decided by |
-|---|---|---|
-| <question> | <recommendation> | <owner / pending> |
+| # | Question | Recommended answer | Decided by |
+|---|---|---|---|
+| Q1 | <question> | <recommendation> | <owner, date / pending> |

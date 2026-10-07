@@ -17,11 +17,11 @@ specs/
 
 ## Status
 
-| Status        | Meaning                                                                  | Effect on `npm run trace`                      |
-| ------------- | ------------------------------------------------------------------------ | ---------------------------------------------- |
-| `Draft`       | Being written. Requirements and ACs may still change.                    | ACs without proof are reported as `pending`.   |
-| `Approved`    | Accepted by the owner. Changing requirements or ACs needs the owner.     | ACs without proof are reported as `pending`.   |
-| `Implemented` | Built and proven. All specs move here together in phase 13-final-review. | Any AC without proof fails the check (exit 1). |
+| Status        | Meaning                                                                  | Effect on `npm run trace`                                                                                                                                                  |
+| ------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Draft`       | Being written. Requirements and ACs may still change.                    | ACs without proof are `pending`, except those named by a ticked task, which must be proven.                                                                                |
+| `Approved`    | Accepted by the owner. Changing requirements or ACs needs the owner.     | Same as `Draft`.                                                                                                                                                           |
+| `Implemented` | Built and proven. All specs move here together in phase 13-final-review. | Every AC must be proven, or the check fails (exit 1). An AC whose project report is absent is `unverified` and fails only when `--require` names that project (see below). |
 
 The status is the line `- **Status:** <value>` near the top of `spec.md`, with exactly one of the three values.
 
@@ -55,7 +55,7 @@ Use the `spec` skill (`/spec NNN-name PFX`). It follows [the template](../.claud
 
 - `Level` is exactly `unit`, `integration`, `e2e` or `ci`.
 - Only when no test can prove an AC (for example Terraform validated in CI), the level is `ci` and the AC adds `- **Verified by:** <command or CI job>`. Any other AC with a `Verified by` line fails the check.
-- A heading that starts like an AC ID but is not exactly `### PFX-ACnn` followed by a space (for example `### MOV-AC3`, `#### MOV-AC03` or `### MOV-AC03:`) fails the check, and so does an AC ID whose prefix is not the spec's `ID prefix`.
+- A heading that starts like an AC ID but is not exactly `### PFX-ACnn` followed by a space or the end of the line (for example `### MOV-AC3`, `#### MOV-AC03` or `### MOV-AC03:`) fails the check, and so does an AC ID whose prefix is not the spec's `ID prefix`.
 - Headings inside fenced code blocks are examples, not ACs. A fence closes only with the same character (backtick or tilde) repeated at least as many times.
 
 ## Tests name the AC they prove
@@ -70,7 +70,7 @@ Proof comes from what Vitest actually ran, never from the test source. `npm test
 
 - An AC is covered only by a test that **passed**, whose full name (its `describe` titles plus its own title) contains the AC ID, in the report of the project that matches the AC's `Level`. A unit test never proves an integration AC.
 - Skipped, todo and failed tests prove nothing, and neither does a test that never ran. A table-driven test counts through each generated case, for example `it.each(cases)('MOV-AC07 rejects %s', ...)`.
-- A test marked `fails`, in any syntax, fails at runtime (`test/setup/forbid-fails.ts`), because Vitest would report it as passed when its body fails.
+- Two guards in every Vitest project (`vitest.shared.ts`) keep a passing test meaningful: a test marked `fails`, in any syntax, fails at runtime (`test/setup/forbid-fails.ts`), because Vitest would report it as passed when its body fails; and a test that makes no assertion fails (`expect.requireAssertions`).
 - An ID that no spec defines fails the check wherever it appears in a test name, whatever the test's status.
 
 ## Traceability check

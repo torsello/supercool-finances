@@ -6,18 +6,18 @@ import { describe, expect, it } from 'vitest';
 
 const REPO_ROOT = resolve(import.meta.dirname, '../..');
 const VITEST = join(REPO_ROOT, 'node_modules/vitest/vitest.mjs');
-const CONFIG = join(REPO_ROOT, 'test/fixtures/forbid-fails/vitest.config.ts');
+const CONFIG = join(REPO_ROOT, 'test/fixtures/test-guards/vitest.config.ts');
 
 interface Report {
   testResults: { assertionResults: { fullName: string; status: string }[] }[];
 }
 
-describe('forbid-fails setup file', () => {
+describe('test guards', () => {
   it(
     'fails every test marked fails, whatever the syntax, and leaves other tests alone',
     { timeout: 30_000 },
     () => {
-      const dir = mkdtempSync(join(tmpdir(), 'forbid-fails-'));
+      const dir = mkdtempSync(join(tmpdir(), 'test-guards-'));
       try {
         const output = join(dir, 'report.json');
         const result = spawnSync(
@@ -40,6 +40,8 @@ describe('forbid-fails setup file', () => {
           'extended test with fails': 'failed',
           'chained fails': 'failed',
           'an ordinary passing test': 'passed',
+          'a test without assertions': 'failed',
+          'an async test without assertions': 'failed',
         });
       } finally {
         rmSync(dir, { recursive: true, force: true });
