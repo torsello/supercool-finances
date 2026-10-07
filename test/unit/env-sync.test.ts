@@ -38,6 +38,7 @@ describe('env:sync', () => {
     expect(result).toEqual({
       created: true,
       added: ['NODE_ENV', 'DATABASE_URL', 'JWT_SECRET', 'REDIS_PASSWORD', 'API_KEY', 'ADMIN_TOKEN'],
+      placeholders: [],
     });
     expect(readFileSync(envPath, 'utf8')).toBe(
       [
@@ -62,7 +63,7 @@ describe('env:sync', () => {
 
     const result = syncEnv(examplePath, envPath, () => 'generated');
 
-    expect(result).toEqual({ created: false, added: ['DATABASE_URL'] });
+    expect(result).toEqual({ created: false, added: ['DATABASE_URL'], placeholders: [] });
     expect(readFileSync(envPath, 'utf8')).toBe(
       'NODE_ENV=production\nJWT_SECRET=keep-me\nREDIS_PASSWORD=keep\nAPI_KEY=keep\nADMIN_TOKEN=keep\n' +
         'DATABASE_URL=postgres://user:pass@localhost:5432/db?sslmode=disable\n',
@@ -74,8 +75,20 @@ describe('env:sync', () => {
     syncEnv(examplePath, envPath);
     const before = readFileSync(envPath, 'utf8');
 
-    expect(syncEnv(examplePath, envPath)).toEqual({ created: false, added: [] });
+    expect(syncEnv(examplePath, envPath)).toEqual({ created: false, added: [], placeholders: [] });
     expect(readFileSync(envPath, 'utf8')).toBe(before);
+  });
+
+  it('reports secret-like keys that still hold the example value, by name only', () => {
+    writeFileSync(
+      envPath,
+      'NODE_ENV=development\nJWT_SECRET=change-me\nREDIS_PASSWORD= change-me \nAPI_KEY=real\n',
+    );
+
+    const result = syncEnv(examplePath, envPath, () => 'generated');
+
+    expect(result.placeholders).toEqual(['JWT_SECRET', 'REDIS_PASSWORD']);
+    expect(result.added).toEqual(['DATABASE_URL', 'ADMIN_TOKEN']);
   });
 
   it('ignores commented-out keys in .env', () => {

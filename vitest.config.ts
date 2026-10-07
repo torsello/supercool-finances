@@ -3,8 +3,9 @@ import { defineConfig } from 'vitest/config';
 // Local runs read .env; CI passes real environment variables instead and has no .env file.
 try {
   process.loadEnvFile('.env');
-} catch {
-  // No .env file: rely on the environment.
+} catch (error) {
+  // Only a missing .env is expected; a malformed or unreadable one must surface.
+  if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
 }
 
 export default defineConfig({

@@ -17,7 +17,12 @@
     "ask": [
       "Bash(git push *)",
       "Bash(npm install *)",
-      "Bash(npm uninstall *)"
+      "Bash(npm uninstall *)",
+      "Bash(docker compose down -v*)",
+      "Bash(docker compose down * -v*)",
+      "Bash(docker compose down --volumes*)",
+      "Bash(docker compose down * --volumes*)",
+      "Bash(npm run infra:reset*)"
     ],
     "deny": [
       "Bash(git push --force*)",
