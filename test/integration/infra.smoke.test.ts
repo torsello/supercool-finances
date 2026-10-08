@@ -1,16 +1,7 @@
 import { Redis } from 'ioredis';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (value === undefined || value === '') {
-    throw new Error(
-      `${name} is not set. Run "npm run env:sync" and "npm run infra:up", or export ${name}.`,
-    );
-  }
-  return value;
-}
+import { requireEnv } from '../support/env.js';
 
 describe('local infrastructure', () => {
   let pool: pg.Pool | undefined;

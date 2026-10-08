@@ -12,6 +12,7 @@ Prerequisites: Node 24 (the version in `.nvmrc`, for example with `nvm use`) and
 npm ci
 npm run env:sync          # creates .env from .env.example, with random secrets
 npm run infra:up          # starts Postgres and Redis
+npm run migrate:up        # applies migrations/ to the dev database as the owner role scf_owner
 npm run check             # typecheck, lint, format check and unit tests
 npm run test:integration  # integration tests against Postgres and Redis
 npm run trace             # every acceptance criterion in specs/ with the test that proves it

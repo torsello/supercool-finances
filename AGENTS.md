@@ -102,6 +102,7 @@ docs/runbooks/                operational runbooks
 docs/ai/                      AI usage log and transcripts
 migrations/                   SQL migrations
 test/unit, test/integration, test/e2e
+test/support/                 shared test helpers: databases, row-lock sessions
 infra/terraform/              AWS IaC (never applied from this repository)
 ```
 

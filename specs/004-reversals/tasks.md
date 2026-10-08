@@ -6,7 +6,7 @@ Ordered tasks for [plan.md](plan.md). Each task is under about an hour and start
 
 These tasks run in the cross-spec order of plan 000 section 1, across every `specs/*/tasks.md`: step 1 roles and functions, step 2 accounts, step 3 ledger, step 4 settlement accounts, step 5 audit, step 6 test helpers, step 7 the database-check ACs. Each task below names its step.
 
-- [ ] Step 7: Test first in `test/integration/reversals/reversal-link.test.ts` (REV-R05): written directly to the database by `scf_app`, a reversal row without a link, a deposit row with one, and a second reversal of the same transaction are refused, the original and the first reversal written directly with their cached balance changes so the test database stays reconciled, the last with SQLSTATE 23505 on `transactions_reversed_transaction_id_key` at its insert; the link column, its unique constraint and `transactions_reversal_link` are part of the migration `ledger` written in step 3 by plan 002, and this task fixes any gap the test finds there.
+- [x] Step 7: Test first in `test/integration/reversals/reversal-link.test.ts` (REV-R05): written directly to the database by `scf_app`, a reversal row without a link, a deposit row with one, and a second reversal of the same transaction are refused, the original and the first reversal written directly with their cached balance changes so the test database stays reconciled, the last with SQLSTATE 23505 on `transactions_reversed_transaction_id_key` at its insert; the link column, its unique constraint and `transactions_reversal_link` are part of the migration `ledger` written in step 3 by plan 002, and this task fixes any gap the test finds there.
 
 ## 06-domain
 

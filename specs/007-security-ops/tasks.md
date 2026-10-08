@@ -6,7 +6,7 @@ Ordered tasks for [plan.md](plan.md). Each task is under about an hour and start
 
 These tasks run in the cross-spec order of plan 000 section 1, across every `specs/*/tasks.md`: step 1 roles and functions, step 2 accounts, step 3 ledger, step 4 settlement accounts, step 5 audit, step 6 test helpers, step 7 the database-check ACs. Each task below names its step.
 
-- [ ] Step 7: Test first in `test/integration/security/readiness-grant.test.ts` (SEC-R24): `scf_app` can read the names in `pgmigrations` and cannot write them; then the migration `readiness-grant`.
+- [x] Step 7: Test first in `test/integration/security/readiness-grant.test.ts` (SEC-R24): `scf_app` can read the names in `pgmigrations` and cannot write them; then the migration `readiness-grant`.
 
 ## 06-domain
 
