@@ -82,7 +82,7 @@ Node 24 LTS, TypeScript 6 (strict), Fastify 5, Zod 4, PostgreSQL 16 with `pg` an
 
 ## 6. Architecture and repository map
 
-Hexagonal architecture (ports and adapters) per module, with tactical DDD, so money rules are unit-tested without infrastructure and the transaction boundary stays visible (ADR 0003, written in phase 03).
+Hexagonal architecture (ports and adapters) per module, with tactical DDD, so money rules are unit-tested without infrastructure and the transaction boundary stays visible ([ADR-0003](docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md)).
 
 ```
 src/

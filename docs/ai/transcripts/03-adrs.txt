@@ -1,0 +1,3060 @@
+ ▐▛███▛█   Claude Code v2.1.292
+▝▜██████▀  Opus 5.5 · Claude Max
+ ▝▝   ▝▝   ~/supercool-finances
+
+▎ [✻] [✻] [✻] · Share Claude Code and earn $10 in usage credits · /passes
+
+❯ /clear                                                                        
+
+!  git switch main && git pull --ff-only && git switch -c phase/03-adrs         
+  ⎿  Switched to branch 'main'
+     Your branch is up to date with 'origin/main'.
+     From https://github.com/torsello/supercool-finances
+        8212df0..ab38e24  main       -> origin/main
+     Updating 8212df0..ab38e24
+     Fast-forward
+      .claude/skills/audit/SKILL.md                      |     6 +-
+      .claude/skills/ship/SKILL.md                       |     2 +-
+      .claude/skills/spec/template.md                    |     6 +-
+      .github/workflows/ci.yml                           |     3 +
+      .gitignore                                         |     6 +
+      .prettierignore                                    |     2 +
+      AGENTS.md                                          |    25 +-
+      README.md                                          |     3 +
+      docs/ai/README.md                                  |     5 +
+      docs/ai/transcripts/02-specs-part1.txt             | 10587
+     +++++++++++++++++++
+      docs/ai/transcripts/02-specs-part2.txt             |  6030 +++++++++++
+      docs/ai/transcripts/02-specs-part3.txt             |  3366 ++++++
+      docs/ai/transcripts/02-specs-part4.txt             |  6209 +++++++++++
+      docs/ai/transcripts/02-specs-part5.txt             |  5331 ++++++++++
+      docs/dependencies.md                               |    37 +-
+      package.json                                       |     7 +-
+      scripts/trace.ts                                   |     5 +
+      scripts/traceability.ts                            |   766 ++
+      specs/000-overview/spec.md                         |   369 +
+      specs/001-accounts/spec.md                         |   369 +
+      specs/002-ledger/spec.md                           |   310 +
+      specs/003-money-movements/spec.md                  |   300 +
+      specs/004-reversals/spec.md                        |   337 +
+      specs/005-idempotency/spec.md                      |   333 +
+      specs/006-auth/spec.md                             |   265 +
+      specs/007-security-ops/spec.md                     |   516 +
+      specs/008-deployment/spec.md                       |   418 +
+      specs/README.md                                    |   124 +
+      test/fixtures/test-guards/samples.test.ts          |    21 +
+      test/fixtures/test-guards/vitest.config.ts         |    12 +
+      test/fixtures/traceability/README.md               |     9 +
+      .../traceability/failing/.github/workflows/ci.yml  |    35 +
+      test/fixtures/traceability/failing/package.json    |    20 +
+      .../failing/reports/vitest-integration.json        |     1 +
+      .../traceability/failing/reports/vitest-unit.json  |    47 +
+      .../traceability/failing/specs/001-gamma/spec.md   |   129 +
+      .../traceability/failing/specs/002-delta/spec.md   |    10 +
+      .../traceability/failing/specs/002-delta/tasks.md  |     5 +
+      .../traceability/invalid/reports/vitest-unit.json  |     1 +
+      .../traceability/invalid/specs/001-one/spec.md     |     8 +
+      .../traceability/invalid/specs/002-two/spec.md     |     7 +
+      .../traceability/invalid/specs/003-three/spec.md   |    53 +
+      .../traceability/invalid/specs/003-three/tasks.md  |    10 +
+      .../traceability/invalid/specs/004-four/spec.md    |    15 +
+      .../traceability/invalid/specs/005-five/Spec.md    |     3 +
+      .../traceability/passing/.github/workflows/ci.yml  |    25 +
+      test/fixtures/traceability/passing/package.json    |    10 +
+      .../passing/reports/vitest-integration.json        |    29 +
+      .../traceability/passing/reports/vitest-unit.json  |    15 +
+      .../traceability/passing/specs/001-alpha/spec.md   |    39 +
+      .../traceability/passing/specs/002-beta/spec.md    |    18 +
+      .../traceability/passing/specs/002-beta/tasks.md   |     4 +
+      test/fixtures/traceability/passing/specs/README.md |     3 +
+      .../traceability/passing/specs/notes/notes.md      |     5 +
+      test/setup/forbid-fails.ts                         |    16 +
+      test/unit/test-guards.test.ts                      |    51 +
+      test/unit/traceability.test.ts                     |   551 +
+      vitest.config.ts                                   |     3 +
+      vitest.shared.ts                                   |    11 +
+      59 files changed, 36864 insertions(+), 39 deletions(-)
+      create mode 100644 docs/ai/transcripts/02-specs-part1.txt
+      create mode 100644 docs/ai/transcripts/02-specs-part2.txt
+      create mode 100644 docs/ai/transcripts/02-specs-part3.txt
+      create mode 100644 docs/ai/transcripts/02-specs-part4.txt
+      create mode 100644 docs/ai/transcripts/02-specs-part5.txt
+      create mode 100644 scripts/trace.ts
+      create mode 100644 scripts/traceability.ts
+      create mode 100644 specs/000-overview/spec.md
+      create mode 100644 specs/001-accounts/spec.md
+      create mode 100644 specs/002-ledger/spec.md
+      create mode 100644 specs/003-money-movements/spec.md
+      create mode 100644 specs/004-reversals/spec.md
+      create mode 100644 specs/005-idempotency/spec.md
+      create mode 100644 specs/006-auth/spec.md
+      create mode 100644 specs/007-security-ops/spec.md
+      create mode 100644 specs/008-deployment/spec.md
+      create mode 100644 specs/README.md
+      create mode 100644 test/fixtures/test-guards/samples.test.ts
+      create mode 100644 test/fixtures/test-guards/vitest.config.ts
+      create mode 100644 test/fixtures/traceability/README.md
+      create mode 100644
+     test/fixtures/traceability/failing/.github/workflows/ci.yml
+      create mode 100644 test/fixtures/traceability/failing/package.json
+      create mode 100644
+     test/fixtures/traceability/failing/reports/vitest-integration.json
+      create mode 100644
+     test/fixtures/traceability/failing/reports/vitest-unit.json
+      create mode 100644
+     test/fixtures/traceability/failing/specs/001-gamma/spec.md
+      create mode 100644
+     test/fixtures/traceability/failing/specs/002-delta/spec.md
+      create mode 100644
+     test/fixtures/traceability/failing/specs/002-delta/tasks.md
+      create mode 100644
+     test/fixtures/traceability/invalid/reports/vitest-unit.json
+      create mode 100644
+     test/fixtures/traceability/invalid/specs/001-one/spec.md
+      create mode 100644
+     test/fixtures/traceability/invalid/specs/002-two/spec.md
+      create mode 100644
+     test/fixtures/traceability/invalid/specs/003-three/spec.md
+      create mode 100644
+     test/fixtures/traceability/invalid/specs/003-three/tasks.md
+      create mode 100644
+     test/fixtures/traceability/invalid/specs/004-four/spec.md
+      create mode 100644
+     test/fixtures/traceability/invalid/specs/005-five/Spec.md
+      create mode 100644
+     test/fixtures/traceability/passing/.github/workflows/ci.yml
+      create mode 100644 test/fixtures/traceability/passing/package.json
+      create mode 100644
+     test/fixtures/traceability/passing/reports/vitest-integration.json
+      create mode 100644
+     test/fixtures/traceability/passing/reports/vitest-unit.json
+      create mode 100644
+     test/fixtures/traceability/passing/specs/001-alpha/spec.md
+      create mode 100644
+     test/fixtures/traceability/passing/specs/002-beta/spec.md
+      create mode 100644
+     test/fixtures/traceability/passing/specs/002-beta/tasks.md
+      create mode 100644 test/fixtures/traceability/passing/specs/README.md
+      create mode 100644 test/fixtures/traceability/passing/specs/notes/notes.md
+      create mode 100644 test/setup/forbid-fails.ts
+      create mode 100644 test/unit/test-guards.test.ts
+      create mode 100644 test/unit/traceability.test.ts
+      create mode 100644 vitest.shared.ts
+     Switched to a new branch 'phase/03-adrs'
+
+⏺ You're on the new phase/03-adrs branch, created from an up-to-date main that
+  includes PR #2 (phase 02 specs). The working tree is clean.
+
+  What should I start with in phase 03? I can read the specs and ADR 0003 in
+  AGENTS.md, then list the ADRs this phase needs and draft each with the adr
+  skill. Before writing any of them, I'll show you the options and trade-offs
+  for decisions the specs don't already settle.
+
+✻ Crunched for 5s · done Wednesday 11:10 PM
+
+❯ /effort                                                                       
+  ⎿  Set effort level to medium (saved as your default for new sessions):
+     Balanced approach with standard implementation and testing
+
+※ recap: We're starting phase 03 to write the ADRs, on the new phase/03-adrs branch from an up-to-date main. Next, I'll read the specs and propose the list of ADRs, which needs your go-ahead.
+
+❯ Using the adr skill, record these accepted decisions, one ADR each, in this   
+  order, with status Accepted. Keep my reasoning; add technical detail, the     
+  alternatives with honest pros and cons, and consequences, and link each ADR   
+  to the spec requirements it explains. Where a spec already fixed a detail,    
+  the ADR follows the spec.                                                     
+                                                                                
+  0001 Spec-driven development with ADRs and AI agents. Behaviour is defined in 
+  specs with acceptance criteria before code; decisions are recorded as ADRs;   
+  AI agents follow AGENTS.md; an independent review (/audit) runs before every  
+  push. Every AC is proven by a test that actually ran and passed: npm run      
+  trace reads Vitest's JSON reports, not the test source, and enforces coverage 
+  for every ticked task in tasks.md, so the gate works from the first           
+  implementation phase. Alternative: code first with docs at the end, which     
+  starts faster but lets behaviour and rationale drift and makes AI output      
+  harder to verify.                                                             
+                                                                                
+  0002 Modular monolith. One bounded context (balances) where a transfer must   
+  update two accounts atomically. One deployable with internal modules          
+  (accounts, ledger, movements, idempotency, auth, http, platform) gives ACID   
+  transactions without sagas or distributed transactions, and still scales      
+  horizontally as stateless replicas. Microservices give independent deploys    
+  and scaling, but would split one consistency boundary and add network failure 
+  modes for no benefit at this size. Modules have explicit interfaces, so one   
+  could be extracted later.                                                     
+                                                                                
+  0003 Hexagonal architecture with tactical DDD inside each module. Each module 
+  has a domain layer (value objects such as Money and Currency, aggregates      
+  such as Account and LedgerTransaction that enforce their own invariants,      
+  typed domain errors) that imports no framework or database code; an           
+  application layer with the use cases and the ports they need; and adapters    
+  for HTTP (Fastify) and persistence (Kysely). Business rules are unit-tested   
+  without a database or HTTP server, and a lint rule keeps the domain free of   
+  infrastructure imports. The unit of work and row locking are explicit ports,  
+  not hidden behind a generic CRUD repository, because the money guarantees     
+  depend on them; the database still enforces the invariants as a second line   
+  of defence. Reads such as account history go through simple query services    
+  that bypass the aggregates. MVC was considered: it fits user interfaces, but  
+  in an API it tends to put business rules in controllers or ORM models, mixed  
+  with HTTP and persistence. Full DDD with event sourcing and CQRS was          
+  considered too: strong for auditing, but the double-entry ledger already      
+  gives an immutable history at a fraction of the complexity.                   
+                                                                                
+  0004 TypeScript with Fastify. Fastify gives schema-based validation and       
+  serialization, encapsulated plugins, good performance and first-class         
+  TypeScript. Express lacks built-in validation and async error handling;       
+  NestJS adds a heavy decorator-based framework that hides control flow we want 
+  explicit.                                                                     
+                                                                                
+  0005 PostgreSQL as the only source of truth. The challenge allows in-memory   
+  storage, but several replicas behind a load balancer and crash safety require 
+  shared, durable state. PostgreSQL gives ACID transactions, row locks, check   
+  constraints, unique indexes and deferrable constraint triggers, so the        
+  database itself enforces the invariants. Redis holds only rate-limit          
+  counters, so money correctness never depends on it. SQLite has a single       
+  writer and no network access; in-memory state is lost on restart and not      
+  shared between replicas.                                                      
+                                                                                
+  0006 Double-entry ledger with signed integer minor units. Every movement is a 
+  balanced set of immutable entries, one signed amount per entry, which makes   
+  money auditable and the invariants checkable with SQL. Amounts are bigint     
+  minor units with a per-currency exponent; floats are never used. Corrections  
+  are compensating reversals, never edits. Alternative: a single mutable        
+  balance column, simpler but with no audit trail and no way to prove           
+  correctness.                                                                  
+                                                                                
+  0007 System accounts without a cached balance, never locked. Every deposit    
+  and withdrawal touches a settlement account; locking or updating its row      
+  would serialize all of them. Their balance is derived from entries instead,   
+  with arbitrary precision so it never overflows. The lock query selects only   
+  customer accounts, so a system account named as a transfer destination is     
+  never locked either. The shared FOR KEY SHARE that the foreign key check      
+  takes on the settlement row is accepted, because it never blocks another      
+  movement; its cost is measured in the load test. Customer accounts keep a     
+  cached balance with CHECK (balance >= 0) for fast reads and a database-level  
+  guarantee, verified by reconciliation.                                        
+                                                                                
+  0008 Concurrency control with READ COMMITTED and ordered pessimistic row      
+  locks. Lock the involved customer accounts with SELECT ... FOR UPDATE one by  
+  one in ascending uuid order, validate after locking, never lock system        
+  accounts, and retry the whole transaction on deadlock or serialization errors 
+  at most 3 times as a safety net. Each lock wait is bounded by a               
+  per-transaction lock timeout and answers 503 with Retry-After. SERIALIZABLE   
+  is also correct, but under contention on hot accounts it aborts and retries   
+  many transactions; optimistic locking with a version column has the same      
+  retry problem.                                                                
+
+⏺ Skill(adr)
+  ⎿  Successfully loaded skill
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; cat
+      .claude/skills/adr/template.md; ls docs docs/adr 2>&1; cat
+      docs/adr/README.md 2>&1; grep -n "Related ADRs" -r s…)
+  ⎿  # ADR-NNNN: Title in plain words
+
+     - **Status:** Proposed | Accepted | Superseded by ADR-XXXX
+     … +75 lines (ctrl+o to expand)
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; cat specs/README.md
+      specs/000-overview/spec.md)
+  ⎿  # Specs
+
+     Every behaviour of the service is described here before it is built. T
+     … +421 lines (ctrl+o to expand)
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; for f in specs/*/spec.md; do
+      echo "== $f"; grep -nE '^#{1,4} ' $f; done; grep -oE
+      '\b[A-Z]{2,5}-R[0-9]+\b' -h specs…)
+  ⎿  == specs/000-overview/spec.md
+     1:# 000 · Overview
+     8:## 1. Context and goal
+     … +354 lines (ctrl+o to expand)
+
+⏺ Now the requirements sections of the core specs.
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; sed -n 1,126p
+      specs/000-overview/spec.md; sed -n 340,369p specs/000-overview/spec.md)
+  ⎿  # 000 · Overview
+
+     - **Status:** Approved
+     … +417 lines (ctrl+o to expand)
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; sed -n 1,90p
+      specs/002-ledger/spec.md; sed -n 286,310p specs/002-ledger/spec.md)
+  ⎿  # 002 · Ledger
+
+     - **Status:** Approved
+     … +368 lines (ctrl+o to expand)
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; sed -n 1,96p
+      specs/003-money-movements/spec.md; sed -n 278,300p
+      specs/003-money-movements/spec.md)
+  ⎿  # 003 · Money movements
+
+     - **Status:** Approved
+     … +369 lines (ctrl+o to expand)
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; sed -n 40,126p
+      specs/000-overview/spec.md | cut -c1-900)
+  ⎿  No caller acts as the system: system accounts are moved only as the ot
+     her side of a customer movement. A caller whose role is not permitted
+     an operation gets 403 (SYS-R04): which operations exist is public, so
+     … +422 lines (ctrl+o to expand)
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; ls; cat package.json; cat
+      docs/dependencies.md | head -80; ls .claude/skills; head -40
+      .claude/skills/audit/SKILL.m…)
+  ⎿  AGENTS.md
+     CLAUDE.md
+     compose.yaml
+     … +264 lines (ctrl+o to expand)
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; cat eslint.config.js; find
+      src -type f | head -30; grep -nE '^\| (SEC|IDM|ACC|REV|DEP|AUT)-R[0-9]+'
+      specs/*/spec.md…)
+  ⎿  import js from '@eslint/js';
+     import { defineConfig, globalIgnores } from 'eslint/config';
+     import prettier from 'eslint-config-prettier/flat';
+     … +380 lines (ctrl+o to expand)
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; grep -n -i "audit"
+      .claude/skills/ship/SKILL.md | head; head -30 scripts/traceability.ts;
+      grep -n "LED-AC09\|MOV-AC…)
+  ⎿  79:   - the verdict of the last `/audit`, if it appears in this conver
+     sation.
+     import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSy
+     … +180 lines (ctrl+o to expand)
+
+⏺ Specs read. Next I'll write the eight ADRs and the ADR index.
+
+⏺ Bash(mkdir -p /Users/matiastorsello/supercool-finances/docs/adr; cd
+      /Users/matiastorsello/supercool-finances; grep -n "Implemented\|tasks.md"
+      specs/README.md | head…)
+  ⎿  13:    tasks.md                ordered implementation tasks (phase 04-
+     plans)
+     24:| `Implemented` | Built and proven. All specs move here together in
+     … +24 lines (ctrl+o to expand)
+
+⏺ Write(docs/adr/0001-spec-driven-development-with-adrs-and-ai-agents.md)  ⎿  Wrote 85 lines to
+     docs/adr/0001-spec-driven-development-with-adrs-and-ai-agents.md
+      1 # ADR-0001: Spec-driven development with ADRs and AI agents
+      3 - **Status:** Accepted
+      5 - **Related specs:** 000-overview, 001-accounts, 002-ledger, 003-
+        money-movements, 004-reversals, 005-idempotency, 006-auth, 007-se
+      6 
+      8 
+         per phase (AGENTS.md section 7), and it moves money: a small beh
+        avioural mistake (a lost update, a duplicated movement, an accoun
+        cosmetic one. AI output is fast to produce and slow to verify. Th
+         that what 
+     … +139 lines (ctrl+o to expand)
+
+⏺ Write(docs/adr/0002-modular-monolith.md)
+  ⎿  Wrote 79 lines to docs/adr/0002-modular-monolith.md
+      1 # ADR-0002: Modular monolith
+      3 - **Status:** Accepted
+      5 - **Related specs:** 000-overview, 002-ledger, 003-money-movement
+        s, 004-reversals, 005-idempotency, 008-deployment
+      7 ## Context and problem
+      9 The service has one bounded context: customer balances. Its centr
+        ansfer debits one account and credits another, writes a balanced 
+        ledger transaction, an idempotency record and an audit record, an
+         REV-R17). The service must still run as several replicas behind 
+        the code into deplo
+     … +115 lines (ctrl+o to expand)
+
+⏺ Write(docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md)
+  ⎿  Wrote 87 lines to
+     docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md
+      1 # ADR-0003: Hexagonal architecture with tactical DDD inside each 
+      2 
+      4 - **Date:** 2026-10-07
+      5 - **Related specs:** 000-overview, 001-accounts, 002-ledger, 003-
+      6 
+      8 
+        ide each module, the code must keep the money rules (balanced tra
+        nsactions, non-negative balances, the order of checks, reversal r
+        he parts that make those rules safe under concurrency (the transa
+         framework. The question is how to structur
+     … +144 lines (ctrl+o to expand)
+
+⏺ Write(docs/adr/0004-typescript-with-fastify.md)
+  ⎿  Wrote 80 lines to docs/adr/0004-typescript-with-fastify.md
+      1 # ADR-0004: TypeScript with Fastify
+      3 - **Status:** Accepted
+      4 - **Date:** 2026-10-07
+      6 
+      7 ## Context and problem
+      9 The service is an HTTP JSON API in Node.js 24 written in strict T
+        ypeScript (AGENTS.md section 4). Every input must pass a strict s
+        s body (SYS-R24, SYS-R27), requests are checked in a fixed order 
+        (SYS-R31), and the service needs hooks for authentication, rate l
+        The question is which HTTP framework to build on.
+     … +112 lines (ctrl+o to expand)
+
+⏺ Write(docs/adr/0005-postgresql-as-the-only-source-of-truth.md)
+  ⎿  Wrote 83 lines to
+     docs/adr/0005-postgresql-as-the-only-source-of-truth.md
+      1 # ADR-0005: PostgreSQL as the only source of truth
+      3 - **Status:** Accepted
+      4 - **Date:** 2026-10-07
+        idempotency, 007-security-ops, 008-deployment
+      7 ## Context and problem
+      8 
+        service, however, runs as several replicas behind a load balancer
+         (SYS-R16, DEP-R15, DEP-R18) and must not lose or duplicate money
+        , idempotency records, balances and the ledger must therefore be 
+        re that state lives.
+     … +130 lines (ctrl+o to expand)
+
+⏺ Write(docs/adr/0006-double-entry-ledger-with-signed-integer-minor-units.md)
+  ⎿  Wrote 85 lines to
+     docs/adr/0006-double-entry-ledger-with-signed-integer-minor-units.md
+      1 # ADR-0006: Double-entry ledger with signed integer minor units
+      3 - **Status:** Accepted
+      5 - **Related specs:** 000-overview, 001-accounts, 002-ledger, 003-
+        money-movements, 004-reversals
+      7 ## Context and problem
+      9 The service must never lose, create or duplicate money, and must 
+        rawal, transfer and reversal changes balances, and a reviewer, an
+         operator or CI must be able to explain every balance from its hi
+        st be exact in every supported currency, including JPY, which has
+        y a
+     … +140 lines (ctrl+o to expand)
+
+⏺ Write(docs/adr/0007-system-accounts-without-a-cached-balance.md)
+  ⎿  Wrote 81 lines to
+     docs/adr/0007-system-accounts-without-a-cached-balance.md
+      1 # ADR-0007: System accounts without a cached balance, never locke
+      2 
+      4 - **Date:** 2026-10-07
+        s, 004-reversals
+      7 ## Context and problem
+      8 
+        al in a currency has the settlement account of that currency as i
+         were updated or locked by each movement, every deposit and withd
+        row serializing all traffic. A settlement account's balance also 
+        10), and can p
+     … +134 lines (ctrl+o to expand)
+
+⏺ Write(docs/adr/0008-read-committed-with-ordered-pessimistic-row-locks.md)
+  ⎿  Wrote 86 lines to
+     docs/adr/0008-read-committed-with-ordered-pessimistic-row-locks.md
+      1 # ADR-0008: Concurrency control with READ COMMITTED and ordered p
+      2 
+      4 - **Date:** 2026-10-07
+      5 - **Related specs:** 000-overview, 001-accounts, 003-money-moveme
+      6 
+      8 
+        s concurrently on the same accounts (SYS-R16). The results must m
+        atch some one-at-a-time execution of the movements accepted (SYS-
+        y one of them can satisfy (MOV-R22), crossed transfers must not d
+        ovement on the same acc
+     … +145 lines (ctrl+o to expand)
+
+⏺ Now I'll check that every cited ID exists.
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; for id in $(grep -ohE
+      '\b[A-Z]{3}-(R|AC)[0-9]+\b' docs/adr/*.md | sort -u); do if echo $id |
+      grep -q AC; then grep…)
+  ⎿  MISSING ACC-R17
+     MISSING ACC-R18
+     MISSING ACC-R22
+     … +24 lines (ctrl+o to expand)
+
+⏺ ACC IDs are false alarms (my script matched "AC" inside "ACC"). DEP-R18 and
+  DEP-R28 are cited wrongly, and so is ACC-R18. Looking up the correct IDs:
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; grep -nE '^\| DEP-R[0-9]+'
+      specs/008-deployment/spec.md | grep -iE 'fargate|two
+      (availability|tasks)|multi-az|RDS'…)
+  ⎿  153:| DEP-R25 | THE SYSTEM SHALL allow inbound traffic from the intern
+     et only to the ALB, on ports 443 and 80; ECS tasks, RDS, RDS Proxy and
+      ElastiCache SHALL have no public IP and accept traffic only from the
+     … +51 lines (ctrl+o to expand)
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances/docs/adr; sed -i ''
+      's/DEP-R18)/DEP-R27)/; s/(DEP-R28)/(DEP-R29)/' 0002-modular-monolith.md
+      0005-postgresql-as-the-o…)
+  ⎿  0002-modular-monolith.md:9:The service has one bounded context: custom
+     er balances. Its central operations cross what could look like service
+      boundaries: a transfer debits one account and credits another, writes
+     … +49 lines (ctrl+o to expand)
+  ⎿  Updated docs/adr/0002-modular-monolith.md (+1 -1)
+      11  ## Decision drivers
+      12  
+      13  - One movement is one atomic unit across accounts, ledger, idem
+          potency and audit (SYS-R11, SYS-R17).
+      14 -- Horizontal scaling with several stateless replicas (SYS-R16, 
+         -DEP-R18).                                                      
+      14 +- Horizontal scaling with several stateless replicas (SYS-R16, 
+         +DEP-R27).                                                      
+      15  - Few failure modes: no partial movements, no distributed recov
+          ery logic.
+      16  - Clear internal boundaries, so the code stays understandable a
+          nd a module could be extracted later.
+      17  - A small team and a short time box.
+  ⎿  Updated docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md (+1 
+     -1)
+      61  
+      62  Chosen option: **Option A**, because business rules are unit-te
+          sted without a database or HTTP server, a lint rule keeps the d
+          omain free of infrastructure imports, and the unit of work and 
+          row locking stay explicit ports instead of being hidden behind 
+          a generic CRUD repository, since the money guarantees depend on
+           them. The database still enforces the invariants as a second l
+          ine of defence. MVC fits user interfaces, but in an API it tend
+          s to put business rules in controllers or ORM models, mixed wit
+          h HTTP and persistence. Full DDD with event sourcing and CQRS i
+          s strong for auditing, but the double-entry ledger already give
+          s an immutable history at a fraction of the complexity.
+      63  
+      64 -Reads such as an account's history (ACC-R18 to ACC-R22) or a tr
+         -ansaction by id (MOV-R26, MOV-R27) go through simple query serv
+         -ices in the application layer that bypass the aggregates and re
+         -ad through a query port, since they enforce no invariant and on
+         -ly need the right projection, paging and authorization.        
+      64 +Reads such as an account's history (ACC-R21, ACC-R22) or a tran
+         +saction by id (MOV-R26, MOV-R27) go through simple query servic
+         +es in the application layer that bypass the aggregates and read
+         + through a query port, since they enforce no invariant and only
+         + need the right projection, paging and authorization.          
+      65  
+      66  ## Consequences
+      67  
+  ⎿  Updated docs/adr/0005-postgresql-as-the-only-source-of-truth.md (+2 
+     -2)
+       6  
+       7  ## Context and problem
+       8  
+       9 -The challenge (docs/challenge.md) allows in-memory storage. Thi
+         -s service, however, runs as several replicas behind a load bala
+         -ncer (SYS-R16, DEP-R15, DEP-R18) and must not lose or duplicate
+         - money when a replica crashes or is killed mid-request (DEP-R17
+         -). Locks, idempotency records, balances and the ledger must the
+         -refore be shared by every replica and survive restarts. The que
+         -stion is where that state lives.                               
+       9 +The challenge (docs/challenge.md) allows in-memory storage. Thi
+         +s service, however, runs as several replicas behind a load bala
+         +ncer (SYS-R16, DEP-R15, DEP-R27) and must not lose or duplicate
+         + money when a replica crashes or is killed mid-request (DEP-R17
+         +). Locks, idempotency records, balances and the ledger must the
+         +refore be shared by every replica and survive restarts. The que
+         +stion is where that state lives.                               
+      10  
+      11  ## Decision drivers
+      12  
+     ...
+      15  - Row-level locking for concurrent movements on the same accoun
+          ts (ADR-0008).
+      16  - The database itself enforces the money invariants, so a code 
+          defect cannot commit a broken ledger (LED-R03 to LED-R17).
+      17  - Money correctness must not depend on any secondary store.
+      18 -- Available as a managed, Multi-AZ service in AWS (DEP-R28).   
+      18 +- Available as a managed, Multi-AZ service in AWS (DEP-R29).   
+      19  
+      20  ## Considered options
+      21  
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances/docs/adr; sed -i '' 's/RDS
+      Proxy, DEP-R28)/RDS Proxy, DEP-R29)/; s/one reversal per transaction,
+      REV-AC08/one revers…)
+  ⎿  0
+  ⎿  Updated docs/adr/0005-postgresql-as-the-only-source-of-truth.md (+2 
+     -2)
+      24  - **Pros:**
+      25    - ACID transactions: a movement's idempotency record, locks, 
+          ledger entries, balance changes and audit record commit togethe
+          r (SYS-R11).
+      26    - Row locks (`SELECT ... FOR UPDATE`) and `lock_timeout` for 
+          the concurrency model of ADR-0008.
+      27 -  - The database enforces invariants independently of the code:
+         - CHECK constraints (non-zero amounts, `balance >= 0` on custome
+         -r accounts, no cached balance on system accounts, LED-R03, LED-
+         -R12, LED-R13), unique indexes (one reversal per transaction, RE
+         -V-AC08; one key row per user and key, spec 005) and deferrable 
+         -constraint triggers that check at commit that each transaction 
+         -balances, has two or more entries and one currency (LED-R04 to 
+         -LED-R07), and that no key row is committed without a result (ID
+         -M-R18).                                                        
+      27 +  - The database enforces invariants independently of the code:
+         + CHECK constraints (non-zero amounts, `balance >= 0` on custome
+         +r accounts, no cached balance on system accounts, LED-R03, LED-
+         +R12, LED-R13), unique indexes (one reversal per transaction, RE
+         +V-R05; one key row per user and key, spec 005) and deferrable c
+         +onstraint triggers that check at commit that each transaction b
+         +alances, has two or more entries and one currency (LED-R04 to L
+         +ED-R07), and that no key row is committed without a result (IDM
+         +-R18).                                                         
+      28    - Roles and privileges make the ledger append-only for the ru
+          ntime role (LED-R16, LED-R17).
+      29    - `numeric` gives arbitrary-precision sums for system balance
+          s and reconciliation (LED-R15), and REPEATABLE READ gives the r
+          econciliation one consistent snapshot without locks (LED-R20).
+      30    - Idempotency keys live in the same transaction as the moveme
+          nt, so a key and its effects can never disagree (IDM-R06).
+      31 -  - Mature managed offering (RDS Multi-AZ with RDS Proxy, DEP-R
+         -28).                                                           
+      31 +  - Mature managed offering (RDS Multi-AZ with RDS Proxy, DEP-R
+         +29).                                                           
+      32  - **Cons:**
+      33    - One database is the write bottleneck and a single point of 
+          failure without Multi-AZ.
+      34    - Every request needs a connection; pool sizing must fit `max
+          _connections` across replicas (SEC-R36).
+
+⏺ Update(docs/adr/0007-system-accounts-without-a-cached-balance.md)
+  ⎿  Added 6 lines, removed 2 lines
+      45    - Every balance read and every funds check is a sum over a gr
+          owing table.
+      46    - "Never below zero" can no longer be a simple CHECK constrai
+          nt, and must be enforced by locking plus a computed sum.
+      47  
+      48 -### Option D: Keep the foreign key from entries to system accou
+         -nts or drop it                                                 
+      48 +### Option D: Option A without the foreign key from ledger entr
+         +ies to accounts                                                
+      49  
+      50 -Dropping the foreign key for system accounts would avoid the `F
+         -OR KEY SHARE` lock, at the cost of referential integrity on exa
+         -ctly the entries that represent money entering and leaving the 
+         -service.                                                       
+      50 +- **Pros:**                                                    
+      51 +  - No `FOR KEY SHARE` on the settlement row, so no multixacts 
+         +from concurrent deposits and withdrawals.                      
+      52 +- **Cons:**                                                    
+      53 +  - Loses referential integrity on exactly the entries that rep
+         +resent money entering and leaving the service; an entry could n
+         +ame an account that does not exist.                            
+      54 +  - Trades a measured cost for an unmeasured risk: the shared l
+         +ock never blocks another movement (section 1.3 of spec 002).   
+      55  
+      56  ## Decision
+      57  
+
+⏺ Now the index and the specs' Related ADRs lines.
+
+⏺ Write(docs/adr/README.md)
+  ⎿  Wrote 18 lines to docs/adr/README.md
+      1 # Architecture decision records
+      3 Every technical decision of the service is recorded here in MADR 
+        format, one file per decision: `NNNN-kebab-title.md`, numbered in
+        -spec-first) and the `adr` skill (`.claude/skills/adr/`).
+      4 
+        s a new ADR, and the old one is marked `Superseded by ADR-NNNN`.
+      6 - Each ADR names the specs it affects, and each of those specs li
+      7 - Where a spec fixes a detail, the ADR follows the spec.
+      8 
+                                                          
+     … +33 lines (ctrl+o to expand)
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; python3 - <<'EOF'
+      import re,glob…)
+  ⎿  000-overview ['0001', '0002', '0003', '0004', '0005', '0006', '0007',
+     '0008']
+     001-accounts ['0001', '0003', '0005', '0006', '0008']
+     … +33 lines (ctrl+o to expand)
+  ⎿  Updated docs/adr/README.md (+9 -9)
+       6  - Each ADR names the specs it affects, and each of those specs 
+          lists it in its "Related ADRs" line.
+       7  - Where a spec fixes a detail, the ADR follows the spec.
+       8  
+       9 -| #    | Title                                                 
+         -                                                               
+         -  | Status   | Date       |                                    
+      10 -| ---- | ------------------------------------------------------
+         ----------------------------------------------------------------
+         -- | -------- | ---------- |                                    
+      11 -| 0001 | [Spec-driven development with ADRs and AI agents](0001
+         --spec-driven-development-with-adrs-and-ai-agents.md)           
+         -  | Accepted | 2026-10-07 |                                    
+      12 -| 0002 | [Modular monolith](0002-modular-monolith.md)          
+         -                                                               
+         -  | Accepted | 2026-10-07 |                                    
+      13 -| 0003 | [Hexagonal architecture with tactical DDD inside each 
+         -module](0003-hexagonal-architecture-with-tactical-ddd.md)      
+         -  | Accepted | 2026-10-07 |                                    
+      14 -| 0004 | [TypeScript with Fastify](0004-typescript-with-fastify
+         -.md)                                                           
+         -  | Accepted | 2026-10-07 |                                    
+      15 -| 0005 | [PostgreSQL as the only source of truth](0005-postgres
+         -ql-as-the-only-source-of-truth.md)                             
+         -  | Accepted | 2026-10-07 |                                    
+      16 -| 0006 | [Double-entry ledger with signed integer minor units](
+         -0006-double-entry-ledger-with-signed-integer-minor-units.md)   
+         -  | Accepted | 2026-10-07 |                                    
+      17 -| 0007 | [System accounts without a cached balance, never locke
+         -d](0007-system-accounts-without-a-cached-balance.md)           
+         -  | Accepted | 2026-10-07 |                                    
+       9 +| #    | Title                                                 
+         +                                                               
+         +                  | Status   | Date       |                    
+      10 +| ---- | ------------------------------------------------------
+         +---------------------------------------------------------------
+         +----------------- | -------- | ---------- |                    
+      11 +| 0001 | [Spec-driven development with ADRs and AI agents](0001
+         +-spec-driven-development-with-adrs-and-ai-agents.md)           
+         +                  | Accepted | 2026-10-07 |                    
+      12 +| 0002 | [Modular monolith](0002-modular-monolith.md)          
+         +                                                               
+         +                  | Accepted | 2026-10-07 |                    
+      13 +| 0003 | [Hexagonal architecture with tactical DDD inside each 
+         +module](0003-hexagonal-architecture-with-tactical-ddd.md)      
+         +                  | Accepted | 2026-10-07 |                    
+      14 +| 0004 | [TypeScript with Fastify](0004-typescript-with-fastify
+         +.md)                                                           
+         +                  | Accepted | 2026-10-07 |                    
+      15 +| 0005 | [PostgreSQL as the only source of truth](0005-postgres
+         +ql-as-the-only-source-of-truth.md)                             
+         +                  | Accepted | 2026-10-07 |                    
+      16 +| 0006 | [Double-entry ledger with signed integer minor units](
+         +0006-double-entry-ledger-with-signed-integer-minor-units.md)   
+         +                  | Accepted | 2026-10-07 |                    
+      17 +| 0007 | [System accounts without a cached balance, never locke
+         +d](0007-system-accounts-without-a-cached-balance.md)           
+         +                  | Accepted | 2026-10-07 |                    
+      18  | 0008 | [Concurrency control with READ COMMITTED and ordered p
+          essimistic row locks](0008-read-committed-with-ordered-pessimis
+          tic-row-locks.md) | Accepted | 2026-10-07 |
+  ⎿  Updated specs/000-overview/spec.md (+1 -1)
+      2  
+      3  - **Status:** Approved
+      4  - **ID prefix:** SYS
+      5 -- **Related ADRs:** none yet (phase 03-adrs)                    
+      5 +- **Related ADRs:** [ADR-0001](../../docs/adr/0001-spec-driven-d
+        +evelopment-with-adrs-and-ai-agents.md), [ADR-0002](../../docs/ad
+        +r/0002-modular-monolith.md), [ADR-0003](../../docs/adr/0003-hexa
+        +gonal-architecture-with-tactical-ddd.md), [ADR-0004](../../docs/
+        +adr/0004-typescript-with-fastify.md), [ADR-0005](../../docs/adr/
+        +0005-postgresql-as-the-only-source-of-truth.md), [ADR-0006](../.
+        +./docs/adr/0006-double-entry-ledger-with-signed-integer-minor-un
+        +its.md), [ADR-0007](../../docs/adr/0007-system-accounts-without-
+        +a-cached-balance.md), [ADR-0008](../../docs/adr/0008-read-commit
+        +ted-with-ordered-pessimistic-row-locks.md)                      
+      6  - **Depends on specs:** none
+      7  
+      8  ## 1. Context and goal
+  ⎿  Updated specs/001-accounts/spec.md (+1 -1)
+      2  
+      3  - **Status:** Approved
+      4  - **ID prefix:** ACC
+      5 -- **Related ADRs:** none yet (phase 03-adrs)                    
+      5 +- **Related ADRs:** [ADR-0001](../../docs/adr/0001-spec-driven-d
+        +evelopment-with-adrs-and-ai-agents.md), [ADR-0003](../../docs/ad
+        +r/0003-hexagonal-architecture-with-tactical-ddd.md), [ADR-0005](
+        +../../docs/adr/0005-postgresql-as-the-only-source-of-truth.md), 
+        +[ADR-0006](../../docs/adr/0006-double-entry-ledger-with-signed-i
+        +nteger-minor-units.md), [ADR-0008](../../docs/adr/0008-read-comm
+        +itted-with-ordered-pessimistic-row-locks.md)                    
+      6  - **Depends on specs:** 000-overview, 002-ledger, 003-money-move
+         ments, 004-reversals, 005-idempotency, 006-auth, 007-security-op
+         s
+      7  
+      8  ## 1. Context and goal
+  ⎿  Updated specs/002-ledger/spec.md (+1 -1)
+      2  
+      3  - **Status:** Approved
+      4  - **ID prefix:** LED
+      5 -- **Related ADRs:** none yet (phase 03-adrs)                    
+      5 +- **Related ADRs:** [ADR-0001](../../docs/adr/0001-spec-driven-d
+        +evelopment-with-adrs-and-ai-agents.md), [ADR-0002](../../docs/ad
+        +r/0002-modular-monolith.md), [ADR-0003](../../docs/adr/0003-hexa
+        +gonal-architecture-with-tactical-ddd.md), [ADR-0005](../../docs/
+        +adr/0005-postgresql-as-the-only-source-of-truth.md), [ADR-0006](
+        +../../docs/adr/0006-double-entry-ledger-with-signed-integer-mino
+        +r-units.md), [ADR-0007](../../docs/adr/0007-system-accounts-with
+        +out-a-cached-balance.md)                                        
+      6  - **Depends on specs:** 000-overview, 001-accounts, 003-money-mo
+         vements, 004-reversals, 005-idempotency
+      7  
+      8  ## 1. Context and goal
+  ⎿  Updated specs/003-money-movements/spec.md (+1 -1)
+      2  
+      3  - **Status:** Approved
+      4  - **ID prefix:** MOV
+      5 -- **Related ADRs:** none yet (phase 03-adrs)                    
+      5 +- **Related ADRs:** [ADR-0001](../../docs/adr/0001-spec-driven-d
+        +evelopment-with-adrs-and-ai-agents.md), [ADR-0002](../../docs/ad
+        +r/0002-modular-monolith.md), [ADR-0003](../../docs/adr/0003-hexa
+        +gonal-architecture-with-tactical-ddd.md), [ADR-0006](../../docs/
+        +adr/0006-double-entry-ledger-with-signed-integer-minor-units.md)
+        +, [ADR-0007](../../docs/adr/0007-system-accounts-without-a-cache
+        +d-balance.md), [ADR-0008](../../docs/adr/0008-read-committed-wit
+        +h-ordered-pessimistic-row-locks.md)                             
+      6  - **Depends on specs:** 000-overview, 001-accounts, 002-ledger, 
+         004-reversals, 005-idempotency, 007-security-ops
+      7  
+      8  ## 1. Context and goal
+  ⎿  … 5 more files changed
+
+⏺ I've written the eight ADRs (0001 to 0008) in docs/adr/, all Accepted and
+  dated 2026-10-07, plus a new index at docs/adr/README.md. npm run check passes
+  and npm run trace reports 0 missing ACs.
+
+  What each ADR contains
+  - Your reasoning is in each Decision section, tightened but unchanged.
+  - Each one has decision drivers and at least two real options with honest pros
+    and cons, including the costs of the option chosen. Each also lists
+    consequences: positive, costs, what to monitor, and follow-ups tied to later
+    phases.
+  - Each one names the requirement and AC IDs it explains. I checked that every
+    cited ID exists in the specs, and corrected three I had cited wrongly on the
+    first pass.
+
+  Where I followed the specs over your wording
+  - 0008: SYS-R18 says "up to 3 attempts in total", which means 2 retries. Your
+    text said "retry at most 3 times", so the ADR uses the spec's wording and
+    its backoff formula. It also adds details the specs already fix: the lock
+    timeout is set per transaction via set_config(..., true) (no SET statements,
+    because of RDS Proxy, SEC-R30 and SEC-R31), the idempotency wait (409) is
+    separate from the account lock wait (503), and the timeout budget comes from
+    SEC-R35.
+  - 0007: I added a fourth option, "drop the foreign key", to give an honest
+    account of why FOR KEY SHARE is accepted. The spec had already settled this,
+    so the decision doesn't change.
+
+  Spec metadata
+  - I replaced "none yet" on the "Related ADRs" line of all nine specs with
+    links to the relevant ADRs. No requirements or ACs changed.
+  - Prettier reformatted the specs and the ADR index after the edits.
+
+  Nothing is committed yet. What's left is /audit, then /ship.
+
+✻ Cogitated for 4m 16s · done Wednesday 11:52 PM
+
+※ recap: We're in phase 03, recording your eight accepted architecture decisions as ADRs. All eight are written and linked from the specs, and the checks pass. Next is running /audit, then /ship to commit and push.
+
+❯ Two changes before the audit:                                                 
+  1. ADR-0004: Fastify validates the route schema before the handler runs, but  
+  SYS-R31, IDM-R06 and IDM-R08 put the idempotent replay before validation, so  
+  a replay must never get a 422. Record how the design reconciles them: routes  
+  that take an Idempotency-Key keep their Zod schema for typing and OpenAPI,    
+  but with Fastify's attachValidation, so the validation error is answered      
+  after the replay step, inside the transaction after the savepoint (spec 005   
+  section 1.1), and the handler never uses the body before that check; routes   
+  without a key validate normally. Add it to the Decision, to Negative / costs, 
+  and to the phase 08-api follow-up.                                            
+  2. ADR-0006, Option C: the con about numeric is not fair as written, since    
+  numeric without a fixed scale is exact. Replace it with the real trade-off:   
+  exact decimal types exist (PostgreSQL numeric, decimal libraries), but        
+  JavaScript has no native decimal, so amounts would still travel as strings    
+  and every operation would need a library, while integer minor units give      
+  exact arithmetic with native bigint and one representation in the domain, the 
+  database and the API. Keep the float con.                                     
+     Change nothing else. Run npm run check.                                    
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; sed -n 14,31p
+      specs/005-idempotency/spec.md | cut -c1-1200; grep -n
+      "Decision\|Negative\|08-api\|Option C" docs/adr…)
+  ⎿  ### 1.1 Life of a request with a key
+
+     Within the order of SYS-R31:
+     … +31 lines (ctrl+o to expand)
+
+  Read 2 files (ctrl+o to expand)
+
+⏺ Update(docs/adr/0004-typescript-with-fastify.md)  ⎿  Added 6 lines
+      57  
+      58  Fastify lives only in the HTTP adapters and the composition roo
+          t (`src/app.ts`); the domain never imports it (ADR-0003).
+      59  
+      60 +Fastify validates the route schema before the handler runs, but
+         + SYS-R31, IDM-R06 and IDM-R08 put the idempotent replay before 
+         +validation, so a replay must never get a 422. The design reconc
+         +iles them this way:                                            
+      61 +                                                               
+      62 +- Routes that take an `Idempotency-Key` keep their Zod schema f
+         +or typing and OpenAPI, but are registered with Fastify's `attac
+         +hValidation`. The validation error is attached to the request i
+         +nstead of answered, and it is answered after the replay step: i
+         +nside the database transaction, after the savepoint (steps 4 an
+         +d 5 of section 1.1 of spec 005).                               
+      63 +- The handler never uses the body before that check.           
+      64 +- Routes without an `Idempotency-Key` validate normally, before
+         + the handler.                                                  
+      65 +                                                               
+      66  ## Consequences
+      67  
+      68  ### Positive
+
+⏺ Update(docs/adr/0004-typescript-with-fastify.md)
+  ⎿  Added 1 line
+      75  
+      76  - Fastify's default error and 404 bodies must be overridden eve
+          rywhere so every error, including framework ones (body too larg
+          e, unsupported media type, malformed JSON), is a problem detail
+          s body.
+      77  - Plugin scope mistakes are easy to make and must be covered by
+           tests of the order of checks (SYS-AC23).
+      78 +- Routes that take an `Idempotency-Key` give up Fastify's autom
+         +atic validation: the handler must check the attached validation
+         + error itself, at the right step, and until then the body's typ
+         +e is a promise the runtime has not kept. A handler that reads t
+         +he body before that check, or forgets the check, breaks the ord
+         +er of SYS-R31.                                                 
+      79  
+      80  ### To monitor
+      81  
+
+⏺ Update(docs/adr/0004-typescript-with-fastify.md)
+  ⎿  Added 1 line, removed 1 line
+      84  
+      85  ### Follow-ups
+      86  
+      87 -- Phase 08-api builds the error handler, the hooks in the order
+         - of SYS-R31 and the OpenAPI document.                          
+      87 +- Phase 08-api builds the error handler, the hooks in the order
+         + of SYS-R31 and the OpenAPI document, and registers the routes 
+         +that take an `Idempotency-Key` with `attachValidation`, answeri
+         +ng their validation error after the replay step and the savepoi
+         +nt, with tests that a replay of a request that would now fail v
+         +alidation still gets its stored response.                      
+
+⏺ Update(docs/adr/0006-double-entry-ledger-with-signed-integer-minor-units.md)
+  ⎿  Added 1 line, removed 1 line
+      50    - Amounts look like the major units people read (`10.50`).
+      51  - **Cons:**
+      52    - Floats cannot represent most decimal fractions exactly and 
+          accumulate rounding errors.
+      53 -  - `numeric` with a fixed scale cannot represent every currenc
+         -y's exponent with one column and invites arithmetic in floats a
+         -t the edges (JSON numbers, `parseFloat`).                      
+      53 +  - Exact decimal types exist (PostgreSQL `numeric`, decimal li
+         +braries), but JavaScript has no native decimal: amounts would s
+         +till travel as strings, and every operation would need a librar
+         +y. Integer minor units give exact arithmetic with native `bigin
+         +t` and one representation in the domain, the database and the A
+         +PI.                                                            
+      54  
+      55  ## Decision
+      56  
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; npx prettier --write
+      docs/adr >/dev/null; npm run check 2>&1 | tail -5; git status --short)
+  ⎿        Tests  37 passed (37)
+        Start at  00:00:49
+        Duration  401ms (tests 60%, import 21%, transform 16%, setup 2%, wo
+     … +14 lines (ctrl+o to expand)
+
+⏺ I made both changes and npm run check passes.
+
+  1. ADR-0004
+     - Decision: explains the reconciliation. Routes that take an
+       Idempotency-Key keep their Zod schema for typing and OpenAPI, but use
+       attachValidation. Their validation error is answered after the replay
+       step, inside the transaction after the savepoint (spec 005 section 1.1,
+       steps 4 and 5). The handler never touches the body before that check, and
+       routes without a key validate normally.
+     - Negative / costs: these routes lose Fastify's automatic validation. A
+       handler that reads the body early, or forgets the check, breaks the order
+       of SYS-R31.
+     - Phase 08-api follow-up: register these routes with attachValidation. I
+       also added a test that wasn't in your request, so check you want it: a
+       replay of a request that would now fail validation still gets its stored
+       response.
+  2. ADR-0006, Option C: the numeric con now reads: exact decimal types exist,
+     but JavaScript has no native decimal, so amounts would still travel as
+     strings and every operation would need a library. Integer minor units give
+     exact arithmetic with native bigint and one representation in the domain,
+     the database and the API. The float con is unchanged.
+
+  Nothing else changed, and nothing is committed yet. Next is /audit.
+
+✻ Worked for 29s · done 12:00 AM
+
+❯ /audit                                                                        
+  ⎿  Audit of phase/03-adrs
+
+     The branch has no commits ahead of main. The scope is the nine "Related ADRs" lines changed in the specs, plus the untracked docs/adr/ folder (eight ADRs and the index). There is no code to review, so every finding is about whether the ADRs match the approved specs, AGENTS.md and the repository.
+
+     Findings
+
+     1. High: the idempotency ADR that spec 005 requires in this phase was not written
+     - Where: specs/005-idempotency/spec.md:12; docs/adr/README.md:9-18
+     - What is wrong: spec 005 says the idempotency design "is decided and will be recorded in an ADR (phase 03-adrs)". None of the eight ADRs is about it. ADR-0005 (one sentence) and ADR-0008 (the timeout ordering) only touch parts of it. Nowhere are the alternatives weighed: a key row inserted first inside the transaction, against a separate pre-transaction claim, a Redis store, or a stored status with polling. Nor are the consequences recorded: waiting on another request's row lock, the savepoint, what gets stored, expiry and cleanup.
+     - How to trigger: look for an ADR about idempotency in docs/adr/. There is none.
+     - Impact: phase 07-idempotency starts with no recorded reasoning for a core guarantee. It also breaks AGENTS.md §2 ("every decision is recorded in docs/adr/") and a commitment written in an approved spec.
+     - Suggested fix: add an ADR, "Idempotency keys as the first write of the movement's transaction". Weigh the options above, cite IDM-R06, R10–R18 and R21–R22, and add it to the "Related ADRs" lines of specs 000, 003, 004 and 005.
+     - AC: none; a missing ADR that spec 005 §1 commits to.
+
+     2. Medium (security): the production authentication ADR that spec 006 requires in this phase was not written
+     - Where: specs/006-auth/spec.md:10, specs/006-auth/spec.md:255
+     - What is wrong: spec 006 says the production design will be recorded in an ADR in phase 03-adrs. That design is an external OpenID Connect provider with RS256 or ES256 signatures and keys fetched through JWKS. The ADR must also cover how to map provider subjects that are not UUIDs. There is no such ADR, and no ADR on the current choice of HS256 with a shared secret either.
+     - How to trigger: look for "OIDC", "JWKS" or "HS256" in docs/adr/. Nothing matches.
+     - Impact: a security decision that was explicitly assigned to this phase is undocumented. The shortcut of a shared symmetric secret is not recorded as a deliberate, temporary choice, which matters because AUT-R03 requires sub to be a UUID.
+     - Suggested fix: add an ADR, "Simulated HS256 JWTs now, an OIDC provider with JWKS in production". Include the mapping of non-UUID subjects, and list the ADR in spec 006 and spec 007.
+     - AC: none; a missing ADR that spec 006 §1 and §6 commit to.
+
+     3. Medium (idempotency): ADR-0003 says every database constraint failure answers 500, but one required case answers 409
+     - Where: docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md:72
+     - What is wrong: the ADR says: "a database constraint failing means the domain missed a rule, and answers 500 (LED-R28)". That is wrong for the unique constraint that allows only one reversal per transaction (REV-R05). REV-R06 says that rejection answers 409 /problems/already-reversed and "never 500". IDM-R14 says it is stored for replay. LED-R28 covers only the ledger checks of spec 002.
+     - How to trigger: implement the HTTP error mapping as ADR-0003 describes. REV-AC08 and IDM-AC17 then get 500 instead of a stored 409.
+     - Impact: a business rejection is turned into an error that is not stored. A retry with the same key re-runs the request instead of replaying the 409.
+     - Suggested fix: limit the sentence to the ledger checks of LED-R28. State that the unique violation of REV-R05 maps to the typed already-reversed rejection and is stored, as IDM-R14 requires.
+     - AC: contradicts REV-R06, IDM-R14 (REV-AC08, IDM-AC17).
+
+     4. Medium (money): ADR-0006 claims a lint rule forbids Number() on amounts, but none does
+     - Where: docs/adr/0006-double-entry-ledger-with-signed-integer-minor-units.md:35; eslint.config.js:35-39
+     - What is wrong: the ADR says "a stray Number() or parseFloat would silently lose precision (forbidden by AGENTS.md and a lint rule)". The lint config only forbids the global parseFloat and Number.parseFloat. Number(x), unary +x, parseInt and Number.parseInt all pass lint.
+     - How to trigger: write const a = Number(row.amount) anywhere, including in a domain file. npm run lint passes.
+     - Impact: later phases may rely on a guard for the main money rule that does not exist.
+     - Suggested fix: either change the ADR to say only parseFloat is linted and Number() is caught by review and by the LED-AC22 test, or add lint rules. A narrow option is restricting Number and parseInt in src/modules/*/domain/** and in the amount schema.
+     - AC: none; documentation of the AGENTS.md §3 money rule.
+
+     5. Low: ADR-0004 lets route schemas check path ids and headers, which breaks the order of checks
+     - Where: docs/adr/0004-typescript-with-fastify.md:62-64
+     - What is wrong:
+       - The ADR says routes without a key "validate normally, before the handler", and that routes with a key keep their whole Zod schema with attachValidation.
+       - If those schemas include a UUID rule for params.id or a header rule for Idempotency-Key:
+         - "not-a-uuid" in the path answers 422 at validation instead of 404 at the lookup step (SYS-R42).
+         - On routes that take a key, a malformed key is attached and answered 422 after the key insert, instead of 400 before it (SYS-R26, IDM-R03).
+     - How to trigger: declare params: z.object({ id: z.uuid() }) on GET /v1/accounts/:id. SYS-AC03 and SYS-AC25 then fail.
+     - Impact: wrong status codes and a broken order of checks, which tests will catch in phase 08.
+     - Suggested fix: state in the ADR that route schemas validate only the body and query string. Path ids are typed as plain strings and checked at the lookup step, and the key header is parsed at the malformed-request step.
+     - AC: SYS-R26, SYS-R31, SYS-R42.
+
+     6. Low: ADR-0001 says an independent /audit runs before every push, but nothing enforces it
+     - Where: docs/adr/0001-spec-driven-development-with-adrs-and-ai-agents.md:58, :60; .claude/skills/ship/SKILL.md:79
+     - What is wrong: the ADR's decision relies on "an independent /audit before every push". /ship neither runs nor requires an audit. It only copies the last verdict into the pull request body, and only "if it appears in this conversation".
+     - How to trigger: run /ship without running /audit. It commits and pushes.
+     - Impact: the ADR describes a stronger control than exists.
+     - Suggested fix: either reword the ADR ("recommended before each push and reported in the pull request") or make /ship stop when no audit verdict is present.
+     - AC: none.
+
+     7. Low: two other ADRs that spec 007 promises are not written
+     - Where: specs/007-security-ops/spec.md:121, :127; docs/adr/0008-read-committed-with-ordered-pessimistic-row-locks.md:57, :82-86
+     - What is wrong:
+       - Spec 007 §1.8 says expand-then-contract migrations are "recorded in an ADR". There is none.
+       - Spec 007 §1.9 says the claim about RDS Proxy (it pins a connection on SET and a direct set_config, but not on a function call) is recorded in an ADR, with its source in AWS documentation and a re-check in phase 12-infra. ADR-0008 mentions the function only in passing, with no source and no phase 12 follow-up.
+     - Impact: if the RDS Proxy claim is wrong, connection pinning in AWS goes unnoticed. The migration rule that SEC-R24 readiness depends on has no recorded rationale.
+     - Suggested fix: add an ADR on migrations (expand-then-contract). Add the RDS Proxy claim with its documentation source to a new ADR, or as a follow-up for phase 12, since accepted ADRs are not edited.
+     - AC: SEC-R24, SEC-R30, SEC-R31 (missing ADRs).
+
+     8. Low: related-spec links and citations are inaccurate in places
+     - Where: docs/adr/0004-…:5, specs/005-idempotency/spec.md:5; docs/adr/0002-modular-monolith.md:13; docs/adr/0005-…:28; docs/adr/0006-…:59
+     - What is wrong:
+       - ADR-0004 designs how spec 005 is handled (IDM-R06, IDM-R08, steps 4–5 of §1.1) but does not list spec 005, and spec 005 does not list ADR-0004. docs/adr/README.md:6 requires both links.
+       - ADR-0002 cites SYS-R17 (serializability) as an atomicity driver.
+       - ADR-0005 says roles and privileges make the ledger append-only. LED-R16 also binds the owner role, which privileges alone cannot do, so triggers are needed.
+       - ADR-0006 says amounts are "capped per movement" by MAX_AMOUNT_MINOR. Spec 002 §1.4 exempts reversals from the cap.
+     - Impact: small misreadings for the phase 05 and 07 implementers.
+     - Suggested fix: add the 0004 ↔ 005 links (spec metadata may be changed without asking). Fix the other points in a follow-up ADR or when the next ADR touches the topic.
+     - AC: none.
+
+     Deferred, already planned: plan.md and tasks.md (04-plans), migrations, roles, triggers and the lock-timeout function (05-schema), domain code (06), idempotency (07), the error handler and attachValidation routes (08), the reconcile step in CI (LED-AC17), RDS Proxy and Terraform (12-infra), the phase 03 transcript and its row in docs/ai/README.md (close of phase via /ship), and spec statuses moving to Implemented (13).
+
+     Categories without findings
+
+     - Spec conformance (code and tests): no code or tests changed. The "Related ADRs" lines match each ADR's "Related specs" line in both directions, except the 0004 ↔ 005 gap in finding 8.
+     - Transactions and concurrency: ADR-0007 and ADR-0008 match MOV-R18–R20, R29–R31, SYS-R18/R19, LED-R14 and SEC-R31/R34/R35, including the lock order, never locking system accounts, the bounded retries and the separate idempotency (409) and account lock (503) timeouts.
+     - Failure handling: the ADRs keep the timeout order database < service < load balancer, the pool sizing and the problem+json errors, consistent with spec 007.
+     - Tests: none changed in this scope.
+
+     Verdict: fix before shipping
+
+❯ Triage of the audit. Findings 1, 2 and 7 are planned: the idempotency,        
+  authentication, timeouts and RDS Proxy, and migrations ADRs come in my next   
+  prompt, in this same branch, before the phase closes. Do not write them now.  
+  Fix the rest in ADRs 0001 to 0008, which are still uncommitted:               
+  3. ADR-0003: limit the 500 sentence to the ledger checks of LED-R28. Say that 
+  the persistence adapter translates the constraint violations the specs name   
+  into typed domain rejections, so the unique violation of REV-R05 becomes      
+  already-reversed, answers 409 and is stored for replay (REV-R06, IDM-R14);    
+  only other database rejections answer 500.                                    
+  4. ADR-0006: AGENTS.md forbids converting amounts to number; the lint rule    
+  forbids parseFloat today, and phase 06-domain extends it to Number(),         
+  Number.parseInt, parseInt and unary + in src/modules//domain/* and            
+  src/modules/*/application/**. Until then, review and LED-AC22 catch it.       
+  5. ADR-0004: replace the attachValidation text with this. Route schemas never 
+  decide the order of checks. Every route registers its Zod schemas with        
+  attachValidation, so a schema error is answered only at the validation step   
+  of SYS-R31, after the replay on routes that take a key. Path ids, the         
+  Idempotency-Key header and the pagination cursor are plain strings in those   
+  schemas and are checked at their own steps: a path id that is not a UUID      
+  answers 404 at lookup (SYS-R42), and a malformed key or cursor answers 400 at 
+  the malformed-request step (SYS-R26, IDM-R03). The handler never uses the     
+  body before that check.                                                       
+  6. ADR-0001: reword the audit claim to what exists: the workflow runs /audit  
+  before each push, and /ship reports its last verdict in the pull request;     
+  /ship does not enforce it.                                                    
+  8. Add spec 005 to ADR-0004's Related specs line and ADR-0004 to spec 005's   
+  Related ADRs line. ADR-0002: drop SYS-R17 from the atomicity driver.          
+  ADR-0005: privileges stop the runtime role and the triggers also stop the     
+  owner (LED-R16, LED-R17); say that both make the ledger append-only.          
+  ADR-0006: MAX_AMOUNT_MINOR caps the amount of deposit, withdrawal and         
+  transfer requests; a reversal carries no amount and is not capped (spec 002   
+  section 1.4).                                                                 
+  Change nothing else. Run npm run check and npm run trace.                     
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances/docs/adr; grep -n "answers
+      500 (LED-R28)" 0003*; grep -n "lint rule\|parseFloat" 0006*; grep -n
+      "attachValidation\|R…)
+  ⎿  72:- Domain rejections and database rejections are distinct: a databas
+     e constraint failing means the domain missed a rule, and answers 500 (
+     LED-R28).
+     … +46 lines (ctrl+o to expand)
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; python3 - <<'EOF'
+      def rep(path, old, new):…)
+  ⎿  5:- **Related ADRs:** [ADR-0001](../../docs/adr/0001-spec-driven-devel
+     opment-with-adrs-and-ai-agents.md), [ADR-0002](../../docs/adr/0002-mod
+     ular-monolith.md), [ADR-0003](../../docs/adr/0003-hexagonal-architectu
+     … +7 lines (ctrl+o to expand)
+  ⎿  Updated
+     docs/adr/0001-spec-driven-development-with-adrs-and-ai-agents.md (+2 
+     -2)
+      55  
+      56  ## Decision
+      57  
+      58 -Chosen option: **Option A**, because behaviour defined in specs
+         - with acceptance criteria before code, decisions recorded as AD
+         -Rs, agents bound by `AGENTS.md` and an independent `/audit` bef
+         -ore every push make AI output verifiable, while code first lets
+         - behaviour and rationale drift. The gate is what makes the spec
+         -s binding: every AC is proven by a test that actually ran and p
+         -assed, read from Vitest's JSON reports rather than the source, 
+         -and enforced for every ticked task, so it works from the first 
+         -implementation phase.                                          
+      58 +Chosen option: **Option A**, because behaviour defined in specs
+         + with acceptance criteria before code, decisions recorded as AD
+         +Rs, agents bound by `AGENTS.md` and an independent `/audit` in 
+         +the workflow make AI output verifiable, while code first lets b
+         +ehaviour and rationale drift. The gate is what makes the specs 
+         +binding: every AC is proven by a test that actually ran and pas
+         +sed, read from Vitest's JSON reports rather than the source, an
+         +d enforced for every ticked task, so it works from the first im
+         +plementation phase.                                            
+      59  
+      60 -The workflow is the one in AGENTS.md section 2: spec, ADR, plan
+         - and tasks, tests first, then code. Specs are `Draft`, then `Ap
+         -proved` by the owner, and all move to `Implemented` together in
+         - phase 13-final-review, when every AC of every spec must be pro
+         -ven (specs/README.md). CI and `/ship` run `npm run trace -- --r
+         -equire unit,integration`; e2e ACs are enforced from phase 12, w
+         -hen CI runs the e2e suite. `/ship` commits and pushes only afte
+         -r the quality gates pass and reports the verdict of the last `/
+         -audit`.                                                        
+      60 +The workflow is the one in AGENTS.md section 2: spec, ADR, plan
+         + and tasks, tests first, then code. Specs are `Draft`, then `Ap
+         +proved` by the owner, and all move to `Implemented` together in
+         + phase 13-final-review, when every AC of every spec must be pro
+         +ven (specs/README.md). CI and `/ship` run `npm run trace -- --r
+         +equire unit,integration`; e2e ACs are enforced from phase 12, w
+         +hen CI runs the e2e suite. `/ship` commits and pushes only afte
+         +r the quality gates pass. The workflow runs `/audit` before eac
+         +h push, and `/ship` reports its last verdict in the pull reques
+         +t; `/ship` does not enforce it.                                
+      61  
+      62  ## Consequences
+      63  
+  ⎿  Updated docs/adr/0002-modular-monolith.md (+1 -1)
+      10  
+      11  ## Decision drivers
+      12  
+      13 -- One movement is one atomic unit across accounts, ledger, idem
+         -potency and audit (SYS-R11, SYS-R17).                          
+      13 +- One movement is one atomic unit across accounts, ledger, idem
+         +potency and audit (SYS-R11).                                   
+      14  - Horizontal scaling with several stateless replicas (SYS-R16, 
+          DEP-R27).
+      15  - Few failure modes: no partial movements, no distributed recov
+          ery logic.
+      16  - Clear internal boundaries, so the code stays understandable a
+          nd a module could be extracted later.
+  ⎿  Updated docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md (+1 
+     -1)
+      69  
+      70  - The order of checks of section 1.4 of spec 003 and section 1.
+          4 of spec 004 is code in one use case, unit-testable step by st
+          ep.
+      71  - Swapping or upgrading Fastify or Kysely touches adapters only
+          .
+      72 -- Domain rejections and database rejections are distinct: a dat
+         -abase constraint failing means the domain missed a rule, and an
+         -swers 500 (LED-R28).                                           
+      72 +- Domain rejections and database rejections are distinct. The p
+         +ersistence adapter translates the constraint violations the spe
+         +cs name into typed domain rejections: the unique violation of R
+         +EV-R05 becomes `already-reversed`, answers 409 and is stored fo
+         +r replay (REV-R06, IDM-R14). A rejection by one of the ledger c
+         +hecks of spec 002 means the domain missed a rule and answers 50
+         +0 (LED-R28), and so does any other database rejection.         
+      73  
+      74  ### Negative / costs
+      75  
+  ⎿  Updated docs/adr/0004-typescript-with-fastify.md (+5 -5)
+      2  
+      3  - **Status:** Accepted
+      4  - **Date:** 2026-10-07
+      5 -- **Related specs:** 000-overview, 006-auth, 007-security-ops   
+      5 +- **Related specs:** 000-overview, 005-idempotency, 006-auth, 00
+        +7-security-ops                                                  
+      6  
+      7  ## Context and problem
+      8  
+     ...
+      59  
+      60  Fastify validates the route schema before the handler runs, but
+           SYS-R31, IDM-R06 and IDM-R08 put the idempotent replay before 
+          validation, so a replay must never get a 422. The design reconc
+          iles them this way:
+      61  
+      62 -- Routes that take an `Idempotency-Key` keep their Zod schema f
+         -or typing and OpenAPI, but are registered with Fastify's `attac
+         -hValidation`. The validation error is attached to the request i
+         -nstead of answered, and it is answered after the replay step: i
+         -nside the database transaction, after the savepoint (steps 4 an
+         -d 5 of section 1.1 of spec 005).                               
+      62 +- Route schemas never decide the order of checks. Every route r
+         +egisters its Zod schemas with `attachValidation`, so a schema e
+         +rror is answered only at the validation step of SYS-R31: after 
+         +the replay on routes that take a key, inside the database trans
+         +action after the savepoint (steps 4 and 5 of section 1.1 of spe
+         +c 005).                                                        
+      63 +- Path ids, the `Idempotency-Key` header and the pagination cur
+         +sor are plain strings in those schemas and are checked at their
+         + own steps: a path id that is not a UUID answers 404 at lookup 
+         +(SYS-R42), and a malformed key or cursor answers 400 at the mal
+         +formed-request step (SYS-R26, IDM-R03).                        
+      64  - The handler never uses the body before that check.
+      64 -- Routes without an `Idempotency-Key` validate normally, before
+         - the handler.                                                  
+      65  
+      66  ## Consequences
+      67  
+     ...
+      75  
+      76  - Fastify's default error and 404 bodies must be overridden eve
+          rywhere so every error, including framework ones (body too larg
+          e, unsupported media type, malformed JSON), is a problem detail
+          s body.
+      77  - Plugin scope mistakes are easy to make and must be covered by
+           tests of the order of checks (SYS-AC23).
+      78 -- Routes that take an `Idempotency-Key` give up Fastify's autom
+         -atic validation: the handler must check the attached validation
+         - error itself, at the right step, and until then the body's typ
+         -e is a promise the runtime has not kept. A handler that reads t
+         -he body before that check, or forgets the check, breaks the ord
+         -er of SYS-R31.                                                 
+      78 +- Routes give up Fastify's automatic validation: the handler mu
+         +st check the attached validation error itself, at the validatio
+         +n step, and until then the body's type is a promise the runtime
+         + has not kept. A handler that reads the body before that check,
+         + or forgets the check, breaks the order of SYS-R31.            
+      79  
+      80  ### To monitor
+      81  
+     ...
+      84  
+      85  ### Follow-ups
+      86  
+      87 -- Phase 08-api builds the error handler, the hooks in the order
+         - of SYS-R31 and the OpenAPI document, and registers the routes 
+         -that take an `Idempotency-Key` with `attachValidation`, answeri
+         -ng their validation error after the replay step and the savepoi
+         -nt, with tests that a replay of a request that would now fail v
+         -alidation still gets its stored response.                      
+      87 +- Phase 08-api builds the error handler, the hooks in the order
+         + of SYS-R31 and the OpenAPI document, and registers every route
+         + with `attachValidation`, answering a schema error at the valid
+         +ation step of SYS-R31 (after the replay step and the savepoint 
+         +on routes that take a key), with tests that a replay of a reque
+         +st that would now fail validation still gets its stored respons
+         +e.                                                             
+  ⎿  Updated docs/adr/0005-postgresql-as-the-only-source-of-truth.md (+1 
+     -1)
+      25    - ACID transactions: a movement's idempotency record, locks, 
+          ledger entries, balance changes and audit record commit togethe
+          r (SYS-R11).
+      26    - Row locks (`SELECT ... FOR UPDATE`) and `lock_timeout` for 
+          the concurrency model of ADR-0008.
+      27    - The database enforces invariants independently of the code:
+           CHECK constraints (non-zero amounts, `balance >= 0` on custome
+          r accounts, no cached balance on system accounts, LED-R03, LED-
+          R12, LED-R13), unique indexes (one reversal per transaction, RE
+          V-R05; one key row per user and key, spec 005) and deferrable c
+          onstraint triggers that check at commit that each transaction b
+          alances, has two or more entries and one currency (LED-R04 to L
+          ED-R07), and that no key row is committed without a result (IDM
+          -R18).
+      28 -  - Roles and privileges make the ledger append-only for the ru
+         -ntime role (LED-R16, LED-R17).                                 
+      28 +  - Privileges and triggers both make the ledger append-only: p
+         +rivileges stop the runtime role, and the triggers also stop the
+         + owner role (LED-R16, LED-R17).                                
+      29    - `numeric` gives arbitrary-precision sums for system balance
+          s and reconciliation (LED-R15), and REPEATABLE READ gives the r
+          econciliation one consistent snapshot without locks (LED-R20).
+      30    - Idempotency keys live in the same transaction as the moveme
+          nt, so a key and its effects can never disagree (IDM-R06).
+      31    - Mature managed offering (RDS Multi-AZ with RDS Proxy, DEP-R
+          29).
+  ⎿  … 2 more files changed
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; grep -n "MAX_AMOUNT_MINOR"
+      docs/adr/0006*; npx prettier --write docs/adr specs >/dev/null; npm run
+      check 2>&1 | tai…)
+  ⎿  59:Where the specs fix the details, this ADR follows them: every amoun
+     t accepted by the API is 1 to 9223372036854775807 minor units (SYS-R07
+     ), and `MAX_AMOUNT_MINOR` caps the amount of deposit, withdrawal and t
+     … +14 lines (ctrl+o to expand)
+
+⏺ I fixed audit findings 3, 4, 5, 6 and 8 as you specified. npm run check passes
+  and npm run trace exits 0 (219 ACs: 0 missing, 201 pending, 18 unverified).
+
+  - 3, ADR-0003: the persistence adapter turns the constraint violations the
+    specs name into typed rejections. So the REV-R05 unique violation becomes
+    already-reversed, answers 409 and is stored for replay (REV-R06, IDM-R14).
+    The 500 now covers only the ledger checks of LED-R28 and any other database
+    rejection.
+  - 4, ADR-0006: AGENTS.md forbids converting amounts to number. The lint rule
+    covers only parseFloat today, and phase 06-domain extends it to Number(),
+    Number.parseInt, parseInt and unary + in domain/** and application/**. Until
+    then, review and LED-AC22 catch it.
+  - 5, ADR-0004: I replaced the reconciliation text with yours. Two other lines
+    described the old key-routes-only design, so I aligned them to say every
+    route uses attachValidation:
+    - the line under Negative / costs;
+    - the phase 08-api follow-up.
+  - 6, ADR-0001: it now says the workflow runs /audit before each push and /ship
+    reports the last verdict in the pull request, but /ship does not enforce
+    it.
+  - 8:
+    - ADR-0004 and spec 005 now link to each other.
+    - ADR-0002 no longer cites SYS-R17.
+    - ADR-0005 now says privileges stop the runtime role and the triggers also
+      stop the owner.
+    - ADR-0006 says MAX_AMOUNT_MINOR caps only deposit, withdrawal and transfer
+      requests, and reversals are not capped.
+
+  Findings 1, 2 and 7 are left for the ADRs in your next prompt. Nothing is
+  committed yet.
+
+❯ /effort 
+  ⎿  Set effort level to medium (saved as your default for new sessions): Balanced approach with standard implementation and testing
+
+✻ Sautéed for 39s · done 12:08 AM
+
+❯ Using the adr skill, record these accepted decisions, one ADR each,           
+  continuing the numbering, with status Accepted. Keep my reasoning; add        
+  technical detail, the alternatives with honest pros and cons, and             
+  consequences, and link each ADR to the spec requirements it explains. Where a 
+  spec already fixed a detail, the ADR follows the spec.                        
+                                                                                
+  0009 Idempotency inside the movement's transaction. The key row is the first  
+  write of the same transaction, so the key and its effect commit or roll back  
+  together: no stuck "in progress" keys and no recovery job. Concurrent         
+  duplicates wait on the key row and then read the stored response; the wait is 
+  bounded and holds a pool connection, which is the main cost. A savepoint      
+  after the key insert lets a business rejection be stored and committed        
+  without its effects. A replay is answered before validation, so a             
+  configuration change or a newer version never turns an applied movement into  
+  an error. Keys expire after 24 hours and an hourly job deletes them.          
+  Alternatives: a two-phase design (claim the key, commit, execute, complete)   
+  is needed when calling external systems that cannot join the transaction; we  
+  have none, so it is the documented evolution path. A Redis store would make   
+  money correctness depend on Redis (SEC-R07) and cannot commit atomically with 
+  the ledger. A stored status with client polling adds a state machine and      
+  recovery for keys left in progress. In-process memory is not shared between   
+  replicas.                                                                     
+                                                                                
+  0010 Kysely and pg instead of an ORM. Money code needs explicit transactions  
+  and row locks. Kysely is a typed SQL builder with forUpdate() and no hidden   
+  queries; migrations are plain SQL, so constraints and triggers are            
+  reviewable. Prisma and TypeORM hide transaction and locking semantics; raw pg 
+  alone loses type safety.                                                      
+                                                                                
+  0011 Amounts as strings in the API and bigint in the domain. JSON numbers     
+  lose precision above 2^53 in JavaScript clients, and pg already returns       
+  bigint as a string. Digit strings in minor units are unambiguous, validated   
+  by a strict regular expression and a bigint range check, and converted to     
+  bigint at the edge. Alternative: decimal strings ("10.50"), friendlier to     
+  read but they mix formatting with value and depend on the currency exponent.  
+                                                                                
+  0012 Simulated authentication with JWT and two roles. The challenge allows    
+  simulating authentication. HS256 tokens, with the algorithm pinned, a secret  
+  of at least 32 bytes, sub, role, iss, aud and a 15-minute exp, minted by a    
+  CLI script; the API never issues tokens, and every failure answers the same   
+  401. Roles: customer and operator, one per identity. Production: an external  
+  OIDC provider with asymmetric keys (RS256 or ES256) and JWKS rotation, and    
+  mTLS between internal services. The service keeps UUID user ids (AUT-R03), so 
+  a provider whose subjects are not UUIDs needs a mapping: a users table from   
+  (issuer, subject) to a UUIDv7 created the first time the subject is seen. A   
+  UUIDv5 derived from issuer and subject was considered: stateless, but it ties 
+  every id to one provider forever.                                             
+                                                                                
+  0013 Rate limiting at the edge and in Redis. In-memory limits break with      
+  several replicas. nginx (AWS WAF in production, with a one-minute window)     
+  limits per IP before traffic reaches the service; the service limits per user 
+  with a fixed window in Redis, shared by all replicas, and fails open if       
+  Redis is down because money correctness never depends on it. A                
+  PostgreSQL-backed limiter would add write load to the critical database.      
+                                                                                
+  0014 AWS deployment on ECS Fargate with RDS PostgreSQL. Long-lived stateless  
+  containers fit connection pooling and graceful shutdown; Fargate removes      
+  server management; RDS Multi-AZ gives managed failover and backups, and RDS   
+  Proxy absorbs connection spikes during scaling and failover. Private tasks    
+  reach AWS services through VPC endpoints instead of a NAT gateway. Containers 
+  report liveness, the load balancer checks readiness, so a database outage     
+  never makes ECS replace every task. Lambda brings cold starts and connection  
+  storms; EKS adds operational overhead not justified for one service; Aurora   
+  PostgreSQL fails over faster but costs more, so it is the upgrade path.       
+                                                                                
+  0015 Terraform for infrastructure as code. Widely known, with a plan and      
+  review workflow, reusable modules, and static scanning with tflint and        
+  checkov in CI through npm run infra:validate, which runs pinned Docker        
+  images. Secrets are created without values, so none enters the state. AWS CDK 
+  and Pulumi would let us use TypeScript, but Terraform is easier for most      
+  reviewers to read. The code is validated and scanned in CI, never applied     
+  from this repository.                                                         
+                                                                                
+  0016 Error model. Every error is RFC 9457 problem details with a requestId.   
+  400 means the request itself is malformed (JSON that does not parse, a        
+  missing or malformed required header, an invalid cursor); 422 means it was    
+  understood and refused (validation errors with one entry per field, and money 
+  movements refused by a business rule); 409 means it conflicts with the        
+  current state of the resource it acts on (status changes, an already reversed 
+  transaction, an idempotency key still in progress). A single 400 for          
+  everything is simpler, but clients could not tell a bug in their request from 
+  a business refusal.                                                           
+                                                                                
+  0017 Keyset pagination with signed cursors. Lists page by (created_at, id),   
+  never by offset; an entry's created_at is taken after its account lock is     
+  held, so entries of one account are ordered as they committed and a history   
+  page never skips or repeats one. The cursor is opaque, carries created_at at  
+  microsecond precision and the user it was issued to, and is signed with       
+  HMAC-SHA256 using CURSOR_SECRET, a secret separate from JWT_SECRET and shared 
+  by all replicas, so a tampered or foreign cursor answers 400 on any replica.  
+  Offset pagination is simpler but slow on deep pages and unstable while        
+  entries arrive.                                                               
+                                                                                
+  0018 Two database roles. An owner role runs the migrations and owns the       
+  tables; the service connects with a runtime role that holds only the          
+  privileges it needs (SELECT and INSERT on the ledger), so a bug or a          
+  compromised service cannot disable the database checks. Triggers reject       
+  UPDATE, DELETE and TRUNCATE on the ledger even for the owner; only DDL or a   
+  superuser could bypass them, and the service never connects as either. One    
+  shared role is simpler but lets the application turn off its own safety net.  
+                                                                                
+  0019 Timeout layers and RDS Proxy. Each layer gives up before the layer       
+  outside it (lock waits < statement timeout < request timeout < load           
+  balancer), and the service refuses to start with a configuration that breaks  
+  that budget. Database timeouts are set on the runtime role; the               
+  per-transaction lock timeouts go through a small SQL function that calls      
+  set_config(..., true), so they last only until the transaction ends and RDS   
+  Proxy does not pin the connection. Source: the AWS page "Avoiding pinning an  
+  RDS Proxy" (https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-proxy- 
+  pinning.html) lists SET and set_config among the PostgreSQL pinning           
+  conditions, and says that calling stored procedures and stored functions      
+  doesn't cause pinning, because RDS Proxy doesn't detect session state changes 
+  made inside them; the setting is transaction-local, so no state survives the  
+  transaction. Follow-up in phase 12-infra: re-check the page and alarm on      
+  DatabaseConnectionsCurrentlySessionPinned. Per-connection SET statements are  
+  simpler but pin connections behind RDS Proxy.                                 
+                                                                                
+  0020 Expand-then-contract migrations. Migrations run as a separate one-off    
+  task before the new version rolls out, and every change is backwards          
+  compatible with the running version; readiness accepts migrations newer than  
+  the code. Running migrations at service startup is simpler but races between  
+  replicas and couples deploys to schema changes.                               
+                                                                                
+  Then record any other decision that a spec in specs/ says is recorded in an   
+  ADR and that none of the ADRs above covers, continuing the numbering, and     
+  list them in your answer. Update docs/adr/README.md and the Related ADRs line 
+  of every spec.                                                                
+
+⏺ Skill(adr)
+  ⎿  Successfully loaded skill
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; grep -noE
+      '[^.|]*\bADR\b[^.|]*' specs/*/spec.md specs/README.md | grep -v "Related
+      ADRs" | cut -c1-400)
+  ⎿  specs/003-money-movements/spec.md:5:md), [ADR-0002](
+     specs/003-money-movements/spec.md:5:md), [ADR-0003](
+     specs/003-money-movements/spec.md:5:md), [ADR-0006](
+     … +39 lines (ctrl+o to expand)
+
+⏺ Only four spec passages say "recorded in an ADR", and all four are covered by
+  0009, 0012, 0019 and 0020. Let me also check for other decisions the specs
+  defer to an ADR in different wording.
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; grep -noiE
+      '[^.|]*\b(decision|decided|adr|rationale|trade-off)\b[^.|]*'
+      specs/*/spec.md | grep -v "Related ADRs\|Ev…)
+  ⎿  specs/001-accounts/spec.md:5:/docs/adr/0001-spec-driven-development-wi
+     th-adrs-and-ai-agents
+     specs/001-accounts/spec.md:5:md), [ADR-0003](
+     … +105 lines (ctrl+o to expand)
+
+⏺ No other spec passage defers a decision to an ADR. Reading the detail sections
+  the new ADRs must follow, starting with spec 005:
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; sed -n 8,13p
+      specs/005-idempotency/spec.md; sed -n 32,100p
+      specs/005-idempotency/spec.md; sed -n 315,333p specs/005…)
+  ⎿  ## 1. Context and goal
+
+     Clients retry: a timeout, a dropped connection or a crashed replica le
+     … +390 lines (ctrl+o to expand)
+
+⏺ Now spec 006 (auth):
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; sed -n 8,99p
+      specs/006-auth/spec.md; sed -n 244,265p specs/006-auth/spec.md)
+  ⎿  ## 1. Context and goal
+
+     Every request to the service, except the health checks and the API doc
+     … +345 lines (ctrl+o to expand)
+
+⏺ Now spec 007 (security and operations):
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; sed -n 8,130p
+      specs/007-security-ops/spec.md)
+  ⎿  ## 1. Context and goal
+
+     The service holds customer money, runs as several replicas behind a lo
+     … +298 lines (ctrl+o to expand)
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; grep -E '^\| SEC-R[0-9]+'
+      specs/007-security-ops/spec.md | cut -c1-330)
+  ⎿  | SEC-R01 | IF one client IP sends requests through the load balancer
+     faster than `RATE_LIMIT_IP_RPS` per second beyond a burst of `RATE_LIM
+     IT_IP_BURST` THEN THE SYSTEM SHALL answer the excess at the load balan
+     … +220 lines (ctrl+o to expand)
+
+⏺ Now spec 008 (deployment) and the cursor parts of spec 001:
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; sed -n 8,30p
+      specs/008-deployment/spec.md; sed -n 46,124p specs/008-deployment/spec.md;
+      grep -E '^\| DEP-R[0-9]+' s…)
+  ⎿  ## 1. Context and goal
+
+     The challenge asks for a service that is simple to run locally and an
+     … +361 lines (ctrl+o to expand)
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; sed -n 74,80p
+      specs/001-accounts/spec.md; grep -E '^\| ACC-R(0[5-9]|1[0-5]|2[0-4]|30)'
+      specs/001-accounts/spec.md |…)
+  ⎿  ### 1.5 Lists, cursors and timestamps
+
+     - Both lists, `GET /accounts` and `GET /accounts/{id}/entries`, go new
+     … +249 lines (ctrl+o to expand)
+
+⏺ I've read all the specs I need. Before writing ADR-0019, I'll check the AWS
+  page it cites.
+
+⏺ Fetch(https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-proxy-pinning
+       .html)
+  ⎿  Received 11KB (200 OK)
+
+⏺ The AWS page confirms session pinning triggers for PostgreSQL—SET/set_config,
+  nextval, named PREPARE, and advisory locks (stored functions don't pin)—plus
+  the DatabaseConnectionsCurrentlySessionPinned metric. I'll fold these into
+  ADR-0019's consequences and start writing the ADRs now.
+
+⏺ Write(docs/adr/0009-idempotency-inside-the-movements-transaction.md)
+  ⎿  Wrote 110 lines to
+     docs/adr/0009-idempotency-inside-the-movements-transaction.md
+      1 # ADR-0009: Idempotency inside the movement's transaction
+      3 - **Status:** Accepted
+      5 - **Related specs:** 000-overview, 001-accounts, 003-money-moveme
+        nts, 004-reversals, 005-idempotency, 007-security-ops, 008-deploy
+      6 
+      8 
+        ca leaves them not knowing whether money moved. Every money-movin
+        g POST therefore carries an `Idempotency-Key`, and a retry with t
+        in (section 1 of spec 005). Several replicas serve requests (SYS-
+        on different replicas, and a replic
+     … +196 lines (ctrl+o to expand)
+
+⏺ Write(docs/adr/0010-kysely-and-pg-instead-of-an-orm.md)
+  ⎿  Wrote 86 lines to docs/adr/0010-kysely-and-pg-instead-of-an-orm.md
+      1 # ADR-0010: Kysely and pg instead of an ORM
+      3 - **Status:** Accepted
+      5 - **Related specs:** 002-ledger, 003-money-movements, 004-reversa
+        ls, 005-idempotency, 007-security-ops
+      7 ## Context and problem
+      9 The money guarantees depend on exact control of the database: one
+        R-0009), a savepoint, `SELECT ... FOR UPDATE` on customer account
+        s in a fixed order (ADR-0008), a call to the lock-timeout functio
+        gint` values that never pass through `number` (ADR-0006), and con
+        ion 1.3 of spec 
+     … +123 lines (ctrl+o to expand)
+
+⏺ Write(docs/adr/0011-amounts-as-strings-in-the-api-and-bigint-in-the-domain.md)
+  ⎿  Wrote 76 lines to docs/adr/0011-amounts-as-strings-in-the-api-and-bigi
+     nt-in-the-domain.md
+      1 # ADR-0011: Amounts as strings in the API and bigint in the domai
+      2 
+      4 - **Date:** 2026-10-08
+      5 - **Related specs:** 000-overview, 001-accounts, 002-ledger, 003-
+      6 
+      8 
+        Amounts also cross the HTTP API, in requests (deposits, withdrawa
+        ls, transfers) and responses (balances, history entries, transact
+        07). JSON has one number type, and JavaScript parses it as a 64-b
+         where it becomes a `bigint`.
+     … +102 lines (ctrl+o to expand)
+
+⏺ Write(docs/adr/0012-simulated-authentication-with-jwt-and-two-roles.md)
+  ⎿  Wrote 77 lines to
+     docs/adr/0012-simulated-authentication-with-jwt-and-two-roles.md
+      1 # ADR-0012: Simulated authentication with JWT and two roles
+      3 - **Status:** Accepted
+      4 - **Date:** 2026-10-08
+         006-auth, 007-security-ops, 008-deployment
+      7 ## Context and problem
+      8 
+         for one user with one role (SYS-R01). The challenge allows authe
+        ntication to be simulated (docs/challenge.md), but the service st
+        ion, the idempotency key scope and audit records all hang off the
+        on design to be recorded, including how an OpenID Connect p
+     … +129 lines (ctrl+o to expand)
+
+⏺ Write(docs/adr/0013-rate-limiting-at-the-edge-and-in-redis.md)
+  ⎿  Wrote 83 lines to
+     docs/adr/0013-rate-limiting-at-the-edge-and-in-redis.md
+      1 # ADR-0013: Rate limiting at the edge and in Redis
+      3 - **Status:** Accepted
+      4 - **Date:** 2026-10-08
+        nt
+      7 ## Context and problem
+      8 
+        d from one address, or one authenticated user scripting requests.
+         Several replicas sit behind a load balancer (SYS-R16), so a limi
+         allowance by the number of replicas, and would change with every
+        d, and what happens when the counter store fails.
+     … +115 lines (ctrl+o to expand)
+
+⏺ Write(docs/adr/0014-aws-deployment-on-ecs-fargate-with-rds-postgresql.md)
+  ⎿  Wrote 84 lines to
+     docs/adr/0014-aws-deployment-on-ecs-fargate-with-rds-postgresql.md
+      1 # ADR-0014: AWS deployment on ECS Fargate with RDS PostgreSQL
+      3 - **Status:** Accepted
+      4 - **Date:** 2026-10-08
+        yment
+      6 
+      8 
+      9 The challenge asks how the service would run in a cloud, expresse
+         long-running, stateless HTTP process with a connection pool, gra
+        ceful shutdown and health checks (spec 007), backed by PostgreSQL
+        es run it.
+     … +116 lines (ctrl+o to expand)
+
+⏺ Write(docs/adr/0015-terraform-for-infrastructure-as-code.md)
+  ⎿  Wrote 70 lines to
+     docs/adr/0015-terraform-for-infrastructure-as-code.md
+      1 # ADR-0015: Terraform for infrastructure as code
+      2 
+      4 - **Date:** 2026-10-08
+      5 - **Related specs:** 008-deployment
+      6 
+      8 
+      9 The AWS architecture of ADR-0014 must be expressed as infrastruct
+        ure as code, reviewed and checked in CI, but never applied from t
+        lenge must be able to read it. The question is which tool express
+        es it.
+     … +87 lines (ctrl+o to expand)
+
+⏺ Write(docs/adr/0016-error-model.md)
+  ⎿  Wrote 72 lines to docs/adr/0016-error-model.md
+      1 # ADR-0016: Error model
+      3 - **Status:** Accepted
+      4 - **Date:** 2026-10-08
+        money-movements, 004-reversals, 005-idempotency, 006-auth, 007-se
+      6 
+      7 ## Context and problem
+      9 Clients of a money API must know what to do with an error: fix th
+        eir request, give up, or retry with the same `Idempotency-Key`. E
+        lidation, the domain, the database) and must never leak internals
+        and which status code means what.
+     … +113 lines (ctrl+o to expand)
+
+⏺ Write(docs/adr/0017-keyset-pagination-with-signed-cursors.md)
+  ⎿  Wrote 84 lines to
+     docs/adr/0017-keyset-pagination-with-signed-cursors.md
+      1 # ADR-0017: Keyset pagination with signed cursors
+      3 - **Status:** Accepted
+      4 - **Date:** 2026-10-08
+        security-ops
+      7 ## Context and problem
+      8 
+        ry (ACC-R08, ACC-R21). A history grows while a client pages throu
+        gh it, and its entries are money: a page that skips or repeats an
+        (SYS-R16), and a client must not be able to tamper with a cursor 
+         are addressed and how the cursor is protected.
+     … +120 lines (ctrl+o to expand)
+
+⏺ Write(docs/adr/0018-two-database-roles.md)
+  ⎿  Wrote 72 lines to docs/adr/0018-two-database-roles.md
+      1 # ADR-0018: Two database roles
+      3 - **Status:** Accepted
+      4 - **Date:** 2026-10-08
+      6 
+      8 
+      9 The database enforces the ledger's invariants as a second line of
+        -only ledger (section 1.3 of spec 002). Those checks protect agai
+        nst defects in the service only if the service cannot switch them
+        its triggers or alter it. Today `docker/postgres/init` creates on
+        es exist and which one the service uses.
+     … +106 lines (ctrl+o to expand)
+
+⏺ Write(docs/adr/0019-timeout-layers-and-rds-proxy.md)
+  ⎿  Wrote 77 lines to docs/adr/0019-timeout-layers-and-rds-proxy.md
+      1 # ADR-0019: Timeout layers and RDS Proxy
+      3 - **Status:** Accepted
+      5 - **Related specs:** 000-overview, 001-accounts, 003-money-moveme
+        nts, 004-reversals, 005-idempotency, 007-security-ops, 008-deploy
+      6 
+      8 
+        e connection pool and PostgreSQL, and can wait at each: for a key
+         row, for account locks, for a statement, for a connection. If an
+         no explanation while the inner work may still commit. In AWS, co
+        ons over database connections between transactions, 
+     … +140 lines (ctrl+o to expand)
+
+⏺ Write(docs/adr/0020-expand-then-contract-migrations.md)
+  ⎿  Wrote 75 lines to docs/adr/0020-expand-then-contract-migrations.md
+      1 # ADR-0020: Expand-then-contract migrations
+      3 - **Status:** Accepted
+      4 - **Date:** 2026-10-08
+      6 
+      7 ## Context and problem
+      9 The service is deployed as a rolling update: for a while, replica
+        s of the old and the new version run side by side against one dat
+        out breaking the version still running. Several replicas start at
+         the same time, and the service connects with a runtime role that
+        w migrations run, and what a migration may change.
+     … +104 lines (ctrl+o to expand)
+
+⏺ Checking every cited ID against the specs:
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; for id in $(grep -ohE
+      '\b[A-Z]{3}-(R|AC)[0-9]+\b' docs/adr/*.md | sort -u); do case $id in
+      *-AC*) grep -q "^### $id…)
+  ⎿  done
+
+⏺ Every cited ID exists. Now a small wording fix in 0016, then the index and the
+  specs' Related ADRs lines.
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; python3 - <<'EOF'
+      import re,glob…)
+  ⎿  000-overview ['0001', '0002', '0003', '0004', '0005', '0006', '0007',
+     '0008', '0009', '0011', '0012', '0013', '0016', '0017', '0019']
+     001-accounts ['0001', '0003', '0005', '0006', '0008', '0009', '0011',
+     … +41 lines (ctrl+o to expand)
+  ⎿  Updated docs/adr/0016-error-model.md (+1 -1)
+      69  ### Follow-ups
+      70  
+      71  - Phase 08-api: the error handler, the problem type registry an
+          d the OpenAPI error schemas.
+      72 -- Phase 09-hardening and 10-runtime: problem details from nginx
+         - for 413, 429 and gateway errors.                              
+      72 +- The phase that adds nginx: problem details for its 413, 429 a
+         +nd gateway errors (section 1.6 of spec 007, DEP-R16).          
+  ⎿  Updated docs/adr/README.md (+12 -0)
+      16  | 0006 | [Double-entry ledger with signed integer minor units](
+          0006-double-entry-ledger-with-signed-integer-minor-units.md)   
+                            | Accepted | 2026-10-07 |
+      17  | 0007 | [System accounts without a cached balance, never locke
+          d](0007-system-accounts-without-a-cached-balance.md)           
+                            | Accepted | 2026-10-07 |
+      18  | 0008 | [Concurrency control with READ COMMITTED and ordered p
+          essimistic row locks](0008-read-committed-with-ordered-pessimis
+          tic-row-locks.md) | Accepted | 2026-10-07 |
+      19 +| 0009 | [Idempotency inside the movement's transaction](0009-i
+         +dempotency-inside-the-movements-transaction.md)                
+         +                  | Accepted | 2026-10-08 |                    
+      20 +| 0010 | [Kysely and pg instead of an ORM](0010-kysely-and-pg-i
+         +nstead-of-an-orm.md)                                           
+         +                  | Accepted | 2026-10-08 |                    
+      21 +| 0011 | [Amounts as strings in the API and bigint in the domai
+         +n](0011-amounts-as-strings-in-the-api-and-bigint-in-the-domain.
+         +md)               | Accepted | 2026-10-08 |                    
+      22 +| 0012 | [Simulated authentication with JWT and two roles](0012
+         +-simulated-authentication-with-jwt-and-two-roles.md)           
+         +                  | Accepted | 2026-10-08 |                    
+      23 +| 0013 | [Rate limiting at the edge and in Redis](0013-rate-lim
+         +iting-at-the-edge-and-in-redis.md)                             
+         +                  | Accepted | 2026-10-08 |                    
+      24 +| 0014 | [AWS deployment on ECS Fargate with RDS PostgreSQL](00
+         +14-aws-deployment-on-ecs-fargate-with-rds-postgresql.md)       
+         +                  | Accepted | 2026-10-08 |                    
+      25 +| 0015 | [Terraform for infrastructure as code](0015-terraform-
+         +for-infrastructure-as-code.md)                                 
+         +                  | Accepted | 2026-10-08 |                    
+      26 +| 0016 | [Error model](0016-error-model.md)                    
+         +                                                               
+         +                  | Accepted | 2026-10-08 |                    
+      27 +| 0017 | [Keyset pagination with signed cursors](0017-keyset-pa
+         +gination-with-signed-cursors.md)                               
+         +                  | Accepted | 2026-10-08 |                    
+      28 +| 0018 | [Two database roles](0018-two-database-roles.md)      
+         +                                                               
+         +                  | Accepted | 2026-10-08 |                    
+      29 +| 0019 | [Timeout layers and RDS Proxy](0019-timeout-layers-and
+         +-rds-proxy.md)                                                 
+         +                  | Accepted | 2026-10-08 |                    
+      30 +| 0020 | [Expand-then-contract migrations](0020-expand-then-con
+         +tract-migrations.md)                                           
+         +                  | Accepted | 2026-10-08 |                    
+  ⎿  Updated specs/000-overview/spec.md (+1 -1)
+      2  
+      3  - **Status:** Approved
+      4  - **ID prefix:** SYS
+      5 -- **Related ADRs:** [ADR-0001](../../docs/adr/0001-spec-driven-d
+        -evelopment-with-adrs-and-ai-agents.md), [ADR-0002](../../docs/ad
+        -r/0002-modular-monolith.md), [ADR-0003](../../docs/adr/0003-hexa
+        -gonal-architecture-with-tactical-ddd.md), [ADR-0004](../../docs/
+        -adr/0004-typescript-with-fastify.md), [ADR-0005](../../docs/adr/
+        -0005-postgresql-as-the-only-source-of-truth.md), [ADR-0006](../.
+        -./docs/adr/0006-double-entry-ledger-with-signed-integer-minor-un
+        -its.md), [ADR-0007](../../docs/adr/0007-system-accounts-without-
+        -a-cached-balance.md), [ADR-0008](../../docs/adr/0008-read-commit
+        -ted-with-ordered-pessimistic-row-locks.md)                      
+      5 +- **Related ADRs:** [ADR-0001](../../docs/adr/0001-spec-driven-d
+        +evelopment-with-adrs-and-ai-agents.md), [ADR-0002](../../docs/ad
+        +r/0002-modular-monolith.md), [ADR-0003](../../docs/adr/0003-hexa
+        +gonal-architecture-with-tactical-ddd.md), [ADR-0004](../../docs/
+        +adr/0004-typescript-with-fastify.md), [ADR-0005](../../docs/adr/
+        +0005-postgresql-as-the-only-source-of-truth.md), [ADR-0006](../.
+        +./docs/adr/0006-double-entry-ledger-with-signed-integer-minor-un
+        +its.md), [ADR-0007](../../docs/adr/0007-system-accounts-without-
+        +a-cached-balance.md), [ADR-0008](../../docs/adr/0008-read-commit
+        +ted-with-ordered-pessimistic-row-locks.md), [ADR-0009](../../doc
+        +s/adr/0009-idempotency-inside-the-movements-transaction.md), [AD
+        +R-0011](../../docs/adr/0011-amounts-as-strings-in-the-api-and-bi
+        +gint-in-the-domain.md), [ADR-0012](../../docs/adr/0012-simulated
+        +-authentication-with-jwt-and-two-roles.md), [ADR-0013](../../doc
+        +s/adr/0013-rate-limiting-at-the-edge-and-in-redis.md), [ADR-0016
+        +](../../docs/adr/0016-error-model.md), [ADR-0017](../../docs/adr
+        +/0017-keyset-pagination-with-signed-cursors.md), [ADR-0019](../.
+        +./docs/adr/0019-timeout-layers-and-rds-proxy.md)                
+      6  - **Depends on specs:** none
+      7  
+      8  ## 1. Context and goal
+  ⎿  Updated specs/001-accounts/spec.md (+1 -1)
+      2  
+      3  - **Status:** Approved
+      4  - **ID prefix:** ACC
+      5 -- **Related ADRs:** [ADR-0001](../../docs/adr/0001-spec-driven-d
+        -evelopment-with-adrs-and-ai-agents.md), [ADR-0003](../../docs/ad
+        -r/0003-hexagonal-architecture-with-tactical-ddd.md), [ADR-0005](
+        -../../docs/adr/0005-postgresql-as-the-only-source-of-truth.md), 
+        -[ADR-0006](../../docs/adr/0006-double-entry-ledger-with-signed-i
+        -nteger-minor-units.md), [ADR-0008](../../docs/adr/0008-read-comm
+        -itted-with-ordered-pessimistic-row-locks.md)                    
+      5 +- **Related ADRs:** [ADR-0001](../../docs/adr/0001-spec-driven-d
+        +evelopment-with-adrs-and-ai-agents.md), [ADR-0003](../../docs/ad
+        +r/0003-hexagonal-architecture-with-tactical-ddd.md), [ADR-0005](
+        +../../docs/adr/0005-postgresql-as-the-only-source-of-truth.md), 
+        +[ADR-0006](../../docs/adr/0006-double-entry-ledger-with-signed-i
+        +nteger-minor-units.md), [ADR-0008](../../docs/adr/0008-read-comm
+        +itted-with-ordered-pessimistic-row-locks.md), [ADR-0009](../../d
+        +ocs/adr/0009-idempotency-inside-the-movements-transaction.md), [
+        +ADR-0011](../../docs/adr/0011-amounts-as-strings-in-the-api-and-
+        +bigint-in-the-domain.md), [ADR-0012](../../docs/adr/0012-simulat
+        +ed-authentication-with-jwt-and-two-roles.md), [ADR-0016](../../d
+        +ocs/adr/0016-error-model.md), [ADR-0017](../../docs/adr/0017-key
+        +set-pagination-with-signed-cursors.md), [ADR-0019](../../docs/ad
+        +r/0019-timeout-layers-and-rds-proxy.md)                         
+      6  - **Depends on specs:** 000-overview, 002-ledger, 003-money-move
+         ments, 004-reversals, 005-idempotency, 006-auth, 007-security-op
+         s
+      7  
+      8  ## 1. Context and goal
+  ⎿  Updated specs/002-ledger/spec.md (+1 -1)
+      2  
+      3  - **Status:** Approved
+      4  - **ID prefix:** LED
+      5 -- **Related ADRs:** [ADR-0001](../../docs/adr/0001-spec-driven-d
+        -evelopment-with-adrs-and-ai-agents.md), [ADR-0002](../../docs/ad
+        -r/0002-modular-monolith.md), [ADR-0003](../../docs/adr/0003-hexa
+        -gonal-architecture-with-tactical-ddd.md), [ADR-0005](../../docs/
+        -adr/0005-postgresql-as-the-only-source-of-truth.md), [ADR-0006](
+        -../../docs/adr/0006-double-entry-ledger-with-signed-integer-mino
+        -r-units.md), [ADR-0007](../../docs/adr/0007-system-accounts-with
+        -out-a-cached-balance.md)                                        
+      5 +- **Related ADRs:** [ADR-0001](../../docs/adr/0001-spec-driven-d
+        +evelopment-with-adrs-and-ai-agents.md), [ADR-0002](../../docs/ad
+        +r/0002-modular-monolith.md), [ADR-0003](../../docs/adr/0003-hexa
+        +gonal-architecture-with-tactical-ddd.md), [ADR-0005](../../docs/
+        +adr/0005-postgresql-as-the-only-source-of-truth.md), [ADR-0006](
+        +../../docs/adr/0006-double-entry-ledger-with-signed-integer-mino
+        +r-units.md), [ADR-0007](../../docs/adr/0007-system-accounts-with
+        +out-a-cached-balance.md), [ADR-0010](../../docs/adr/0010-kysely-
+        +and-pg-instead-of-an-orm.md), [ADR-0011](../../docs/adr/0011-amo
+        +unts-as-strings-in-the-api-and-bigint-in-the-domain.md), [ADR-00
+        +16](../../docs/adr/0016-error-model.md), [ADR-0017](../../docs/a
+        +dr/0017-keyset-pagination-with-signed-cursors.md), [ADR-0018](..
+        +/../docs/adr/0018-two-database-roles.md)                        
+      6  - **Depends on specs:** 000-overview, 001-accounts, 003-money-mo
+         vements, 004-reversals, 005-idempotency
+      7  
+      8  ## 1. Context and goal
+  ⎿  … 6 more files changed
+
+⏺ I've written ADRs 0009 to 0020, all Accepted and dated 2026-10-08. npm run 
+  check passes and npm run trace exits 0 (219 ACs, 0 missing).
+
+  Extra ADRs required by the specs: none. Only four passages in specs/ defer a
+  decision to an ADR: idempotency (005 §1), production auth (006 §1 and §6),
+  expand-then-contract migrations (007 §1.8) and the RDS Proxy pinning claim
+  (007 §1.9). ADRs 0009, 0012, 0020 and 0019 cover them, so I added no others.
+
+  What's in them
+  - Each one keeps your reasoning in its Decision section and has at least two
+    honest options with the costs of the chosen one, plus what to monitor and
+    follow-ups by phase.
+  - Where a spec already fixed a detail, the ADR follows the spec. I checked
+    that every requirement and AC ID cited across ADRs 0001 to 0020 exists in
+    the specs.
+  - ADR-0014: I added "Aurora's storage engine differs from the PostgreSQL run
+    locally and in CI" as a con. Spec 008 already gives that reason for not
+    using Aurora.
+  - ADR-0012: I noted that one identity per role is not enforced by the service,
+    which spec 006 §1.1 records as an accepted risk.
+
+  ADR-0019 source: I fetched the AWS page today and it matches your quote:
+  - it lists SET and set_config as pinning conditions for PostgreSQL;
+  - it says stored functions don't cause pinning;
+  - it names the DatabaseConnectionsCurrentlySessionPinned metric.
+
+  The same page also lists named PREPARE, temporary tables, cursors, LISTEN,
+  session advisory locks and nextval as pinning. I added these to ADR-0019's
+  costs as conditions to avoid. That's a consequence of the source, not a new
+  decision, but check you agree with it.
+
+  Metadata: I updated docs/adr/README.md with all 20 ADRs. I also regenerated
+  the "Related ADRs" line of all nine specs from each ADR's "Related specs"
+  line, so both directions match.
+
+  Nothing is committed yet. The next steps are /audit, then /ship to close the
+  phase.
+
+✻ Brewed for 5m 8s · done 12:16 AM
+
+※ recap: Phase 03 is recording the project's architecture decisions, and ADRs 0001 to 0020 are written, cross-linked with the specs, and pass check and trace. Next, run /audit, then /ship to commit and close the phase.
+
+❯ Two changes before the audit:                                                 
+  1. Spec 008 section 1.8: add the alarm row "RDS Proxy pinned connections |    
+  above 0 for 15 minutes (ADR-0019)", on the AWS metric                         
+  DatabaseConnectionsCurrentlySessionPinned. The 15 minutes tolerate the        
+  migration task, whose node-pg-migrate session advisory lock pins its own      
+  connection while it runs; say so in ADR-0019's costs. I approve this change   
+  to the approved spec; keep it Approved. ADR-0019's phase 12 follow-up then    
+  points to that row instead of adding an alarm of its own, and ADR-0014's list 
+  of alarms includes it.                                                        
+  2. ADR-0009: Option A's last con says routes with a key cannot use automatic  
+  validation; ADR-0004 now registers every route with attachValidation, so say  
+  that the framework's validation never answers before the replay step          
+  (ADR-0004). Also simplify the con about replays: every keyed request, a       
+  replay included, runs in a database transaction that attempts the key insert. 
+     Change nothing else. Run npm run check and npm run trace.                  
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; grep -n "WAF blocked
+      requests\|ElastiCache memory" specs/008-deployment/spec.md; grep -n "Every
+      keyed request\|Vali…)
+  ⎿  122:| ElastiCache memory       | above 80%
+              |
+     123:| WAF blocked requests     | above 1000 in 5 minutes
+     … +14 lines (ctrl+o to expand)
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; grep -n "alarm"
+      specs/008-deployment/spec.md | cut -c1-400)
+  ⎿  56:  ECS -.logs and metrics.-> CW[CloudWatch logs and alarms]
+     68:| Observability | `observability`  | CloudWatch log groups, alarms
+     and the SNS topic they notify (section 1.8).
+     … +17 lines (ctrl+o to expand)
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; python3 - <<'EOF'
+      def rep(p,old,new):…)
+  ⎿  | Alarm                        | Fires when
+                                              |
+     | ---------------------------- | -------------------------------------
+     … +25 lines (ctrl+o to expand)
+  ⎿  Updated docs/adr/0009-idempotency-inside-the-movements-transaction.md
+     (+2 -2)
+      30    - A replay is answered right after the malformed-request step
+          , before validation and every later check (SYS-R33, IDM-R08), s
+          o a configuration change (for example a lower `MAX_AMOUNT_MINOR
+          `) or a newer version never turns an applied movement into an e
+          rror.
+      31  - **Cons:**
+      32    - A duplicate that arrives while the first request runs waits
+           on the key row, holding a pool connection and an open transact
+          ion; the wait is bounded by `IDEMPOTENCY_WAIT_TIMEOUT_MS` (defa
+          ult 2000 ms) and then answers 409 `/problems/request-in-progres
+          s` (IDM-R12). This is the main cost.
+      33 -  - Every keyed request opens a database transaction and writes
+         - a row, replays included in the sense that they need a transact
+         -ion to read the key under its lock.                            
+      33 +  - Every keyed request, a replay included, runs in a database 
+         +transaction that attempts the key insert.                      
+      34    - It only works because every effect of a movement is in the 
+          same PostgreSQL database; it cannot cover a call to an external
+           system.
+      35 -  - Validation runs after a write, so routes with a key cannot 
+         -use the framework's automatic validation (ADR-0004).           
+      35 +  - Validation runs after a write, so the framework's validatio
+         +n never answers before the replay step (ADR-0004).             
+      36  
+      37  ### Option B: Two-phase keys (claim the key and commit, execute
+          , then complete the key)
+      38  
+  ⎿  Updated
+     docs/adr/0014-aws-deployment-on-ecs-fargate-with-rds-postgresql.md (+1
+     -1)
+      76  
+      77  ### To monitor
+      78  
+      79 -- The CloudWatch alarms of section 1.8 of spec 008: ALB 5xx, ta
+         -rget response time, healthy targets, ECS and RDS CPU, RDS conne
+         -ctions, free storage.                                          
+      79 +- The CloudWatch alarms of section 1.8 of spec 008: ALB 5xx, ta
+         +rget response time, healthy targets, ECS and RDS CPU, RDS conne
+         +ctions, free storage, RDS Proxy pinned connections.            
+      80  - Failover duration in practice, which decides whether Aurora i
+          s worth its cost.
+      81  
+      82  ### Follow-ups
+  ⎿  Updated docs/adr/0019-timeout-layers-and-rds-proxy.md (+2 -1)
+      65  
+      66  - The rule "never send `SET`, `RESET`, `DISCARD` or a direct `s
+          et_config`" (SEC-R30) binds every future feature; the same AWS 
+          page lists other PostgreSQL pinning conditions to avoid too: na
+          med `PREPARE` statements, temporary tables, cursors, `LISTEN`, 
+          session advisory locks, and sequence functions such as `nextval
+          ` (ids are UUIDv7 generated by the service, so no sequence is n
+          eeded).
+      67  - If AWS changes the proxy so that it detects state changes ins
+          ide functions, connections pin silently.
+      68 +- The migration task pins its own connection while it runs, bec
+         +ause node-pg-migrate takes a session advisory lock; the pinned-
+         +connections alarm therefore fires only after 15 minutes above 0
+         +, so a migration run does not trigger it.                      
+      69  
+      70  ### To monitor
+      71  
+     ...
+      75  ### Follow-ups
+      76  
+      77  - Phase 05-schema: the role settings migration and `app.set_loc
+          k_timeout`.
+      77 -- Phase 12-infra: re-check the AWS page, and add a CloudWatch a
+         -larm on `DatabaseConnectionsCurrentlySessionPinned` above zero;
+         - if the documented behaviour changed, write a new ADR.         
+      78 +- Phase 12-infra: re-check the AWS page, and implement the RDS 
+         +Proxy pinned-connections alarm of section 1.8 of spec 008; if t
+         +he documented behaviour changed, write a new ADR.              
+  ⎿  Updated specs/008-deployment/spec.md (+12 -11)
+      110  
+      111  Every alarm uses a metric AWS publishes and notifies the one S
+           NS topic of the `observability` module (DEP-R32).
+      112  
+      113 -| Alarm                    | Fires when                       
+          -             |                                                
+      114 -| ------------------------ | ---------------------------------
+          ------------- |                                                
+      115 -| ALB 5xx                  | above 1% of requests over 5 minut
+          -es           |                                                
+      116 -| ALB target response time | p99 above 300 ms over 5 minutes (
+          -SYS-R20)     |                                                
+      117 -| ALB healthy targets      | fewer than 2                     
+          -             |                                                
+      118 -| ECS CPU, ECS memory      | above 80%                        
+          -             |                                                
+      119 -| RDS CPU                  | above 80%                        
+          -             |                                                
+      120 -| RDS free storage         | below 10%                        
+          -             |                                                
+      121 -| RDS connections          | above 80% of the RDS Proxy's conn
+          -ection limit |                                                
+      122 -| ElastiCache memory       | above 80%                        
+          -             |                                                
+      123 -| WAF blocked requests     | above 1000 in 5 minutes          
+          -             |                                                
+      113 +| Alarm                        | Fires when                   
+          +                                                 |            
+      114 +| ---------------------------- | -----------------------------
+          +------------------------------------------------ |            
+      115 +| ALB 5xx                      | above 1% of requests over 5 m
+          +inutes                                           |            
+      116 +| ALB target response time     | p99 above 300 ms over 5 minut
+          +es (SYS-R20)                                     |            
+      117 +| ALB healthy targets          | fewer than 2                 
+          +                                                 |            
+      118 +| ECS CPU, ECS memory          | above 80%                    
+          +                                                 |            
+      119 +| RDS CPU                      | above 80%                    
+          +                                                 |            
+      120 +| RDS free storage             | below 10%                    
+          +                                                 |            
+      121 +| RDS connections              | above 80% of the RDS Proxy's 
+          +connection limit                                 |            
+      122 +| ElastiCache memory           | above 80%                    
+          +                                                 |            
+      123 +| WAF blocked requests         | above 1000 in 5 minutes      
+          +                                                 |            
+      124 +| RDS Proxy pinned connections | `DatabaseConnectionsCurrently
+          +SessionPinned` above 0 for 15 minutes (ADR-0019) |            
+      125  
+      126  ## 2. Requirements
+      127  
+
+⏺ I made both changes. npm run check passes and npm run trace exits 0 (219 ACs,
+  0 missing).
+
+  1. Pinned-connections alarm
+     - Spec 008 §1.8: new row "RDS Proxy pinned connections |
+       DatabaseConnectionsCurrentlySessionPinned above 0 for 15 minutes
+       (ADR-0019)". The spec stays Approved, and DEP-AC23 already requires every
+       alarm in §1.8, so it covers the new row without changes.
+     - ADR-0019: a new cost explains that node-pg-migrate's session advisory
+       lock pins the migration task's own connection while it runs. That is why
+       the alarm waits 15 minutes. The phase 12 follow-up now points to the spec
+       008 §1.8 row instead of adding its own alarm.
+     - ADR-0014: RDS Proxy pinned connections is now in its list of alarms.
+  2. ADR-0009, Option A cons
+     - The framework's validation never answers before the replay step
+       (ADR-0004).
+     - Every keyed request, a replay included, runs in a database transaction
+       that attempts the key insert.
+
+  Nothing else changed, and nothing is committed yet. Next is /audit.
+
+✻ Brewed for 25s · done 12:21 AM
+
+❯ /audit                                                                        
+  ⎿  Phase 03-adrs has no code, so this review covers the 20 new ADRs, the ADR index and the spec header changes against main. I checked every AC and requirement ID the ADRs cite: all of them exist. The "Related ADRs" and "Related specs" lines match in both directions, and the index titles and dates match the files. Two problems need attention before shipping: one in the idempotency design and one unapproved spec change.
+
+     Findings
+
+     1. Medium: the ADRs never say which body the idempotency fingerprint is computed from
+     - Where: docs/adr/0004-typescript-with-fastify.md:62-64, together with docs/adr/0011-amounts-as-strings-in-the-api-and-bigint-in-the-domain.md:28
+     - What is wrong: ADR-0004 registers every route with attachValidation and says "The handler never uses the body before that check". But spec 005 §1.1 step 2 computes the fingerprint from the body before validation (step 5), so that sentence contradicts the spec. The design also leaves open which body gets hashed. When a body passes validation, Fastify replaces request.body with the Zod output before the handler runs. ADR-0011 says amounts become bigint "once, at the HTTP edge", which in practice means a Zod transform.
+     - How to trigger it: In phase 08, use an amount schema with .transform(BigInt) and compute the fingerprint in the handler. JSON canonicalization cannot serialize a bigint, so every valid keyed movement fails with a 500. A second case: if destinationAccountId is lowercased by a transform (MOV-R30), C1 can send a transfer with key k1 and an uppercase destination, then the same transfer with k1 and a lowercase destination. The second request gets the first one's stored 201 back instead of 422 idempotency-key-reused.
+     - Impact: Either every valid keyed movement fails, or two different bodies share one fingerprint and the second is answered with the first one's stored response.
+     - Suggested fix: State in ADR-0004 that the fingerprint is computed from the parsed but not yet validated JSON, captured in a preValidation hook (or copied in the content-type parser) before Fastify's validation step can replace the body. State also that Zod transforms never feed the fingerprint.
+     - AC violated: IDM-R05, IDM-R09, SYS-R31 (IDM-AC06, IDM-AC09)
+
+     2. Medium: an Approved spec's requirement scope changed without recorded owner approval
+     - Where: specs/008-deployment/spec.md:124
+     - What is wrong: The diff adds an "RDS Proxy pinned connections" row to the alarm table in section 1.8. DEP-R32 requires "the CloudWatch alarms of section 1.8", and DEP-AC23 checks that every one of them exists. So this row changes a requirement and an AC, not metadata. AGENTS.md §2 says to ask before changing either. There is no phase-03 transcript or other record of an owner decision.
+     - How to trigger it: Compare git diff main -- specs/008-deployment/spec.md with AGENTS.md §2.
+     - Impact: The spec now gets its requirements from an ADR, the opposite of the ADR README's own rule ("the ADR follows the spec").
+     - Suggested fix: Get the owner's approval and record it in the commit body and transcript. Otherwise revert the row and leave it as a follow-up in ADR-0019.
+     - AC violated: DEP-R32, DEP-AC23
+
+     3. Low: the pinned-connections alarm can misfire, and a quieter fix exists
+     - Where: docs/adr/0019-timeout-layers-and-rds-proxy.md:68 and specs/008-deployment/spec.md:124
+     - What is wrong: The alarm waits 15 minutes only so that the migration task's session advisory lock does not trigger it. ADR-0020 itself expects migrations that lock large tables, and any migration longer than 15 minutes fires a false alarm. Meanwhile, a pinning defect under light traffic can go unnoticed: pg's pool closes idle connections after 10 s, so the metric keeps dropping back to 0 and never stays above 0 for 15 minutes in a row.
+     - How to trigger it: Run a long index migration through the proxy, or ship a stray SET while traffic is low.
+     - Impact: False alarms on deploys, and missed regressions.
+     - Suggested fix: Have the migration task connect to the RDS instance endpoint directly. DEP-R29 only requires the service itself to go through the proxy. Then any pinning is a defect, and the alarm can fire after one or a few minutes. The section 1.3 diagram needs the same change.
+     - AC violated: missing AC (DEP-AC23 only checks that the alarm exists)
+
+     4. Low: specs still point forward to ADRs that now exist
+     - Where: specs/005-idempotency/spec.md:12, specs/006-auth/spec.md:10 and :255, specs/007-security-ops/spec.md:121 and :127
+     - What is wrong: These lines still say "will be recorded in an ADR (phase 03-adrs)" or "recorded in an ADR" without naming it.
+     - Impact: Stale text that a reader has to resolve by hand.
+     - Suggested fix: Link ADR-0009, ADR-0012, ADR-0020 and ADR-0019 in those places.
+     - AC violated: none (docs drift)
+
+     5. Low: ADR-0016 says every transient condition is a 503
+     - Where: docs/adr/0016-error-model.md:50
+     - What is wrong: It says "503 with Retry-After: 1 for every transient condition". SYS-R34 and section 4 of spec 000 also count the idempotency wait (409 request-in-progress) and the per-user rate limit (429, with Retry-After set to the remaining window) as transient conditions.
+     - Impact: An implementer could map the key wait to 503, which IDM-R12 forbids.
+     - Suggested fix: Change it to "transient conditions as listed in section 4 of spec 000 (409, 429, 503), never 500".
+     - AC violated: SYS-R34, IDM-R12 (wording only)
+
+     6. Low: ADR-0003 maps "any other database rejection" to 500
+     - Where: docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md:72
+     - What is wrong: As written, this includes the lock timeout (55P03), statement timeout (57014) and serialization/deadlock errors (40001/40P01). The specs answer all of those with 409 or 503, or retry them, and never with 500.
+     - Suggested fix: Narrow it to "any other constraint or trigger violation".
+     - AC violated: SYS-R34, SEC-R32, IDM-R13, SYS-R18
+
+     7. Low: ADR-0006 overclaims what LED-AC22 catches
+     - Where: docs/adr/0006-double-entry-ledger-with-signed-integer-minor-units.md:35
+     - What is wrong: It says LED-AC22 catches a stray Number() on amounts until phase 06. LED-AC22 only checks that domain arithmetic refuses a number amount. It cannot catch Number() in an adapter or route.
+     - Suggested fix: Rely on review plus the phase 06 lint rule, or cite an integration AC that round-trips amounts above 2^53 through the API.
+     - AC violated: none (docs drift)
+
+     8. Low: ADR-0014's alarm list leaves some out
+     - Where: docs/adr/0014-aws-deployment-on-ecs-fargate-with-rds-postgresql.md:79
+     - What is wrong: It introduces "the CloudWatch alarms of section 1.8 of spec 008" with a list that leaves out ECS memory, ElastiCache memory and WAF blocked requests.
+     - Suggested fix: Refer to section 1.8 without listing the alarms, or list all of them.
+     - AC violated: none (docs drift)
+
+     Deferred, already planned: plans and tasks (04), schema, roles, triggers and app.set_lock_timeout (05), the lint ban on Number()/parseInt/unary + (06), the idempotency key step (07), error handler, OpenAPI and the verifier (08), rate limiting, nginx and CORS (09), the compose migrate job (10), the performance report (11), Terraform, the alarms themselves, the WAF rule and re-checking the AWS pinning page (12), checking that docs/traceability.md is fresh (13), and exporting the phase-03 transcript.
+
+     - Money: no findings. ADR-0006 and ADR-0011 match SYS-R06 to SYS-R09, LED-R23 and LED-R27.
+     - Transactions and concurrency: no findings. ADR-0007 and ADR-0008 match MOV-R18 to MOV-R31, REV-R18 to REV-R20 and SYS-R18.
+     - Security: no findings. ADR-0012, ADR-0013, ADR-0017 and ADR-0018 match specs 006, 007, 001 and 002.
+     - Failure handling: no findings. The timeout order, the 20130 ms worst case, the keep-alive values and the pool budget in ADR-0019 and ADR-0014 match spec 007 §1.1 and §1.9.
+     - Tests: no findings. This phase adds no tests.
+
+     Follow-ups: 3, 4, 5, 6, 7, 8
+     Verdict: fix before shipping
+
+     Critical Files for Implementation
+
+     - /Users/matiastorsello/supercool-finances/docs/adr/0004-typescript-with-fastify.md
+     - /Users/matiastorsello/supercool-finances/specs/008-deployment/spec.md
+     - /Users/matiastorsello/supercool-finances/docs/adr/0019-timeout-layers-and-rds-proxy.md
+     - /Users/matiastorsello/supercool-finances/docs/adr/0016-error-model.md
+     - /Users/matiastorsello/supercool-finances/specs/005-idempotency/spec.md
+
+❯ Fix all eight findings:                                                       
+  1. ADR-0004: the fingerprint (IDM-R05) is computed at step 2 of spec 005      
+  section 1.1 from the request as received: the method, the raw path and the    
+  JSON body as parsed, captured before the validation step can replace          
+  request.body (for example in a preValidation hook), never from the Zod        
+  output. Schemas may transform values for the use case, but a transformed      
+  value never feeds the fingerprint. Apart from the fingerprint, the handler    
+  uses the body only after the validation check. Name the two failure cases the 
+  audit found: a bigint produced by a transform cannot be canonicalized, and a  
+  lowercased id would let two different bodies share a fingerprint, against     
+  IDM-R05 and IDM-R09.                                                          
+     2 and 3. Revert the alarm row I asked you to add to spec 008 section 1.8,  
+  so spec 008 differs from main only in its Related ADRs line, and remove the   
+  15-minute note from ADR-0019. My threshold was wrong: the pool closes idle    
+  connections, so a short pin never stays above 0 for 15 minutes, while a long  
+  migration through the proxy would fire it. In ADR-0019, keep                  
+  DatabaseConnectionsCurrentlySessionPinned under To monitor (its Maximum       
+  should stay at 0), and make the phase 12 follow-up: decide whether the        
+  migration task connects through RDS Proxy or to the instance directly, and    
+  whether to alarm on this metric; either one is a change to spec 008 for its   
+  owner to approve.                                                             
+  4. In specs 005, 006 and 007, replace the forward references ("will be        
+  recorded in an ADR (phase 03-adrs)", "recorded in an ADR") with links to      
+  ADR-0009, ADR-0012, ADR-0020 and ADR-0019 as they apply. Change no            
+  requirement or AC.                                                            
+  5. ADR-0016: transient conditions are answered as section 4 of spec 000 lists 
+  them (409 request-in-progress, 429 and 503, each with Retry-After),           
+  never 500.                                                                    
+  6. ADR-0003: narrow "any other database rejection" to any other constraint or 
+  trigger violation; lock timeouts, statement timeouts, deadlocks and           
+  serialization failures are answered as SYS-R18, SYS-R34, SEC-R32 and IDM-R13  
+  say.                                                                          
+  7. ADR-0006: until phase 06-domain extends the lint rule, review is what      
+  catches a stray Number(); drop the claim about LED-AC22.                      
+  8. ADR-0014: refer to the alarms of section 1.8 of spec 008 without listing   
+  them.                                                                         
+     Change nothing else. Run npm run check and npm run trace.                  
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; sed -n 58,66p
+      docs/adr/0004*.md; grep -n "pinned\|Pinned\|migration task pins"
+      docs/adr/0019*.md docs/adr/0014*.md;…)
+  ⎿  Fastify lives only in the HTTP adapters and the composition root (`src
+     /app.ts`); the domain never imports it (ADR-0003).
+     … +59 lines (ctrl+o to expand)
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; python3 - <<'EOF'
+      import re,subprocess…)
+  ⎿  specs/006-auth/spec.md:10: In production the tokens would come from an
+      external OpenID Connect provider, signed with an asymmetric key (RS25
+     6 or ES256) and verified through its JWKS; that is out of scope here a
+     … +10 lines (ctrl+o to expand)
+  ⎿  Updated docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md (+1 
+     -1)
+      69  
+      70  - The order of checks of section 1.4 of spec 003 and section 1.
+          4 of spec 004 is code in one use case, unit-testable step by st
+          ep.
+      71  - Swapping or upgrading Fastify or Kysely touches adapters only
+          .
+      72 -- Domain rejections and database rejections are distinct. The p
+         -ersistence adapter translates the constraint violations the spe
+         -cs name into typed domain rejections: the unique violation of R
+         -EV-R05 becomes `already-reversed`, answers 409 and is stored fo
+         -r replay (REV-R06, IDM-R14). A rejection by one of the ledger c
+         -hecks of spec 002 means the domain missed a rule and answers 50
+         -0 (LED-R28), and so does any other database rejection.         
+      72 +- Domain rejections and database rejections are distinct. The p
+         +ersistence adapter translates the constraint violations the spe
+         +cs name into typed domain rejections: the unique violation of R
+         +EV-R05 becomes `already-reversed`, answers 409 and is stored fo
+         +r replay (REV-R06, IDM-R14). A rejection by one of the ledger c
+         +hecks of spec 002 means the domain missed a rule and answers 50
+         +0 (LED-R28), and so does any other constraint or trigger violat
+         +ion. Lock timeouts, statement timeouts, deadlocks and serializa
+         +tion failures are not rejections of this kind: they are answere
+         +d as SYS-R18, SYS-R34, SEC-R32 and IDM-R13 say.                
+      73  
+      74  ### Negative / costs
+      75  
+  ⎿  Updated docs/adr/0004-typescript-with-fastify.md (+2 -1)
+      61  
+      62  - Route schemas never decide the order of checks. Every route r
+          egisters its Zod schemas with `attachValidation`, so a schema e
+          rror is answered only at the validation step of SYS-R31: after 
+          the replay on routes that take a key, inside the database trans
+          action after the savepoint (steps 4 and 5 of section 1.1 of spe
+          c 005).
+      63  - Path ids, the `Idempotency-Key` header and the pagination cur
+          sor are plain strings in those schemas and are checked at their
+           own steps: a path id that is not a UUID answers 404 at lookup 
+          (SYS-R42), and a malformed key or cursor answers 400 at the mal
+          formed-request step (SYS-R26, IDM-R03).
+      64 -- The handler never uses the body before that check.           
+      64 +- The idempotency fingerprint (IDM-R05) is computed at step 2 o
+         +f section 1.1 of spec 005 from the request as received: the met
+         +hod, the raw path and the JSON body as parsed, captured before 
+         +the validation step can replace `request.body` (for example in 
+         +a `preValidation` hook), never from the Zod output. Schemas may
+         + transform values for the use case, but a transformed value nev
+         +er feeds the fingerprint. Two failures follow otherwise: a `big
+         +int` produced by a transform cannot be canonicalized, so every 
+         +valid keyed movement would fail; and an id lowercased by a tran
+         +sform (MOV-R30) would let two different bodies share a fingerpr
+         +int, so the second would replay the first's response instead of
+         + answering 422 `idempotency-key-reused` (IDM-R05, IDM-R09).    
+      65 +- Apart from the fingerprint, the handler uses the body only af
+         +ter the validation check.                                      
+      66  
+      67  ## Consequences
+      68  
+  ⎿  Updated
+     docs/adr/0006-double-entry-ledger-with-signed-integer-minor-units.md
+     (+1 -1)
+      32    - More rows and more writes per movement than updating a bala
+          nce.
+      33    - Reading a balance from entries is a sum over a growing tabl
+          e; customer accounts therefore also cache their balance (ADR-00
+          07), which must be kept equal to the entries.
+      34    - Signed amounts need a convention everyone reads the same wa
+          y (positive credits the account), stated in the glossary of spe
+          c 000.
+      35 -  - `bigint` amounts need care at every boundary: the `pg` driv
+         -er returns them as strings, and JSON has no `bigint`, so a stra
+         -y `Number()` or `parseFloat` would silently lose precision. AGE
+         -NTS.md forbids converting amounts to `number`; the lint rule fo
+         -rbids `parseFloat` today, and phase 06-domain extends it to `Nu
+         -mber()`, `Number.parseInt`, `parseInt` and unary `+` in `src/mo
+         -dules/*/domain/**` and `src/modules/*/application/**`. Until th
+         -en, review and LED-AC22 catch it.                              
+      35 +  - `bigint` amounts need care at every boundary: the `pg` driv
+         +er returns them as strings, and JSON has no `bigint`, so a stra
+         +y `Number()` or `parseFloat` would silently lose precision. AGE
+         +NTS.md forbids converting amounts to `number`; the lint rule fo
+         +rbids `parseFloat` today, and phase 06-domain extends it to `Nu
+         +mber()`, `Number.parseInt`, `parseInt` and unary `+` in `src/mo
+         +dules/*/domain/**` and `src/modules/*/application/**`. Until th
+         +en, review is what catches a stray `Number()`.                 
+      36  
+      37  ### Option B: A single mutable balance column per account
+      38  
+  ⎿  Updated
+     docs/adr/0014-aws-deployment-on-ecs-fargate-with-rds-postgresql.md (+1
+     -1)
+      76  
+      77  ### To monitor
+      78  
+      79 -- The CloudWatch alarms of section 1.8 of spec 008: ALB 5xx, ta
+         -rget response time, healthy targets, ECS and RDS CPU, RDS conne
+         -ctions, free storage, RDS Proxy pinned connections.            
+      79 +- The CloudWatch alarms of section 1.8 of spec 008.            
+      80  - Failover duration in practice, which decides whether Aurora i
+          s worth its cost.
+      81  
+      82  ### Follow-ups
+  ⎿  Updated docs/adr/0016-error-model.md (+1 -1)
+      47  
+      48  Chosen option: **Option A**. Every error is RFC 9457 problem de
+          tails with a `requestId`. 400 means the request itself is malfo
+          rmed (JSON that does not parse, a missing or malformed required
+           header, an invalid cursor); 422 means it was understood and re
+          fused (validation errors with one entry per field, and money mo
+          vements refused by a business rule); 409 means it conflicts wit
+          h the current state of the resource it acts on (status changes,
+           an already reversed transaction, an idempotency key still in p
+          rogress). A single 400 for everything is simpler, but clients c
+          ould not tell a bug in their request from a business refusal.
+      49  
+      50 -The rule and the catalogue are in section 1 and section 4 of sp
+         -ec 000 (SYS-R24 to SYS-R29), with each capability spec adding i
+         -ts own types. Other codes follow from the same principles: 401 
+         -with one body for every authentication failure (AUT-R06); 403 f
+         -or a role not permitted, since which operations exist is public
+         -, and 404 for a resource the caller may not see, so a foreign a
+         -ccount is indistinguishable from an unknown one (SYS-R04, SYS-R
+         -05); 413, 415 and 429 from spec 007; 503 with `Retry-After: 1` 
+         -for every transient condition, never 500 (SYS-R34); 500 `/probl
+         -ems/internal-error` only for a defect (SYS-R25, LED-R28); and t
+         -he load balancer's own errors as `/problems/upstream-unavailabl
+         -e` (DEP-R16). A 422 `/problems/idempotency-key-reused` is a ref
+         -usal of the key, not a business rule, and is not stored for rep
+         -lay (section 1.3 of spec 005).                                 
+      50 +The rule and the catalogue are in section 1 and section 4 of sp
+         +ec 000 (SYS-R24 to SYS-R29), with each capability spec adding i
+         +ts own types. Other codes follow from the same principles: 401 
+         +with one body for every authentication failure (AUT-R06); 403 f
+         +or a role not permitted, since which operations exist is public
+         +, and 404 for a resource the caller may not see, so a foreign a
+         +ccount is indistinguishable from an unknown one (SYS-R04, SYS-R
+         +05); 413, 415 and 429 from spec 007; transient conditions answe
+         +red as section 4 of spec 000 lists them (409 `/problems/request
+         +-in-progress`, 429 and 503, each with `Retry-After`), never 500
+         + (SYS-R34); 500 `/problems/internal-error` only for a defect (S
+         +YS-R25, LED-R28); and the load balancer's own errors as `/probl
+         +ems/upstream-unavailable` (DEP-R16). A 422 `/problems/idempoten
+         +cy-key-reused` is a refusal of the key, not a business rule, an
+         +d is not stored for replay (section 1.3 of spec 005).          
+      51  
+      52  ## Consequences
+      53  
+  ⎿  … 3 more files changed
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; python3 - <<'EOF'
+      def rep(p,old,new):…)
+  ⎿   specs/008-deployment/spec.md | 2 +-
+      1 file changed, 1 insertion(+), 1 deletion(-)
+        Duration  404ms (tests 59%, import 20%, transform 16%, setup 3%, wo
+     … +7 lines (ctrl+o to expand)
+  ⎿  Updated specs/006-auth/spec.md (+2 -2)
+       7  
+       8  ## 1. Context and goal
+       9  
+      10 -Every request to the service, except the health checks and the 
+         -API documentation, acts for one user with one role (SYS-R01). T
+         -he challenge allows authentication to be simulated (docs/challe
+         -nge.md), so this version verifies bearer JWTs signed with HS256
+         - and a shared secret from the environment, and the only way to 
+         -get a token is a local CLI script. The API has no login and no 
+         -endpoint that issues tokens. In production the tokens would com
+         -e from an external OpenID Connect provider, signed with an asym
+         -metric key (RS256 or ES256) and verified through its JWKS; that
+         - is out of scope here and will be recorded in an ADR (phase 03-
+         -adrs).                                                         
+      10 +Every request to the service, except the health checks and the 
+         +API documentation, acts for one user with one role (SYS-R01). T
+         +he challenge allows authentication to be simulated (docs/challe
+         +nge.md), so this version verifies bearer JWTs signed with HS256
+         + and a shared secret from the environment, and the only way to 
+         +get a token is a local CLI script. The API has no login and no 
+         +endpoint that issues tokens. In production the tokens would com
+         +e from an external OpenID Connect provider, signed with an asym
+         +metric key (RS256 or ES256) and verified through its JWKS; that
+         + is out of scope here and is recorded in [ADR-0012](../../docs/
+         +adr/0012-simulated-authentication-with-jwt-and-two-roles.md).  
+      11  
+      12  This spec defines what a valid token is, how the caller's ident
+          ity and role are taken from it and from nowhere else, what a re
+          quest with no valid token answers, and which role may do what o
+          n whose account, written once as the authorization matrix of se
+          ction 1.3. Terms have the meanings in the glossary of spec 000.
+      13  
+     ...
+      252  
+      253  ## 6. Out of scope
+      254  
+      255 -- An external OpenID Connect provider, asymmetric signatures (
+          -RS256, ES256) and key discovery through JWKS. The production d
+          -esign is recorded in an ADR in phase 03-adrs, including the ma
+          -pping an OIDC provider whose subjects are not UUIDs would need
+          -.                                                             
+      255 +- An external OpenID Connect provider, asymmetric signatures (
+          +RS256, ES256) and key discovery through JWKS. The production d
+          +esign is recorded in [ADR-0012](../../docs/adr/0012-simulated-
+          +authentication-with-jwt-and-two-roles.md), including the mappi
+          +ng an OIDC provider whose subjects are not UUIDs would need.  
+      256  - Login, user registration, passwords, multi-factor authentica
+           tion, refresh tokens and token revocation. A token lives at mo
+           st 15 minutes and cannot be revoked before it expires.
+      257  - Rotating `JWT_SECRET` without a restart, and accepting more 
+           than one secret at a time.
+      258  - Scopes or permissions beyond the two roles.
+  ⎿  Updated specs/007-security-ops/spec.md (+2 -2)
+      118  
+      119  ### 1.8 Health and shutdown
+      120  
+      121 -- **Readiness.** `SELECT 1` runs with a 1000 ms timeout on a d
+          -edicated connection outside the request pool, so a busy pool n
+          -ever marks a healthy replica unready. Every migration in the c
+          -ode's `migrations/` folder must be present in node-pg-migrate'
+          -s table; migrations the database holds beyond those are accept
+          -ed, so a replica of the previous version stays ready while a n
+          -ewer one rolls out. Migrations are therefore written expand-th
+          -en-contract, recorded in an ADR (SEC-R24).                    
+      121 +- **Readiness.** `SELECT 1` runs with a 1000 ms timeout on a d
+          +edicated connection outside the request pool, so a busy pool n
+          +ever marks a healthy replica unready. Every migration in the c
+          +ode's `migrations/` folder must be present in node-pg-migrate'
+          +s table; migrations the database holds beyond those are accept
+          +ed, so a replica of the previous version stays ready while a n
+          +ewer one rolls out. Migrations are therefore written expand-th
+          +en-contract, recorded in [ADR-0020](../../docs/adr/0020-expand
+          +-then-contract-migrations.md) (SEC-R24).                      
+      122  - **Shutdown exit code.** A shutdown that reaches `SHUTDOWN_TI
+           MEOUT_MS` with requests still in flight exits with code 1, so 
+           the orchestrator records that requests were cut off; it exits 
+           0 only when every request finished (SEC-R27, SEC-R28). Since `
+           SHUTDOWN_TIMEOUT_MS` is at least `REQUEST_TIMEOUT_MS` (SEC-R35
+           ), this happens only if a request outlives its own timeout. In
+            AWS the ECS `stopTimeout` must exceed `SHUTDOWN_DRAIN_DELAY_M
+           S` + `SHUTDOWN_TIMEOUT_MS` (phase 12-infra).
+      123  
+      124  ### 1.9 Database sessions and connections
+      125  
+      126  - **Role settings.** A migration run by the owner role sets `s
+           tatement_timeout` and `idle_in_transaction_session_timeout` wi
+           th `ALTER ROLE <runtime role> SET ...`, so local, CI and AWS g
+           et the same values; the owner role is granted the right to alt
+           er the runtime role. `statement_timeout` (5 s) is above both l
+           ock waits, so a lock wait always ends as SQLSTATE 55P03, never
+            57014; `idle_in_transaction_session_timeout` (10 s) ends a tr
+           ansaction left open by a defect. The reconcile and cleanup scr
+           ipts raise `statement_timeout` for their own transaction throu
+           gh a function of the same kind as the lock-timeout function (S
+           EC-R29).
+      127 -- **Lock-timeout function.** `app.set_lock_timeout(ms integer)
+          -`, `SECURITY INVOKER`, checks 1 ≤ ms ≤ 60000 and runs `set_con
+          -fig('lock_timeout', ms || 'ms', true)`; only the runtime role 
+          -may execute it (SEC-R31). That RDS Proxy pins a connection on 
+          -`SET` and `set_config` statements but not on function calls is
+          - taken from its documentation and recorded in an ADR, to be re
+          --checked when RDS Proxy is introduced in phase 12-infra.      
+      127 +- **Lock-timeout function.** `app.set_lock_timeout(ms integer)
+          +`, `SECURITY INVOKER`, checks 1 ≤ ms ≤ 60000 and runs `set_con
+          +fig('lock_timeout', ms || 'ms', true)`; only the runtime role 
+          +may execute it (SEC-R31). That RDS Proxy pins a connection on 
+          +`SET` and `set_config` statements but not on function calls is
+          + taken from its documentation and recorded in [ADR-0019](../..
+          +/docs/adr/0019-timeout-layers-and-rds-proxy.md), to be re-chec
+          +ked when RDS Proxy is introduced in phase 12-infra.           
+      128  - **Statement timeout.** A statement cancelled by `statement_t
+           imeout` is a transient overload like a lock timeout, and the r
+           equest has already used most of its time, so it is answered 50
+           3 and not retried in process (SEC-R32).
+      129  - **Pool size.** Each replica holds `DB_POOL_MAX` (default 10)
+            request connections plus one readiness connection, and 10 con
+           nections are kept in reserve for migrations, the reconcile and
+            cleanup scripts and manual sessions (SEC-R36). Locally that i
+           s 2 × 11 + 10 = 32 of PostgreSQL's 97 usable connections; in A
+           WS the same rule applies to RDS Proxy's connection budget and 
+           the maximum task count.
+      130  
+
+⏺ I fixed all eight findings. npm run check passes and npm run trace exits 0
+  (219 ACs, 0 missing).
+
+  1. ADR-0004, fingerprint: it's computed at step 2 of spec 005 §1.1 from the
+     request as received: method, raw path and the JSON body as parsed. The body
+     is captured before validation can replace request.body, for example in a
+     preValidation hook, and never taken from the Zod output. Transformed values
+     never feed it. The ADR names both failure cases:
+     - a bigint produced by a transform cannot be canonicalized;
+     - a lowercased id would let two different bodies share a fingerprint
+       (IDM-R05, IDM-R09).
+
+     Apart from the fingerprint, the handler uses the body only after the
+     validation check.
+  2. and 3. Alarm reverted:
+     - Spec 008: I rebuilt it from main with only the current Related ADRs line,
+       so it now differs from main by that one line.
+     - ADR-0019: the 15-minute note is gone. Under To monitor,
+       DatabaseConnectionsCurrentlySessionPinned Maximum should stay at 0. The
+       phase 12 follow-up now asks two questions, each a change to spec 008 for
+       its owner to approve: does the migration task connect through RDS Proxy
+       or to the instance directly, and should there be an alarm on this metric?
+  3. Forward references: they now link to the ADRs:
+     - spec 005 to ADR-0009;
+     - spec 006, both places, to ADR-0012;
+     - spec 007 §1.8 to ADR-0020 and §1.9 to ADR-0019.
+
+     No requirement or AC changed.
+  4. ADR-0016: transient conditions are answered as spec 000 §4 lists them (409
+     request-in-progress, 429 and 503, each with Retry-After), never 500.
+  5. ADR-0003: the 500 is narrowed to other constraint or trigger violations.
+     Lock timeouts, statement timeouts, deadlocks and serialization failures
+     follow SYS-R18, SYS-R34, SEC-R32 and IDM-R13.
+  6. ADR-0006: until phase 06 extends the lint rule, review is what catches a
+     stray Number(). The LED-AC22 claim is gone.
+  7. ADR-0014: it refers to the alarms of spec 008 §1.8 without listing them.
+
+  Nothing else changed, and nothing is committed yet. Next is /audit again, or
+  /ship to close the phase.
+
+✻ Churned for 41s · done 12:28 AM
+
+❯ /audit                                                                        
+  ⎿  I found no Critical, High or Medium findings, only six Low ones. This phase adds no code: it adds 20 ADRs plus their index, and changes only the "Related ADRs" line and a few "will be recorded in an ADR" sentences in the nine specs.
+
+     What holds up:
+     - Every ADR follows the template and appears in the index.
+     - The ADR→spec and spec→ADR "Related" lists match in both directions.
+     - Every requirement and AC ID cited in an ADR exists in the specs.
+     - The numbers I checked match the specs: retry backoff, timeouts and their 20130 ms worst case, rate-limit defaults, pool sizes and AWS sizes.
+     - The quotes ADR-0019 takes from the AWS RDS Proxy pinning page match that page's PostgreSQL section, which I fetched.
+
+     Findings (all Low)
+
+     1. docs/adr/0004-typescript-with-fastify.md:5 (and 0003:5, 0005:5, 0014:5, 0017:5, 0018:5)
+        - What is wrong: some ADRs cite requirements from specs missing from their "Related specs" line, so those specs don't link back.
+          - 0004 cites MOV-R30, yet specs 003 and 004 don't link it.
+          - 0003 cites SEC-R32 (spec 007).
+          - 0005 cites REV-R05 and AUT-R21 (specs 004 and 006).
+          - 0014 cites SYS-R20 (spec 000).
+          - 0017 cites DEP-R07 (spec 008).
+          - 0018 cites SYS-R15 (spec 000).
+        - How to trigger: in phase 08, someone implements the deposit, withdrawal, transfer and reversal routes from specs 003 and 004. They follow those specs' Related ADRs and never reach ADR-0004's rules: routes use attachValidation, and the fingerprint comes from the body as parsed, never from Zod output.
+        - Impact: the main risk is that the fingerprint gets computed from transformed values, for example ids lowercased by Zod. Two bodies that differ only in id case would then share a fingerprint. The second request would replay the first's response instead of getting 422 idempotency-key-reused. The rest is broken navigation, against docs/adr/README.md:6.
+        - Suggested fix: add the missing specs to each ADR's "Related specs" line and the matching ADRs to each spec's "Related ADRs" line. This is metadata, so it needs no owner approval.
+        - AC: missing AC (process rule in the ADR README and the adr skill, step 6).
+     2. docs/adr/0019-timeout-layers-and-rds-proxy.md:66
+        - What is wrong: the list of "other pinning conditions to avoid" leaves out one the same AWS page gives for all engines: any statement whose text is over 16 KB pins the session.
+        - How to trigger: a later feature builds one large multi-row INSERT or IN (...) query through Kysely.
+        - Impact: connections pin silently behind RDS Proxy, the failure this ADR exists to prevent.
+        - Suggested fix: add the 16 KB rule to the list, and point to the DatabaseConnectionsCurrentlySessionPinned monitor already named in the ADR.
+        - AC: SEC-R30 (spirit), missing AC.
+     3. docs/adr/0006-double-entry-ledger-with-signed-integer-minor-units.md:35
+        - What is wrong: the promise to extend the lint rule to Number(), parseInt, Number.parseInt and unary + in domain/** and application/** appears only in a Cons bullet. It is missing from the Follow-ups section, which only lists Money, Currency and LedgerTransaction. eslint.config.js:35-39 bans only parseFloat today.
+        - How to trigger: phase 04 builds its tasks from the ADR Follow-ups, so the lint extension never becomes a task.
+        - Impact: a stray Number(amount) would lose precision above 2^53, and only review would catch it.
+        - Suggested fix: add the lint extension as a Phase 06-domain follow-up in ADR-0006, with a lint test.
+        - AC: LED-R27, SYS-R06.
+     4. docs/adr/0002-modular-monolith.md:33 and docs/adr/0010-kysely-and-pg-instead-of-an-orm.md:63
+        - What is wrong: ADR-0002 says module boundaries are "enforced by convention and lint rules", and ADR-0010 says Kysely and pg "live only in persistence adapters and platform/". But eslint.config.js:42-63 restricts imports only under src/modules/*/domain/**. Nothing stops an application/ file importing kysely, or one module reaching into another module's adapters/.
+        - How to trigger: a use case in application/ imports kysely, and lint passes.
+        - Impact: an ADR claims a guarantee the code doesn't enforce, and the transaction boundary can leak into use cases.
+        - Suggested fix: either add a follow-up to extend no-restricted-imports to application/** and to cross-module internals, or reword both sentences to "review".
+        - AC: missing AC.
+     5. docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md:34
+        - What is wrong: it says the SYS-R37 test seams "attach at ports". Several of those seams are HTTP-level, not ports: the throwing route, the hook that adds a member to every response body, and the hook that destroys the client connection after commit.
+        - How to trigger: phase 04 or 08 designs every seam as a port, as the ADR says.
+        - Impact: a misleading design note, with possible over-engineering or a seam missing from the test-only list.
+        - Suggested fix: say the seams attach at ports or as test-only Fastify plugins, all registered through the one list of SYS-R37.
+        - AC: SYS-R37.
+     6. AGENTS.md:85
+        - What is wrong: it still says "(ADR 0003, written in phase 03)" instead of linking the ADR that now exists.
+        - How to trigger: reading AGENTS.md.
+        - Impact: a small doc drift; agents don't get a direct link.
+        - Suggested fix: link docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md.
+        - AC: missing AC.
+
+     Deferred, already planned: lint extension to Number() and related calls (phase 06-domain, per ADR-0006); plan.md/tasks.md with AC IDs (phase 04-plans); schema, roles, triggers and app.set_lock_timeout (phase 05-schema); re-checking the AWS pinning page and choosing the migration task's connection path (phase 12-infra); WAF rule, Terraform and infra:validate (phase 12-infra); e2e in --require (phase 12); docs/traceability.md freshness check (phase 13).
+
+     Categories without findings
+     - Spec conformance: no code or tests changed; no AC touched.
+     - Money: no findings; the ADRs match SYS-R06/R07, LED-R23 to R29 and the currency-exponent rule.
+     - Transactions and concurrency: no findings; ADR-0007 and ADR-0008 match MOV-R18 to R20, MOV-R31, REV-R18/R19, SYS-R18/R19 and LED-R14.
+     - Idempotency: no findings; ADR-0009 matches spec 005 sections 1.1 to 1.4 and IDM-R01 to R23, including 409 for the key wait versus 503 for account locks.
+     - Security: no findings; no secrets in the new files, and ADR-0012, 0013 and 0018 match specs 006, 007 and 002.
+     - Failure handling: no findings; ADR-0019 matches spec 007 table 1.1 (20130 ms < 25000 ms < 30 s and 60 s) and SEC-R29 to R36.
+     - Tests: no tests added or changed.
+
+     Follow-ups: 1, 2, 3, 4, 5, 6
+     Verdict: ready to ship
+
+❯ The audit says ready to ship with six Low follow-ups. These ADRs are not      
+  accepted until they are committed, so fix all six now:                        
+  1. For every requirement or AC an ADR cites, its spec must be on the ADR's    
+  Related specs line and the ADR on that spec's Related ADRs line. Fix ADRs     
+  0003, 0004, 0005, 0014, 0017 and 0018 as the audit lists, then check all 20   
+  ADRs the same way so both directions match the citations.                     
+  2. ADR-0019: add to the pinning conditions to avoid the AWS page's rule for   
+  every engine: a statement whose text is larger than 16 KB pins the session    
+  (for example a large multi-row INSERT or IN list). The same metric watches    
+  it.                                                                           
+  3. ADR-0006: add the lint extension (Number(), Number.parseInt, parseInt and  
+  unary + forbidden in src/modules//domain/* and src/modules/*/application/**,  
+  with a test that the rule fires) as a Phase 06-domain follow-up.              
+  4. ADR-0002 and ADR-0010: state what lint enforces today (only the domain     
+  import rule), and add a Phase 06-domain follow-up to extend                   
+  no-restricted-imports: src/modules//application/* may not import kysely, pg,  
+  fastify, ioredis or any adapters/ path, and no module imports another         
+  module's internals. Until then, review enforces it.                           
+  5. ADR-0003: test seams attach at ports or as test-only Fastify plugins, all  
+  registered through the one list of SYS-R37.                                   
+  6. AGENTS.md: link docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md  
+  instead of "(ADR 0003, written in phase 03)".                                 
+     Change nothing else. Run npm run check and npm run trace.                  
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; python3 - <<'EOF'
+      import re,glob…)
+  ⎿  0003 added ['007-security-ops']
+     0004 added ['003-money-movements']
+     0005 added ['004-reversals', '006-auth']
+     … +11 lines (ctrl+o to expand)
+  ⎿  Updated docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md (+1 
+     -1)
+      2  
+      3  - **Status:** Accepted
+      4  - **Date:** 2026-10-07
+      5 -- **Related specs:** 000-overview, 001-accounts, 002-ledger, 003
+        --money-movements, 004-reversals, 005-idempotency                
+      5 +- **Related specs:** 000-overview, 001-accounts, 002-ledger, 003
+        +-money-movements, 004-reversals, 005-idempotency, 007-security-o
+        +ps                                                              
+      6  
+      7  ## Context and problem
+      8  
+  ⎿  Updated docs/adr/0004-typescript-with-fastify.md (+1 -1)
+      2  
+      3  - **Status:** Accepted
+      4  - **Date:** 2026-10-07
+      5 -- **Related specs:** 000-overview, 005-idempotency, 006-auth, 00
+        -7-security-ops                                                  
+      5 +- **Related specs:** 000-overview, 003-money-movements, 005-idem
+        +potency, 006-auth, 007-security-ops                             
+      6  
+      7  ## Context and problem
+      8  
+  ⎿  Updated docs/adr/0005-postgresql-as-the-only-source-of-truth.md (+1 
+     -1)
+      2  
+      3  - **Status:** Accepted
+      4  - **Date:** 2026-10-07
+      5 -- **Related specs:** 000-overview, 001-accounts, 002-ledger, 005
+        --idempotency, 007-security-ops, 008-deployment                  
+      5 +- **Related specs:** 000-overview, 001-accounts, 002-ledger, 004
+        +-reversals, 005-idempotency, 006-auth, 007-security-ops, 008-dep
+        +loyment                                                         
+      6  
+      7  ## Context and problem
+      8  
+  ⎿  Updated
+     docs/adr/0008-read-committed-with-ordered-pessimistic-row-locks.md (+1
+     -1)
+      2  
+      3  - **Status:** Accepted
+      4  - **Date:** 2026-10-07
+      5 -- **Related specs:** 000-overview, 001-accounts, 003-money-movem
+        -ents, 004-reversals, 005-idempotency, 007-security-ops          
+      5 +- **Related specs:** 000-overview, 001-accounts, 002-ledger, 003
+        +-money-movements, 004-reversals, 005-idempotency, 007-security-o
+        +ps                                                              
+      6  
+      7  ## Context and problem
+      8  
+  ⎿  Updated
+     docs/adr/0014-aws-deployment-on-ecs-fargate-with-rds-postgresql.md (+1
+     -1)
+      2  
+      3  - **Status:** Accepted
+      4  - **Date:** 2026-10-08
+      5 -- **Related specs:** 005-idempotency, 007-security-ops, 008-depl
+        -oyment                                                          
+      5 +- **Related specs:** 000-overview, 005-idempotency, 007-security
+        +-ops, 008-deployment                                            
+      6  
+      7  ## Context and problem
+      8  
+  ⎿  … 9 more files changed
+
+⏺ Besides the six ADRs the audit named, ADR-0008 also needed spec 002, because
+  it cites LED-R14. Now items 2 to 6:
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; grep -n "convention and lint
+      rules\|Kysely and \`pg\` live only\|attach at ports\|Phase 06-domain"
+      docs/adr/0002*.m…)
+  ⎿  docs/adr/0010-kysely-and-pg-instead-of-an-orm.md:63:Kysely and `pg` li
+     ve only in persistence adapters and `platform/` (ADR-0003); the domain
+      lint rule forbids them in `domain/`.
+     … +25 lines (ctrl+o to expand)
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances; python3 - <<'EOF'
+      def rep(p,old,new):…)
+  ⎿     Duration  402ms (tests 60%, import 21%, transform 16%, setup 2%, wo
+     rker 1%)
+     … +6 lines (ctrl+o to expand)
+  ⎿  Updated AGENTS.md (+1 -1)
+      82  
+      83  ## 6. Architecture and repository map
+      84  
+      85 -Hexagonal architecture (ports and adapters) per module, with ta
+         -ctical DDD, so money rules are unit-tested without infrastructu
+         -re and the transaction boundary stays visible (ADR 0003, writte
+         -n in phase 03).                                                
+      85 +Hexagonal architecture (ports and adapters) per module, with ta
+         +ctical DDD, so money rules are unit-tested without infrastructu
+         +re and the transaction boundary stays visible ([ADR-0003](docs/
+         +adr/0003-hexagonal-architecture-with-tactical-ddd.md)).        
+      86  
+      87  ```
+      88  src/
+  ⎿  Updated docs/adr/0002-modular-monolith.md (+2 -1)
+      30    - Explicit module interfaces (ports, ADR-0003) keep the bound
+          aries visible, so a module could be extracted later.
+      31  - **Cons:**
+      32    - Modules cannot be deployed or scaled independently; a chang
+          e to any module redeploys all of them.
+      33 -  - Boundaries are enforced by convention and lint rules, not b
+         -y the network, so they can erode if not reviewed.              
+      33 +  - Boundaries are enforced by convention, review and lint, not
+         + by the network, so they can erode if not reviewed. Lint enforc
+         +es only the domain import rule today (`src/modules/*/domain/**`
+         + may not import infrastructure, `adapters/` or `platform/`); im
+         +ports between modules are enforced by review.                  
+      34    - All modules share one database, which is a single scaling p
+          oint for writes.
+      35  
+      36  ### Option B: Microservices (for example accounts, ledger and m
+          ovements as separate services)
+     ...
+      76  ### Follow-ups
+      77  
+      78  - ADR-0003 defines the layers inside each module.
+      79 +- Phase 06-domain: extend `no-restricted-imports` in `eslint.co
+         +nfig.js` so that `src/modules/*/application/**` may not import 
+         +`kysely`, `pg`, `fastify`, `ioredis` or any `adapters/` path, a
+         +nd no module imports another module's internals. Until then, re
+         +view enforces it.                                              
+      80  - If a module ever needs to be split out, a new ADR must first 
+          address how its writes stay atomic with the ledger.
+  ⎿  Updated docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md (+1 
+     -1)
+      31    - The unit of work and row locking are explicit ports (for ex
+          ample a lock port that takes customer account ids and locks the
+          m in ascending order, MOV-R18), not hidden behind a generic CRU
+          D repository; reading a use case shows where the transaction st
+          arts, what is locked and when the checks run.
+      32    - Aggregates enforce their invariants in one place (a `Ledger
+          Transaction` cannot be built unbalanced, LED-R04, LED-R05), and
+           the database enforces them again through constraints and a def
+          erred trigger.
+      33    - Typed domain errors map to problem details at the HTTP edge
+           in one place (SYS-R24, SYS-R28).
+      34 -  - Test seams (SYS-R37) attach at ports, so they exist only in
+         - the test app.                                                 
+      34 +  - Test seams attach at ports or as test-only Fastify plugins,
+         + all registered through the one list of SYS-R37, so they exist 
+         +only in the test app.                                          
+      35    - A lint rule keeps the domain free of infrastructure: `eslin
+          t.config.js` forbids imports of `fastify`, `kysely`, `pg`, `ior
+          edis` and other infrastructure packages, and of any `adapters/`
+           or `platform/` path, from `src/modules/*/domain/**`.
+      36  - **Cons:**
+      37    - More files and indirection than a direct route-to-SQL desig
+          n: ports, adapters and mapping between rows and aggregates.
+  ⎿  Updated
+     docs/adr/0006-double-entry-ledger-with-signed-integer-minor-units.md
+     (+1 -0)
+      82  
+      83  - Phase 05-schema: tables, constraints and the deferred balance
+           trigger of section 1.3 of spec 002.
+      84  - Phase 06-domain: `Money`, `Currency` and `LedgerTransaction` 
+          with unit tests at the limits (LED-AC22).
+      85 +- Phase 06-domain: extend the lint rule so that `Number()`, `Nu
+         +mber.parseInt`, `parseInt` and unary `+` are forbidden in `src/
+         +modules/*/domain/**` and `src/modules/*/application/**`, with a
+         + test that the rule fires.                                     
+      86  - ADR-0007 decides how system and customer account balances are
+           stored.
+  ⎿  Updated docs/adr/0010-kysely-and-pg-instead-of-an-orm.md (+2 -1)
+      60  
+      61  Chosen option: **Option A**, because money code needs explicit 
+          transactions and row locks. Kysely is a typed SQL builder with 
+          `forUpdate()` and no hidden queries, and migrations are plain S
+          QL, so constraints and triggers are reviewable. Prisma and Type
+          ORM hide transaction and locking semantics; raw `pg` alone lose
+          s type safety.
+      62  
+      63 -Kysely and `pg` live only in persistence adapters and `platform
+         -/` (ADR-0003); the domain lint rule forbids them in `domain/`. 
+      63 +Kysely and `pg` live only in persistence adapters and `platform
+         +/` (ADR-0003). Lint enforces only the domain import rule today,
+         + which forbids them in `domain/`; elsewhere, review enforces it
+         + until the follow-up below.                                    
+      64  
+      65  ## Consequences
+      66  
+     ...
+      84  
+      85  - Phase 05-schema: first migrations and the Kysely database int
+          erface.
+      86  - Phase 06-domain and later: repositories and the unit of work 
+          on Kysely.
+      87 +- Phase 06-domain: extend `no-restricted-imports` in `eslint.co
+         +nfig.js` so that `src/modules/*/application/**` may not import 
+         +`kysely`, `pg`, `fastify`, `ioredis` or any `adapters/` path, a
+         +nd no module imports another module's internals. Until then, re
+         +view enforces it.                                              
+  ⎿  … 1 more file changed
+
+⏺ I fixed all six findings. npm run check passes, npm run trace exits 0 (219
+  ACs, 0 missing), and a script check confirms the Related lines match the
+  citations in both directions for all 20 ADRs.
+
+  1. Related lines: I derived each ADR's specs from the requirement and AC IDs
+     it cites, then rebuilt every spec's "Related ADRs" line from those. The six
+     ADRs the audit named now include:
+     - 0003: spec 007
+     - 0004: spec 003
+     - 0005: specs 004 and 006
+     - 0014: spec 000
+     - 0017: spec 008
+     - 0018: spec 000
+
+     The check also found one the audit missed: ADR-0008 cites LED-R14 but
+     didn't list spec 002, so I added it.
+  2. ADR-0019: the pinning conditions to avoid now include any statement larger
+     than 16 KB, which pins on every engine (for example a large multi-row
+     INSERT or IN list). DatabaseConnectionsCurrentlySessionPinned watches all
+     of them.
+  3. ADR-0006: new Phase 06-domain follow-up: forbid Number(), Number.parseInt,
+     parseInt and unary + in domain/** and application/**, with a test that the
+     rule fires.
+  4. ADR-0002 and ADR-0010: both say lint enforces only the domain import rule
+     today, and review covers the rest. Both now have the Phase 06-domain
+     follow-up for no-restricted-imports:
+     - application/** may not import kysely, pg, fastify, ioredis or any
+       adapters/ path;
+     - no module imports another module's internals.
+  5. ADR-0003: test seams attach at ports or as test-only Fastify plugins, all
+     registered through the one SYS-R37 list.
+  6. AGENTS.md: it now links
+     docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md.
+
+  Nothing else changed, and nothing is committed yet. Next is /ship to close the
+  phase.
+
+✻ Worked for 41s · done 12:36 AM
+❯ /export docs/ai/transcripts/03-adrs.txt                                       
+  ⎿  Conversation exported to:
+     /Users/matiastorsello/supercool-finances/docs/ai/transcripts/03-adrs.txt
+
+❯ /ship close phase 03: adrs                                                    
+
+⏺ Bash(git branch --show-current)
+  ⎿  phase/03-adrs
+
+⏺ Bash(npm run check 2>&1 | tail -8)
+  ⎿   ✓ |unit| test/unit/test-guards.test.ts (1 test) 295ms
+
+      Test Files  5 passed (5)
+     … +7 lines (ctrl+o to expand)
+
+⏺ compose.yaml exists, so step 2 needs the infrastructure and integration tests.
+
+⏺ Bash(npm run infra:up 2>&1 | tail -8)
+  ⎿  > docker compose up -d --wait postgres redis
+
+      Container supercool-finances-redis-1 Running
+     … +5 lines (ctrl+o to expand)
+
+⏺ Bash(npm run test:integration 2>&1 | tail -8)
+  ⎿   ✓ |integration| test/integration/infra.smoke.test.ts (3 tests) 18ms
+
+      Test Files  1 passed (1)
+     … +7 lines (ctrl+o to expand)
+
+⏺ Bash(npm run trace -- --require unit,integration 2>&1 | tail -3; echo "exit
+      ${PIPESTATUS[0]}")
+  ⎿  | DEP-AC26 | 008-deployment | Approved | ci | pending | Verified by: C
+     I job `ci`, step `npm run infra:validate` (phase 12-infra) (npm run in
+     fra:validate is not a script in package.json; npm run infra:validate i
+     … +6 lines (ctrl+o to expand)
+
+⏺ The pipe hid the exit code. Re-running it without a pipe:
+
+⏺ Bash(npm run trace -- --require unit,integration > /dev/null; echo "exit $?")
+  ⎿  exit 0
+
+⏺ Gates pass. Step 3: check that the transcript has a row in docs/ai/README.md.
+
+  Listed 1 directory (ctrl+o to expand)
+
+⏺ The transcript has no row yet, so I'll add one. The summary skill rule says
+  never change code; this is docs only.
+
+⏺ Bash(printf '%s\n' '| 03 | 2026-10-08 | [03-adrs.txt](transcripts/03-adrs.txt)
+      | ADRs: twenty decisions 0001-0020 with the owner'"'"'s reasoning,
+      alternatives and co…)
+  ⎿  | 02 part 4 | 2026-10-07 | [02-specs-part4.txt](transcripts/02-specs-p
+     art4.txt) | Specs, part 4: specs 006-auth, 007-sec
+     | 02 part 5 | 2026-10-07 | [02-specs-part5.txt](transcripts/02-specs-p
+     … +3 lines (ctrl+o to expand)
+  ⎿  Updated docs/ai/README.md (+1 -0)
+      26  | 02 part 3 | 2026-10-07 | [02-specs-part3.txt](transcripts/02-
+          specs-part3.txt) | Specs, part 3: specs 004-reversals and 005-i
+          dempotency with the owner's decisions, an audit round and its f
+          ixes, including a traceability gate that no longer counts a CI 
+          step whose failure is ignored with `||`, and `/ship` of both sp
+          ecs. |
+      27  | 02 part 4 | 2026-10-07 | [02-specs-part4.txt](transcripts/02-
+          specs-part4.txt) | Specs, part 4: specs 006-auth, 007-security-
+          ops and 008-deployment with the owner's decisions, an audit rou
+          nd and its fixes, including a traceability gate that no longer 
+          counts a CI script feeding a pipe without pipefail or a `&&` li
+          st before the last line of its block, and `/ship` of the three 
+          specs. |
+      28  | 02 part 5 | 2026-10-07 | [02-specs-part5.txt](transcripts/02-
+          specs-part5.txt) | Specs, part 5: cross-spec review of specs 00
+          0-008, the owner's answers to every open question folded into t
+          he specs as rules, eight overview ACs retired, all specs set to
+           Approved, an audit round and its fixes, including a traceabili
+          ty gate that accepts a CI script only as the whole command of a
+           step, and `/ship` closing the phase. |
+      29 +| 03 | 2026-10-08 | [03-adrs.txt](transcripts/03-adrs.txt) | AD
+         +Rs: twenty decisions 0001-0020 with the owner's reasoning, alte
+         +rnatives and consequences, the ADR index, links to and from eve
+         +ry spec, the AWS RDS Proxy pinning source checked, and three au
+         +dit rounds and their fixes. |                                  
+
+⏺ Bash(npm run format:check 2>&1 | tail -3)
+  ⎿  Checking formatting...
+     All matched files use Prettier code style!
+
+⏺ Bash(git add -A)
+  ⎿  (No output)
+
+⏺ Bash(git status --short)
+  ⎿  M  AGENTS.md
+     A  docs/adr/0001-spec-driven-development-with-adrs-and-ai-agents.md
+     A  docs/adr/0002-modular-monolith.md
+     … +30 lines (ctrl+o to expand)
+
+⏺ Nothing sensitive is staged (no .env, dist or reports). Committing:
+
+⏺ Bash(git commit -m "docs(adr): record the twenty architecture decisions of
+      phase 03" -m "Adds ADRs 0001-0020 in MADR format with alternatives,
+      consequences and links…)
+  ⎿  [phase/03-adrs c0e45ef] docs(adr): record the twenty architecture deci
+     sions of phase 03
+      33 files changed, 4608 insertions(+), 15 deletions(-)
+     … +22 lines (ctrl+o to expand)
+
+⏺ Step 6, the secret scan of the branch:
+
+⏺ Bash(gitleaks git --no-banner --redact --log-opts="origin/main..HEAD")
+  ⎿  12:37AM INF 1 commits scanned.
+     12:37AM INF scanned ~309266 bytes (309.27 KB) in 168ms
+     12:37AM INF no leaks found
+
+⏺ Bash(git push -u origin HEAD)
+  ⎿  remote:
+     remote: Create a pull request for 'phase/03-adrs' on GitHub by visitin
+     g:
+     … +6 lines (ctrl+o to expand)
+
+⏺ The description starts with "close phase 03", so I'll check for an existing
+  pull request first.
+
+⏺ Bash(gh pr view)
+  ⎿  Error: Exit code 1
+     no pull requests found for branch "phase/03-adrs"
+
+⏺ Bash(gh pr create --base main --title "Phase 03-adrs: twenty architecture
+      decision records" --body-file - <<'EOF'
+      ## What the phase delivered…)  ⎿  https://github.com/torsello/supercool-finances/pull/3
+
+⏺ Phase 03 is committed and pushed, and I opened pull request #3 for you to
+  merge once CI is green.
+
+  - Commit: c0e45ef docs(adr): record the twenty architecture decisions of
+    phase 03.
+  - Gates: npm run check, npm run test:integration (3 tests), npm run trace -- 
+    --require unit,integration (exit 0) and the gitleaks scan of the branch (no
+    leaks) all passed.
+  - ACs covered: none. The phase adds no code, tests or AC changes.
+  - Pull request: https://github.com/torsello/supercool-finances/pull/3
+  - Other change: I added the phase 03 row to docs/ai/README.md, which the
+    docs-in-sync step required. npm run format:check passed after that edit.
+    Everything else in the commit is the 20 ADRs, the index, the spec link
+    lines, the AGENTS.md link and the transcript.
+
+✻ Cogitated for 57s · done 12:38 AM
