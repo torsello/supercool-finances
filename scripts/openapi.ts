@@ -15,6 +15,7 @@ export async function renderOpenApiYaml(): Promise<string> {
   const app = buildApp(
     loadConfig({
       DATABASE_URL: 'postgres://openapi:unused@127.0.0.1:1/unused',
+      REDIS_URL: 'redis://127.0.0.1:1',
       JWT_SECRET: 'openapi-export-placeholder-never-used-to-sign-0001',
       JWT_ISSUER: 'openapi-export',
       JWT_AUDIENCE: 'openapi-export',

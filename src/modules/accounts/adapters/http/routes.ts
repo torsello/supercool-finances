@@ -106,6 +106,7 @@ export function accountRoutes(deps: AccountRoutesDeps): (scope: FastifyInstance)
         };
         if (deps.keyed.isKeyed(request)) {
           return await deps.keyed.answer(request, reply, caller.userId, {
+            kind: 'account_creation',
             transactions: deps.keyedTransactions,
             operation: async (tx) => await create(tx.accounts),
             created: (account) => ({

@@ -2,7 +2,10 @@ import { readFile } from 'node:fs/promises';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp } from '../../src/app.js';
 import { loadConfig } from '../../src/platform/config/config.js';
-import { PROBLEM_REFERENCE } from '../../src/platform/http/api-reference.js';
+import {
+  PROBLEM_REFERENCE,
+  UNDOCUMENTED_PROBLEM_TYPES,
+} from '../../src/platform/http/api-reference.js';
 import { PROBLEM_TYPES } from '../../src/platform/http/problem.js';
 import { OPENAPI_PATH, renderOpenApiYaml } from '../../scripts/openapi.js';
 import { K } from '../support/tokens.js';
@@ -34,6 +37,7 @@ describe('the OpenAPI document (SEC-R44)', () => {
   const app = buildApp(
     loadConfig({
       DATABASE_URL: 'postgres://scf_app:unused@127.0.0.1:1/unused',
+      REDIS_URL: 'redis://127.0.0.1:1',
       JWT_SECRET: K,
       JWT_ISSUER: 'scf-test',
       JWT_AUDIENCE: 'scf-api',
@@ -103,8 +107,8 @@ describe('the OpenAPI document (SEC-R44)', () => {
   });
 
   it('SEC-R44 documents every problem type of the registry with its status, title and detail', () => {
-    for (const [type, problem] of Object.entries(PROBLEM_TYPES)) {
-      const reference = PROBLEM_REFERENCE[type as keyof typeof PROBLEM_TYPES];
+    for (const [type, reference] of Object.entries(PROBLEM_REFERENCE)) {
+      const problem = PROBLEM_TYPES[type as keyof typeof PROBLEM_REFERENCE];
       expect(reference.statuses, type).toContain(problem.status);
       expect(reference.title, type).toBe(problem.title);
       expect(reference.detail, type).toBe(problem.detail);
@@ -118,6 +122,13 @@ describe('the OpenAPI document (SEC-R44)', () => {
         .map((example) => (example.value as { type?: string }).type),
     );
     expect([...documented].sort()).toEqual(Object.keys(PROBLEM_REFERENCE).sort());
+    // Every type of the registry is documented, except those of spec 007 that the 12-infra docs
+    // task adds.
+    expect(
+      Object.keys(PROBLEM_TYPES)
+        .filter((type) => !(type in PROBLEM_REFERENCE))
+        .sort(),
+    ).toEqual([...UNDOCUMENTED_PROBLEM_TYPES].sort());
     // Only what the service answers today: the 413, 415 and 429 types of spec 007 and the load
     // balancer's upstream-unavailable join with the 12-infra docs task of plan 007, as do the pool
     // wait and the request timeout among the causes of a 503.

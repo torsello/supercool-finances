@@ -26,17 +26,17 @@ These tasks run in the cross-spec order of plan 000 section 1 for 08-api: authen
 
 ## 09-hardening
 
-- [ ] Test first: SEC-AC30 in `test/unit/platform/config.test.ts`; then every variable of section 1.2, `REPLICA_ID` and `MIGRATION_DATABASE_URL` in `src/platform/config/config.ts`, in one error that names each invalid variable and its rule.
-- [ ] Test first in `test/unit/platform/config-budget.test.ts` (SEC-R35): the budget refuses 20130 and accepts 20131, refuses a shutdown timeout below the request timeout, and names every variable involved; then the budget check.
-- [ ] Test first: SEC-AC31 in `test/integration/security/startup.test.ts`, with the production build as a child process.
-- [ ] Test first: SEC-AC07, SEC-AC08 and SEC-AC09 in `test/integration/security/body-limits.test.ts`; then `src/platform/http/body-limits.ts` and the 413 and 415 mappings.
-- [ ] Test first: SEC-AC11 in `test/integration/security/headers.test.ts`; then `src/platform/http/security-headers.ts`.
-- [ ] Test first: SEC-AC12 and SEC-AC13 in `test/integration/security/cors.test.ts`; then `src/platform/http/cors.ts`.
-- [ ] Test first: SEC-AC14 in `test/integration/security/trusted-proxies.test.ts`; then `src/platform/http/trust-proxy.ts`.
-- [ ] Test first: SEC-AC17 in `test/integration/security/redaction.test.ts`; then the redaction, the request serializer without query strings and the startup error handling of `src/platform/logging/logger.ts`.
-- [ ] Test first in `test/integration/security/redis-client.test.ts` (SEC-R06, SEC-R07): with Redis unreachable, the client fails a command within `REDIS_COMMAND_TIMEOUT_MS` and never queues it; then `src/platform/redis/redis.ts`.
-- [ ] Test first: SEC-AC02 and SEC-AC03 in `test/integration/security/user-rate-limit.test.ts`; then `src/platform/http/rate-limit.ts` as an `onRequest` hook between authentication and the role check, and `RATE_LIMIT_USER_MAX` "1000000" as the default of `test/support/app.ts`.
-- [ ] Test first: SEC-AC32 in `test/integration/security/metrics.test.ts`, with the 40001 fault of the `unit-of-work-faults` seam; then `src/platform/metrics/metrics.ts` and the metrics server on `METRICS_PORT`.
+- [x] Test first: SEC-AC30 in `test/unit/platform/config.test.ts`; then every variable of section 1.2, `REPLICA_ID` and `MIGRATION_DATABASE_URL` in `src/platform/config/config.ts`, in one error that names each invalid variable and its rule.
+- [x] Test first in `test/unit/platform/config-budget.test.ts` (SEC-R35): the budget refuses 20130 and accepts 20131, refuses a shutdown timeout below the request timeout, and names every variable involved; then the budget check.
+- [x] Test first: SEC-AC31 in `test/integration/security/startup.test.ts`, with the production build as a child process.
+- [x] Test first: SEC-AC07, SEC-AC08 and SEC-AC09 in `test/integration/security/body-limits.test.ts`; then `src/platform/http/body-limits.ts` and the 413 and 415 mappings.
+- [x] Test first: SEC-AC11 in `test/integration/security/headers.test.ts`; then `src/platform/http/security-headers.ts`.
+- [x] Test first: SEC-AC12 and SEC-AC13 in `test/integration/security/cors.test.ts`; then `src/platform/http/cors.ts`.
+- [x] Test first: SEC-AC14 in `test/integration/security/trusted-proxies.test.ts`; then `src/platform/http/trust-proxy.ts`.
+- [x] Test first: SEC-AC17 in `test/integration/security/redaction.test.ts`; then the redaction, the request serializer without query strings and the startup error handling of `src/platform/logging/logger.ts`.
+- [x] Test first in `test/integration/security/redis-client.test.ts` (SEC-R06, SEC-R07): with Redis unreachable, the client fails a command within `REDIS_COMMAND_TIMEOUT_MS` and never queues it; then `src/platform/redis/redis.ts`.
+- [x] Test first: SEC-AC02 and SEC-AC03 in `test/integration/security/user-rate-limit.test.ts`; then `src/platform/http/rate-limit.ts` as an `onRequest` hook between authentication and the role check, and `RATE_LIMIT_USER_MAX` "1000000" as the default of `test/support/app.ts`.
+- [x] Test first: SEC-AC32 in `test/integration/security/metrics.test.ts`, with the 40001 fault of the `unit-of-work-faults` seam; then `src/platform/metrics/metrics.ts` and the metrics server on `METRICS_PORT`.
 - [ ] Test first: SEC-AC06 in `test/integration/security/redis-down.test.ts`, with the TCP proxy of plan section 6; then the transition logs and `scf_rate_limit_store_errors_total`.
 - [ ] Test first in `test/unit/platform/migrations-dir.test.ts` (SEC-R24): the resolver finds `migrations/` from the source tree and `dist/migrations/` from a build, and fails when neither exists or the folder is empty; then `src/platform/db/migrations-dir.ts`, and `npm run build` copying `migrations/*.sql` into `dist/migrations/`, so the production build ships its migrations (SEC-R24).
 - [ ] Test first: SEC-AC18 and SEC-AC19 in `test/integration/security/health.test.ts`; then `src/platform/health/health.ts` with the dedicated readiness connection and the migrations check.

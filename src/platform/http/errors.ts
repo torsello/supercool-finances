@@ -42,3 +42,39 @@ export class RouteNotFound extends Error {
     super('no route');
   }
 }
+
+/**
+ * A request body above 16384 bytes, by `Content-Length` or by the bytes received (SEC-R10): 413
+ * `/problems/payload-too-large`.
+ */
+export class PayloadTooLarge extends Error {
+  override readonly name = 'PayloadTooLarge';
+
+  constructor() {
+    super('request body too large');
+  }
+}
+
+/**
+ * A request body whose `Content-Type` is missing or is not `application/json`, alone or with
+ * `charset=utf-8` (SEC-R11): 415 `/problems/unsupported-media-type`.
+ */
+export class UnsupportedMediaType extends Error {
+  override readonly name = 'UnsupportedMediaType';
+
+  constructor() {
+    super('unsupported request media type');
+  }
+}
+
+/**
+ * An authenticated user above `RATE_LIMIT_USER_MAX` requests in the current window (SEC-R03): 429
+ * `/problems/rate-limited`, with the whole seconds left in the window as `Retry-After`.
+ */
+export class RateLimited extends Error {
+  override readonly name = 'RateLimited';
+
+  constructor(readonly retryAfterSeconds: number) {
+    super('per-user rate limit exceeded');
+  }
+}

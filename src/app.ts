@@ -13,7 +13,7 @@ import {
   KyselyAccountRepository,
   KyselyAccountTransactions,
 } from './modules/accounts/adapters/persistence/kysely-accounts.js';
-import { registerAuthentication } from './modules/auth/adapters/http/authenticate.js';
+import { callerOf, registerAuthentication } from './modules/auth/adapters/http/authenticate.js';
 import { registerAuthorization } from './modules/auth/adapters/http/authorize.js';
 import {
   KeyedHandler,
@@ -50,11 +50,23 @@ import {
   handleFrameworkError,
   MAX_PARAM_LENGTH,
 } from './platform/http/framework-errors.js';
-import { registerDocs } from './platform/http/docs.js';
+import { BODY_LIMIT_BYTES, registerBodyLimits } from './platform/http/body-limits.js';
+import { registerCors } from './platform/http/cors.js';
+import { DOCS_PREFIX, registerDocs } from './platform/http/docs.js';
+import { registerRateLimitStore, registerUserRateLimit } from './platform/http/rate-limit.js';
 import { registerRequestId, requestIdOf } from './platform/http/request-id.js';
 import { registerRoutes, type RouteModule } from './platform/http/routes.js';
+import { registerSecurityHeaders } from './platform/http/security-headers.js';
+import { trustProxy } from './platform/http/trust-proxy.js';
 import { UuidV7Generator } from './platform/ids/uuid-v7.js';
 import { loggerOptions, type LogDestination } from './platform/logging/logger.js';
+import { Metrics, MetricsServer, registerRequestMetrics } from './platform/metrics/metrics.js';
+import {
+  connectRedis,
+  createRedis,
+  disconnectRedis,
+  RedisAvailability,
+} from './platform/redis/redis.js';
 
 export type { RouteModule } from './platform/http/routes.js';
 
@@ -94,6 +106,10 @@ declare module 'fastify' {
     testSeams: readonly TestSeamName[];
     /** The seams attached to each component with a hook point, read from the components. */
     attachedTestHooks(): AttachedTestHooks;
+    /** The metrics of section 1.4 of spec 007. */
+    metrics: Metrics;
+    /** The server of `/metrics` on `METRICS_PORT`, started by `listen` (SEC-R41). */
+    metricsServer: MetricsServer;
   }
 }
 
@@ -108,32 +124,77 @@ export interface AppOptions {
 
 const liveResponse = z.object({ status: z.literal('ok') });
 
+/** Every API route is served under this prefix (SYS-R43). */
+const API_PREFIX = '/v1';
+
 /**
  * The composition root (plan 000 section 2, ADR-0003): builds the app from a parsed configuration,
- * so an invalid one never builds an app, and wires the adapters. Module routes are served under
- * `/v1` behind authentication and the role check (SYS-R31, SYS-R43); the health check is outside
- * it and never reads credentials (AUT-R20).
+ * so an invalid one never builds an app, and wires the adapters. Every response carries the
+ * security headers of spec 007 and, for configured origins only, CORS headers; bodies are limited
+ * to JSON of 16384 bytes. Module routes are served under `/v1` behind authentication, the per-user
+ * rate limit and the role check (SYS-R31, SYS-R43, section 1.3 of spec 007); the health check is
+ * outside it and never reads credentials (AUT-R20). Nothing listens until `listen` is called.
  */
 export function buildApp(config: Config, options: AppOptions = {}) {
   const app = Fastify({
-    logger: loggerOptions(config.logLevel, options.logStream),
+    logger: loggerOptions({
+      level: config.logLevel,
+      secrets: {
+        jwtSecret: config.jwt.secret,
+        cursorSecret: config.cursorSecret,
+        databaseUrl: config.databaseUrl,
+        redisUrl: config.redisUrl,
+      },
+      ...(options.logStream === undefined ? {} : { destination: options.logStream }),
+    }),
     routerOptions: { maxParamLength: MAX_PARAM_LENGTH },
     requestIdHeader: false,
     genReqId: requestIdOf,
     frameworkErrors: handleFrameworkError,
     clientErrorHandler: clientErrorHandler(),
+    bodyLimit: BODY_LIMIT_BYTES,
+    trustProxy: trustProxy(config.trustedProxyCidrs),
   }).withTypeProvider<ZodTypeProvider>();
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
   registerRequestId(app);
+  registerSecurityHeaders(app, { docsPrefix: DOCS_PREFIX, apiPrefix: API_PREFIX });
+  registerCors(app, config.corsOrigins);
+  registerBodyLimits(app);
 
   const pool = createPool({ connectionString: config.databaseUrl, logger: app.log });
   const db = createDatabase(pool);
+  const metrics = new Metrics({ pool });
+  const metricsServer = new MetricsServer(metrics);
+  app.decorate('metrics', metrics);
+  app.decorate('metricsServer', metricsServer);
+  registerRequestMetrics(app, metrics);
+
+  // Redis holds nothing but the per-user counters (SEC-R07): the service starts and serves while
+  // it is down, and the limit fails open (SEC-R06).
+  const redis = createRedis({
+    url: config.redisUrl,
+    commandTimeoutMs: config.redisCommandTimeoutMs,
+  });
+  const redisAvailability = new RedisAvailability(app.log);
+  redisAvailability.watch(redis);
+  registerRateLimitStore(app, {
+    redis,
+    max: config.rateLimitUserMax,
+    windowSeconds: config.rateLimitUserWindowSeconds,
+    userOf: (request) => callerOf(request).userId,
+  });
+  app.addHook('onReady', async () => {
+    await connectRedis(redis, config.redisCommandTimeoutMs);
+  });
+
   app.addHook('onClose', async () => {
+    await metricsServer.close();
+    disconnectRedis(redis);
     await db.destroy();
   });
   const ids = new UuidV7Generator();
-  const unitOfWork = new UnitOfWorkRunner(new TransactionRunner({ pool }), {
+  const unitOfWork = new UnitOfWorkRunner(new TransactionRunner({ pool, observer: metrics }), {
     ...(options.seams?.unitOfWorkFaults === undefined
       ? {}
       : { faults: options.seams.unitOfWorkFaults }),
@@ -151,6 +212,11 @@ export function buildApp(config: Config, options: AppOptions = {}) {
       ...(options.seams?.afterCommit === undefined
         ? {}
         : { afterCommit: options.seams.afterCommit }),
+      observer: {
+        answered: (kind, outcome) => {
+          metrics.keyed(kind, outcome);
+        },
+      },
     },
   );
 
@@ -227,12 +293,26 @@ export function buildApp(config: Config, options: AppOptions = {}) {
   registerRoutes(app, {
     protect: (scope) => {
       registerAuthentication(scope, config.jwt, options.clock);
+      registerUserRateLimit(scope, { availability: redisAvailability, observer: metrics });
       registerAuthorization(scope);
     },
     modules,
   });
 
   return app;
+}
+
+/**
+ * Starts serving: the API on `PORT` and the metrics on `METRICS_PORT`, a second server the load
+ * balancer never routes to (SEC-R41, SEC-R43).
+ */
+export async function listen(
+  app: ReturnType<typeof buildApp>,
+  config: Pick<Config, 'port' | 'metricsPort'>,
+  host = '0.0.0.0',
+): Promise<void> {
+  await app.listen({ port: config.port, host });
+  await app.metricsServer.listen(config.metricsPort, host);
 }
 
 /**

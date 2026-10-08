@@ -90,6 +90,7 @@ export function movementRoutes(deps: MovementRoutesDeps): (scope: FastifyInstanc
       async (request, reply) => {
         const actor = operatorOf(request);
         return await deps.keyed.answer(request, reply, actor.id, {
+          kind: 'deposit',
           transactions: deps.transactions,
           operation: async (tx) => {
             validateRequest(request);
@@ -126,6 +127,7 @@ export function movementRoutes(deps: MovementRoutesDeps): (scope: FastifyInstanc
       async (request, reply) => {
         const actor = customerOf(request);
         return await deps.keyed.answer(request, reply, actor.id, {
+          kind: 'withdrawal',
           transactions: deps.transactions,
           operation: async (tx) => {
             validateRequest(request);
@@ -162,6 +164,7 @@ export function movementRoutes(deps: MovementRoutesDeps): (scope: FastifyInstanc
       async (request, reply) => {
         const actor = customerOf(request);
         return await deps.keyed.answer(request, reply, actor.id, {
+          kind: 'transfer',
           transactions: deps.transactions,
           operation: async (tx) => {
             // The registered schema cannot see the path, so the body as received is validated
@@ -226,6 +229,7 @@ export function movementRoutes(deps: MovementRoutesDeps): (scope: FastifyInstanc
       async (request, reply) => {
         const actor = operatorOf(request);
         return await deps.keyed.answer(request, reply, actor.id, {
+          kind: 'reversal',
           transactions: deps.transactions,
           operation: async (tx) => {
             validateRequest(request);

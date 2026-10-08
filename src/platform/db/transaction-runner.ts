@@ -1,6 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises';
-import { RetriesExhausted } from './errors.js';
-import { classifyDatabaseError, isRetryable } from './sqlstate.js';
+import { AccountLockTimeout, IdempotencyWaitTimeout, RetriesExhausted } from './errors.js';
+import { classifyDatabaseError, isRetryable, sqlstateOf } from './sqlstate.js';
 
 /** Attempts in total for a money movement, the first included (SYS-R18). */
 export const MAX_ATTEMPTS = 3;
@@ -29,8 +29,19 @@ export interface RunnerPool<Client extends RunnerClient> {
 /** `movement` retries 40P01 and 40001 (SYS-R18); `none` never retries (plan 000 section 6.1). */
 export type RetryPolicy = 'movement' | 'none';
 
+/** What the runner reports for the metrics of section 1.4 of spec 007. */
+export interface TransactionObserver {
+  /** An attempt failed with 40P01 or 40001 and is retried. */
+  retried(sqlstate: '40P01' | '40001'): void;
+  /** The last attempt failed with 40P01 or 40001 (SYS-R19). */
+  retriesExhausted(): void;
+  /** A lock wait ended with 55P03: at an account row lock, or at the key wait. */
+  lockTimeout(lock: 'account' | 'idempotency'): void;
+}
+
 export interface TransactionRunnerOptions<Client extends RunnerClient> {
   pool: RunnerPool<Client>;
+  observer?: TransactionObserver;
   /** A number in [0, 1), `Math.random` by default. */
   random?: () => number;
   sleep?: (ms: number) => Promise<void>;
@@ -45,11 +56,13 @@ const BEGIN = 'BEGIN ISOLATION LEVEL READ COMMITTED';
  */
 export class TransactionRunner<Client extends RunnerClient> {
   readonly #pool: RunnerPool<Client>;
+  readonly #observer: TransactionObserver | undefined;
   readonly #random: () => number;
   readonly #sleep: (ms: number) => Promise<void>;
 
   constructor(options: TransactionRunnerOptions<Client>) {
     this.#pool = options.pool;
+    this.#observer = options.observer;
     this.#random = options.random ?? Math.random;
     this.#sleep = options.sleep ?? ((ms) => delay(ms));
   }
@@ -91,12 +104,23 @@ export class TransactionRunner<Client extends RunnerClient> {
         if (retry === 'movement' && isRetryable(error)) {
           // A broken connection cannot serve another attempt, so this one was the last (SYS-R19).
           if (connection.broken !== undefined || attempt >= MAX_ATTEMPTS) {
+            this.#observer?.retriesExhausted();
             throw new RetriesExhausted(attempt, { cause: error });
           }
+          this.#observer?.retried(sqlstateOf(error) === '40P01' ? '40P01' : '40001');
           await this.#sleep(this.#random() * backoffBound(attempt));
           continue;
         }
-        throw classifyDatabaseError(error, 'work');
+        const classified = classifyDatabaseError(error, 'work');
+        // Only a lock wait that ended with 55P03 counts (table 1.4 of spec 007): a key wait whose
+        // deadline ran out before another wait is an IdempotencyWaitTimeout without that cause.
+        if (sqlstateOf(classified) === '55P03') {
+          if (classified instanceof AccountLockTimeout) this.#observer?.lockTimeout('account');
+          if (classified instanceof IdempotencyWaitTimeout) {
+            this.#observer?.lockTimeout('idempotency');
+          }
+        }
+        throw classified;
       }
     }
   }

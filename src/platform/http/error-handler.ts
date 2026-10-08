@@ -28,7 +28,10 @@ import {
 import { sqlstateOf } from '../db/sqlstate.js';
 import {
   MalformedRequest,
+  PayloadTooLarge,
+  RateLimited,
   RouteNotFound,
+  UnsupportedMediaType,
   ValidationFailed,
   type MalformedPart,
   type ValidationIssue,
@@ -90,9 +93,33 @@ const BODY_PARSE_ERRORS: ReadonlySet<string> = new Set([
   'FST_ERR_CTP_INVALID_CONTENT_LENGTH',
 ]);
 
+/** The code of a Fastify error, such as `FST_ERR_CTP_BODY_TOO_LARGE`, if it has one. */
+function codeOf(error: unknown): string | undefined {
+  if (typeof error !== 'object' || error === null || !('code' in error)) return undefined;
+  return typeof error.code === 'string' ? error.code : undefined;
+}
+
 function isBodyParseError(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null || !('code' in error)) return false;
-  return typeof error.code === 'string' && BODY_PARSE_ERRORS.has(error.code);
+  const code = codeOf(error);
+  return code !== undefined && BODY_PARSE_ERRORS.has(code);
+}
+
+/**
+ * A body above `bodyLimit`, which Fastify refuses by `Content-Length` before reading it or once
+ * the bytes received pass it (SEC-R10).
+ */
+function isPayloadTooLarge(error: unknown): boolean {
+  return error instanceof PayloadTooLarge || codeOf(error) === 'FST_ERR_CTP_BODY_TOO_LARGE';
+}
+
+/**
+ * A body no content-type parser accepts (SEC-R11). The media-type hook of `body-limits.ts` refuses
+ * it first; Fastify's own error is mapped the same way as a fallback.
+ */
+function isUnsupportedMediaType(error: unknown): boolean {
+  return (
+    error instanceof UnsupportedMediaType || codeOf(error) === 'FST_ERR_CTP_INVALID_MEDIA_TYPE'
+  );
 }
 
 /**
@@ -120,6 +147,13 @@ export function toProblem(error: unknown): Problem {
     return problemOf('/problems/unauthenticated', UNAUTHENTICATED_HEADERS);
   }
   if (error instanceof Forbidden) return problemOf('/problems/forbidden');
+  if (error instanceof RateLimited) {
+    return problemOf('/problems/rate-limited', {
+      'retry-after': String(error.retryAfterSeconds),
+    });
+  }
+  if (isUnsupportedMediaType(error)) return problemOf('/problems/unsupported-media-type');
+  if (isPayloadTooLarge(error)) return problemOf('/problems/payload-too-large');
   if (error instanceof MalformedRequest) {
     return { ...problemOf('/problems/malformed-request'), detail: MALFORMED_DETAILS[error.part] };
   }
