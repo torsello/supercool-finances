@@ -28,3 +28,5 @@ Every technical decision of the service is recorded here in MADR format, one fil
 | 0018 | [Two database roles](0018-two-database-roles.md)                                                                                       | Accepted | 2026-10-08 |
 | 0019 | [Timeout layers and RDS Proxy](0019-timeout-layers-and-rds-proxy.md)                                                                   | Accepted | 2026-10-08 |
 | 0020 | [Expand-then-contract migrations](0020-expand-then-contract-migrations.md)                                                             | Accepted | 2026-10-08 |
+| 0021 | [Statement-timeout function for the maintenance scripts](0021-statement-timeout-function-for-maintenance-scripts.md)                   | Accepted | 2026-10-08 |
+| 0022 | [Request timeout: answer first, then roll back after the statement in flight](0022-request-timeout-answer-first-then-roll-back.md)     | Accepted | 2026-10-08 |

@@ -2,7 +2,7 @@
 
 - **Status:** Approved
 - **ID prefix:** REV
-- **Related ADRs:** [ADR-0001](../../docs/adr/0001-spec-driven-development-with-adrs-and-ai-agents.md), [ADR-0002](../../docs/adr/0002-modular-monolith.md), [ADR-0003](../../docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md), [ADR-0005](../../docs/adr/0005-postgresql-as-the-only-source-of-truth.md), [ADR-0006](../../docs/adr/0006-double-entry-ledger-with-signed-integer-minor-units.md), [ADR-0007](../../docs/adr/0007-system-accounts-without-a-cached-balance.md), [ADR-0008](../../docs/adr/0008-read-committed-with-ordered-pessimistic-row-locks.md), [ADR-0009](../../docs/adr/0009-idempotency-inside-the-movements-transaction.md), [ADR-0010](../../docs/adr/0010-kysely-and-pg-instead-of-an-orm.md), [ADR-0011](../../docs/adr/0011-amounts-as-strings-in-the-api-and-bigint-in-the-domain.md), [ADR-0016](../../docs/adr/0016-error-model.md), [ADR-0019](../../docs/adr/0019-timeout-layers-and-rds-proxy.md)
+- **Related ADRs:** [ADR-0001](../../docs/adr/0001-spec-driven-development-with-adrs-and-ai-agents.md), [ADR-0002](../../docs/adr/0002-modular-monolith.md), [ADR-0003](../../docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md), [ADR-0005](../../docs/adr/0005-postgresql-as-the-only-source-of-truth.md), [ADR-0006](../../docs/adr/0006-double-entry-ledger-with-signed-integer-minor-units.md), [ADR-0007](../../docs/adr/0007-system-accounts-without-a-cached-balance.md), [ADR-0008](../../docs/adr/0008-read-committed-with-ordered-pessimistic-row-locks.md), [ADR-0009](../../docs/adr/0009-idempotency-inside-the-movements-transaction.md), [ADR-0010](../../docs/adr/0010-kysely-and-pg-instead-of-an-orm.md), [ADR-0011](../../docs/adr/0011-amounts-as-strings-in-the-api-and-bigint-in-the-domain.md), [ADR-0016](../../docs/adr/0016-error-model.md), [ADR-0019](../../docs/adr/0019-timeout-layers-and-rds-proxy.md), [ADR-0022](../../docs/adr/0022-request-timeout-answer-first-then-roll-back.md)
 - **Depends on specs:** 000-overview, 001-accounts, 002-ledger, 003-money-movements, 005-idempotency
 
 ## 1. Context and goal
@@ -157,7 +157,7 @@ Unless stated otherwise: customer user C1 owns account A1 (EUR), customer user C
 - **Covers:** REV-R06
 - **Given** the test app (SYS-R37) with a fault-injection hook that skips step 5 of section 1.4, the check for an existing reversal; A1 with "2000" EUR after two deposits by O1, D of "1000" EUR and a later one of "1000" EUR; and D reversed once by O1, leaving A1 "1000" EUR
 - **When** O1 reverses D again with Idempotency-Key k2
-- **Then** the insert of the second reversal is rejected by the unique constraint of REV-R05; the answer is 409 with type `/problems/already-reversed`, not 500; A1 stays "1000" EUR; and no transaction, ledger entry or audit record exists for k2
+- **Then** the hook records that it skipped the check for an existing reversal; the insert of the second reversal is refused by the unique constraint of REV-R05, with SQLSTATE 23505 on that constraint; the answer is still 409 with type `/problems/already-reversed`, not 500; A1 stays "1000" EUR; and no transaction, ledger entry or audit record exists for k2
 
 ### REV-AC09 · A reversal cannot be reversed
 

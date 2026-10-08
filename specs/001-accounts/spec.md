@@ -2,7 +2,7 @@
 
 - **Status:** Approved
 - **ID prefix:** ACC
-- **Related ADRs:** [ADR-0001](../../docs/adr/0001-spec-driven-development-with-adrs-and-ai-agents.md), [ADR-0003](../../docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md), [ADR-0005](../../docs/adr/0005-postgresql-as-the-only-source-of-truth.md), [ADR-0006](../../docs/adr/0006-double-entry-ledger-with-signed-integer-minor-units.md), [ADR-0008](../../docs/adr/0008-read-committed-with-ordered-pessimistic-row-locks.md), [ADR-0009](../../docs/adr/0009-idempotency-inside-the-movements-transaction.md), [ADR-0011](../../docs/adr/0011-amounts-as-strings-in-the-api-and-bigint-in-the-domain.md), [ADR-0012](../../docs/adr/0012-simulated-authentication-with-jwt-and-two-roles.md), [ADR-0016](../../docs/adr/0016-error-model.md), [ADR-0017](../../docs/adr/0017-keyset-pagination-with-signed-cursors.md), [ADR-0019](../../docs/adr/0019-timeout-layers-and-rds-proxy.md)
+- **Related ADRs:** [ADR-0001](../../docs/adr/0001-spec-driven-development-with-adrs-and-ai-agents.md), [ADR-0003](../../docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md), [ADR-0005](../../docs/adr/0005-postgresql-as-the-only-source-of-truth.md), [ADR-0006](../../docs/adr/0006-double-entry-ledger-with-signed-integer-minor-units.md), [ADR-0008](../../docs/adr/0008-read-committed-with-ordered-pessimistic-row-locks.md), [ADR-0009](../../docs/adr/0009-idempotency-inside-the-movements-transaction.md), [ADR-0011](../../docs/adr/0011-amounts-as-strings-in-the-api-and-bigint-in-the-domain.md), [ADR-0012](../../docs/adr/0012-simulated-authentication-with-jwt-and-two-roles.md), [ADR-0016](../../docs/adr/0016-error-model.md), [ADR-0017](../../docs/adr/0017-keyset-pagination-with-signed-cursors.md), [ADR-0019](../../docs/adr/0019-timeout-layers-and-rds-proxy.md), [ADR-0022](../../docs/adr/0022-request-timeout-answer-first-then-roll-back.md)
 - **Depends on specs:** 000-overview, 002-ledger, 003-money-movements, 004-reversals, 005-idempotency, 006-auth, 007-security-ops
 
 ## 1. Context and goal
@@ -75,7 +75,7 @@ A history entry shows no counterparty account and no running balance, so a histo
 
 - Both lists, `GET /accounts` and `GET /accounts/{id}/entries`, go newest first by (`createdAt`, `id`) and answer one page as `{"items": [...], "nextCursor": "..."}`, with `nextCursor` absent on the last page. The page size `limit` is an integer from 1 to 100, and 20 when it is absent.
 - A cursor is the base64url encoding of a payload (the list it belongs to, the id of the user it was issued to, the account id for a history, and the `createdAt`, at its stored precision of microseconds, and `id` of the last item returned) followed by an HMAC-SHA256 tag keyed with `CURSOR_SECRET`. That secret is separate from `JWT_SECRET`, so that one key never serves two purposes, and shared by every replica (ACC-R30). A cursor that fails to decode or whose tag does not verify answers as ACC-R23.
-- Timestamps are written in RFC 3339 in UTC with millisecond precision, for example `"2026-10-07T14:03:00.123Z"`. The database keeps microseconds, and cursors carry them (ACC-R22).
+- Timestamps are written in RFC 3339 in UTC with millisecond precision, truncated from the stored microseconds, for example `"2026-10-07T14:03:00.123Z"`. The database keeps microseconds, and cursors carry them (ACC-R22).
 - An entry's `createdAt` is taken when the entry is inserted, after the account's row lock is held, not at the start of the database transaction (LED-R18), so the entries of one account are ordered by `createdAt` as they committed and keyset paging through a history never skips one. Account creation takes no lock, so an account created while a client pages through the account list may be missed (ACC-R22).
 
 ## 2. Requirements
@@ -163,7 +163,7 @@ Unless stated otherwise: customer user C1 owns account A1 (EUR), customer user C
 - **Covers:** ACC-R06
 - **Given** O1 is an operator
 - **When** O1 posts `{"currency": "EUR"}` to create an account
-- **Then** the answer is 403 with type `/problems/forbidden` and no account exists
+- **Then** the answer is 403 with type `/problems/forbidden` and no account is created
 
 ### ACC-AC07 · A customer reads their own account
 
