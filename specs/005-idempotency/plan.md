@@ -125,7 +125,7 @@ Shared errors are in section 7 of plan 000. This plan's typed errors:
 Notes:
 
 - IDM-AC14 is unit level but names "the typed error that the HTTP error handler maps to", so it is whole once `toProblem` exists (08-api), like SYS-AC16. In 07-idempotency the same file proves the step classification under IDM-R12 and IDM-R13.
-- IDM-AC10 to IDM-AC13 start the replicas with `REQUEST_TIMEOUT_MS` and `SHUTDOWN_TIMEOUT_MS`, which the service first reads in 09-hardening (plan 000 section 1). They observe the waits through `pg_stat_activity` and `pg_blocking_pids`, with no fixed delay.
+- IDM-AC10 to IDM-AC13 start the replicas with `REQUEST_TIMEOUT_MS` and `SHUTDOWN_TIMEOUT_MS`, which the service first reads in 09-hardening (plan 000 section 1). They observe the waits through `pg_blocking_pids` only (plan 000 section 9), with no fixed delay.
 - IDM-AC17 reads the record of the `skip-existing-reversal-check` seam: the check was skipped, and the insert was refused with SQLSTATE 23505 on `transactions_reversed_transaction_id_key` (plan 004).
 - IDM-AC21 builds the test app on a TCP port with the `destroy-connection-after-commit` seam; IDM-AC08 rebuilds the test app with the `extra-response-member` seam.
 - IDM-AC24 runs `npm run idempotency:cleanup` as a child process against a scratch database, and reads its report from the last line of stdout, after npm's header.

@@ -44,7 +44,9 @@ jobs:
           --health-retries 30
 
     env:
-      TEST_DATABASE_URL: postgres://scf:scf_local_only@127.0.0.1:5432/supercool_test
+      # Runtime role for the tests, owner role for the migrations and scratch databases (ADR-0018).
+      TEST_DATABASE_URL: postgres://scf_app:scf_app_local_only@127.0.0.1:5432/supercool_test
+      TEST_MIGRATION_DATABASE_URL: postgres://scf_owner:scf_owner_local_only@127.0.0.1:5432/supercool_test
       REDIS_URL: redis://127.0.0.1:6379
 
     steps:
@@ -59,7 +61,7 @@ jobs:
 
       - run: npm run check
 
-      - name: Create the role and databases (same SQL as local Docker Compose)
+      - name: Create the roles and databases (same SQL as local Docker Compose)
         run: docker exec -i ${{ job.services.postgres.id }} psql -v ON_ERROR_STOP=1 -U postgres < docker/postgres/init/01-databases.sql
 
       - run: npm run test:integration

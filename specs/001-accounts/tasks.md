@@ -6,7 +6,7 @@ Ordered tasks for [plan.md](plan.md). Each task is under about an hour and start
 
 These tasks run in the cross-spec order of plan 000 section 1, across every `specs/*/tasks.md`: step 1 roles and functions, step 2 accounts, step 3 ledger, step 4 settlement accounts, step 5 audit, step 6 test helpers, step 7 the database-check ACs. Each task below names its step.
 
-- [ ] Step 2: Test first in `test/integration/accounts/accounts-table.test.ts` (ACC-R01, SYS-R08, LED-R12): as `scf_app`, a customer account row needs an owner, a status and a balance; a currency outside table 1.3, a status outside the three values, a negative balance and a `closed` row with a balance other than 0 are refused; `created_at` equals `updated_at` on insert; and `scf_app` can update only `status`, `balance` and `updated_at`; then the migration `accounts` of plan section 2.
+- [x] Step 2: Test first in `test/integration/accounts/accounts-table.test.ts` (ACC-R01, SYS-R08, LED-R12): as `scf_app`, a customer account row needs an owner, a status and a balance; a currency outside table 1.3, a status outside the three values, a negative balance and a `closed` row with a balance other than 0 are refused; `created_at` equals `updated_at` on insert; and `scf_app` can update only `status`, `balance` and `updated_at`; then the migration `accounts` of plan section 2.
 
 ## 06-domain
 

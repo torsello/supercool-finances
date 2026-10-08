@@ -6,7 +6,7 @@ Ordered tasks for [plan.md](plan.md). Each task is under about an hour and start
 
 These tasks run in the cross-spec order of plan 000 section 1, across every `specs/*/tasks.md`: step 1 roles and functions, step 2 accounts, step 3 ledger, step 4 settlement accounts, step 5 audit, step 6 test helpers, step 7 the database-check ACs. Each task below names its step.
 
-- [ ] Step 1: Point the `postgres` healthcheck of `compose.yaml` at `scf_owner`, since the role `scf` is replaced by plan 000, and check that `npm run infra:reset` turns healthy and `npm run test:integration` passes (DEP-R05).
+- [x] Step 1: Point the `postgres` healthcheck of `compose.yaml` at `scf_owner`, since the role `scf` is replaced by plan 000, and check that `npm run infra:reset` turns healthy and `npm run test:integration` passes (DEP-R05).
 
 ## 06-domain
 

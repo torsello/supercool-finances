@@ -8,13 +8,13 @@ The tasks of 05-schema and 06-domain set up balances with `writeDirectDeposit`, 
 
 These tasks run in the cross-spec order of plan 000 section 1, across every `specs/*/tasks.md`: step 1 roles and functions, step 2 accounts, step 3 ledger, step 4 settlement accounts, step 5 audit, step 6 test helpers, step 7 the database-check ACs. Each task below names its step.
 
-- [ ] Step 3: Test first in `test/integration/ledger/ledger-schema.test.ts` (LED-R03 to LED-R07, LED-R16, LED-R17): with transfer-shaped rows between two customer accounts written directly as `scf_app`, a balanced transaction commits, on a scratch database, since its cached balances cannot match its entries before the settlement accounts and `writeDirectDeposit` exist, while a zero amount, a single entry, an unbalanced pair, a currency other than the account's or the transaction's, and an `UPDATE`, `DELETE` or `TRUNCATE` are refused; then the migration `ledger` (tables, composite foreign keys, the reversal link and its unique constraint, grants, both deferred triggers, the append-only triggers and the indexes).
-- [ ] Step 4: Test first in `test/integration/ledger/settlement-schema.test.ts` (LED-R08, LED-R13): the test database holds exactly one settlement account per currency, each with its code, no owner and no cached balance; then the migration `settlement-accounts`.
-- [ ] Step 7: Test first: LED-AC03 and LED-AC04 in `test/integration/ledger/database-checks.test.ts`, with balances set up by `writeDirectDeposit`, closing any gap they find in the migration `ledger`.
-- [ ] Step 7: Test first: LED-AC05 and LED-AC08 in `test/integration/ledger/database-checks.test.ts`.
-- [ ] Step 7: Test first: LED-AC11 in `test/integration/ledger/append-only.test.ts`.
-- [ ] Step 7: Test first: LED-AC12 in `test/integration/ledger/runtime-role.test.ts`, closing any privilege gap it finds in the migrations.
-- [ ] Step 7: Test first: LED-AC06 in `test/integration/ledger/settlement-accounts.test.ts`, on a scratch database.
+- [x] Step 3: Test first in `test/integration/ledger/ledger-schema.test.ts` (LED-R03 to LED-R07, LED-R16, LED-R17): with transfer-shaped rows between two customer accounts written directly as `scf_app`, a balanced transaction commits, on a scratch database, since its cached balances cannot match its entries before the settlement accounts and `writeDirectDeposit` exist, while a zero amount, a single entry, an unbalanced pair, a currency other than the account's or the transaction's, and an `UPDATE`, `DELETE` or `TRUNCATE` are refused; then the migration `ledger` (tables, composite foreign keys, the reversal link and its unique constraint, grants, both deferred triggers, the append-only triggers and the indexes).
+- [x] Step 4: Test first in `test/integration/ledger/settlement-schema.test.ts` (LED-R08, LED-R13): the test database holds exactly one settlement account per currency, each with its code, no owner and no cached balance; then the migration `settlement-accounts`.
+- [x] Step 7: Test first: LED-AC03 and LED-AC04 in `test/integration/ledger/database-checks.test.ts`, with balances set up by `writeDirectDeposit`, closing any gap they find in the migration `ledger`.
+- [x] Step 7: Test first: LED-AC05 and LED-AC08 in `test/integration/ledger/database-checks.test.ts`.
+- [x] Step 7: Test first: LED-AC11 in `test/integration/ledger/append-only.test.ts`.
+- [x] Step 7: Test first: LED-AC12 in `test/integration/ledger/runtime-role.test.ts`, closing any privilege gap it finds in the migrations.
+- [x] Step 7: Test first: LED-AC06 in `test/integration/ledger/settlement-accounts.test.ts`, on a scratch database.
 
 ## 06-domain
 

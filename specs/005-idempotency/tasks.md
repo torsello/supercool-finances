@@ -6,8 +6,8 @@ Ordered tasks for [plan.md](plan.md). Each task is under about an hour and start
 
 These tasks run in the cross-spec order of plan 000 section 1, across every `specs/*/tasks.md`: step 1 roles and functions, step 2 accounts, step 3 ledger, step 4 settlement accounts, step 5 audit, step 6 test helpers, step 7 the database-check ACs. Each task below names its step.
 
-- [ ] Step 7: Test first: IDM-AC20 in `test/integration/idempotency/key-table.test.ts`; then the migration `idempotency-keys` with the table, the deferred completeness trigger, the expiry index and the grants of plan section 2.
-- [ ] Step 7: Test first in the same file (IDM-R04, IDM-R18): as `scf_app`, keys are unique per user and compared exactly, case included; a key of 256 characters and a fingerprint that is not 64 lowercase hex characters are refused; and `scf_app` can update and delete key rows.
+- [x] Step 7: Test first: IDM-AC20 in `test/integration/idempotency/key-table.test.ts`; then the migration `idempotency-keys` with the table, the deferred completeness trigger, the expiry index and the grants of plan section 2.
+- [x] Step 7: Test first in the same file (IDM-R04, IDM-R18): as `scf_app`, keys are unique per user and compared exactly, case included; a key of 256 characters and a fingerprint that is not 64 lowercase hex characters are refused; and `scf_app` can update and delete key rows.
 
 ## 06-domain
 

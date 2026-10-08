@@ -34,7 +34,7 @@ A positive amount credits the account (adds to its balance) and a negative amoun
 
 ### 1.3 Database enforcement
 
-- **Roles.** The database has two roles. The owner role runs the migrations and owns the tables. The runtime role, used by the service, holds SELECT and INSERT on transactions and ledger entries and only the privileges it needs on the other tables (LED-R16, LED-R17). Phase 05-schema replaces the single role `scf` that `docker/postgres/init` creates today.
+- **Roles.** The database has two roles. The owner role runs the migrations and owns the tables. The runtime role, used by the service, holds SELECT and INSERT on transactions and ledger entries and only the privileges it needs on the other tables (LED-R16, LED-R17). Phase 05-schema replaced the single role `scf` that `docker/postgres/init` created before.
 - **Checks at commit.** A deferred constraint trigger (`DEFERRABLE INITIALLY DEFERRED`) on inserts into ledger entries and transactions checks, for each transaction, at least two entries, a zero sum and one currency (LED-R04 to LED-R07). Zero amounts, the entry's currency against its account's, the absence of a cached balance on system accounts and the non-negative cached balance of customer accounts are row constraints (LED-R03, LED-R07, LED-R12, LED-R13).
 - **Foreign key lock on system accounts.** Inserting an entry on a system account makes PostgreSQL take `FOR KEY SHARE` on that account's row to check the foreign key. That lock is accepted: it is shared, never blocks another movement and does not conflict with LED-R14. The foreign key is kept, because integrity matters more than the multixact cost under load, which the load test (SYS-R20) measures.
 

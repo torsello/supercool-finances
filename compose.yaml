@@ -16,7 +16,7 @@ services:
     healthcheck:
       # TCP, not the Unix socket: during init scripts the server only listens on the socket,
       # so this turns healthy only once the init scripts have finished.
-      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U scf -d supercool_test']
+      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U scf_owner -d supercool_test']
       interval: 2s
       timeout: 3s
       retries: 30
