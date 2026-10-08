@@ -1459,3 +1459,138 @@
   transcript row to docs/ai/README.md.
 
 ✻ Cogitated for 4m 20s · done 1:30 PM
+
+❯ /export docs/ai/transcripts/06-domain-part2.txt                               
+  ⎿  Conversation exported to: /Users/matiastorsello/supercool-finances/docs/ai/
+     transcripts/06-domain-part2.txt
+
+❯ /ship close phase 06: reversals domain                                        
+
+⏺ Bash(git branch --show-current)
+  ⎿  phase/06-domain
+
+⏺ Bash(npm run check)
+  ⎿  > supercool-finances@0.1.0 check
+     > npm run typecheck && npm run lint && npm run format:check && npm run
+      test
+     … +51 lines (ctrl+o to expand)
+
+  Listed 1 directory (ctrl+o to expand)
+
+⏺ Bash(npm run infra:up)
+  ⎿  > supercool-finances@0.1.0 infra:up
+     > docker compose up -d --wait postgres redis
+     … +6 lines (ctrl+o to expand)
+
+⏺ Bash(npm run test:integration)
+  ⎿  > supercool-finances@0.1.0 test:integration
+     > vitest run --project integration --reporter=default --reporter=json
+     --outputFile.json=reports/vitest-integration.json
+     … +53 lines (ctrl+o to expand)
+
+⏺ Check and integration tests pass; running the trace gate.
+
+⏺ Bash(npm run trace -- --require unit,integration)
+  ⎿  > supercool-finances@0.1.0 trace
+     > tsx scripts/trace.ts --require unit,integration
+     … +278 lines (ctrl+o to expand)
+
+⏺ Gates pass. Step 3: docs in sync — transcripts and the README index.
+
+  Read 1 file, listed 1 directory (ctrl+o to expand)
+
+⏺ The two 06-domain transcripts have no rows in the index, so I'm adding them.
+
+⏺ Bash(cat >> docs/ai/README.md <<'EOF'
+      | 06 part 1 | 2026-10-08 |
+      [06-domain-part1.txt](transcripts/06-domain-part1.txt) | Domain, part 1:
+      the accounts module, the tr…)
+  ⎿  n-part2.txt](transcripts/06-domain-part2.txt) | Domain, part 2: the re
+     versals domain (`reversalOf`, reversal rules, the `Reversals` use case
+      with its test seam, the 23505 mapping to `AlreadyReversed`), lock-wai
+     … +2 lines (ctrl+o to expand)
+  ⎿  Updated docs/ai/README.md (+2 -0)
+      29  | 03 | 2026-10-08 | [03-adrs.txt](transcripts/03-adrs.txt) | AD
+          Rs: twenty decisions 0001-0020 with the owner's reasoning, alte
+          rnatives and consequences, the ADR index, links to and from eve
+          ry spec, the AWS RDS Proxy pinning source checked, and three au
+          dit rounds and their fixes. |
+      30  | 04 | 2026-10-08 | [04-plans.txt](transcripts/04-plans.txt) | 
+          Plans: plan.md and tasks.md for specs 000-008 with every AC pla
+          ced in a phase and a test file, owner-approved spec fixes, ADR-
+          0021 (statement-timeout function) and ADR-0022 (request timeout
+          : answer first, then roll back), the `yaml` dev dependency, and
+           seven audit rounds and their fixes. |
+      31  | 05 | 2026-10-08 | [05-schema.txt](transcripts/05-schema.txt) 
+          | Schema: the owner and runtime roles, eight SQL migrations (ro
+          le settings, session functions, accounts, ledger with deferred 
+          and append-only triggers, settlement accounts, audit records, i
+          dempotency keys, readiness grant), the Kysely instance with exa
+          ct int8 and numeric strings, test helpers, the database-check A
+          Cs, down migrations proven, and an audit round with six fixes.
+      32 +| 06 part 1 | 2026-10-08 | [06-domain-part1.txt](transcripts/06
+         +-domain-part1.txt) | Domain, part 1: the accounts module, the t
+         +ransaction runner and unit of work, module lint rules, the ledg
+         +er, money movements and reconciliation domain with tests first.
+         + |                                                             
+      33 +| 06 part 2 | 2026-10-08 | [06-domain-part2.txt](transcripts/06
+         +-domain-part2.txt) | Domain, part 2: the reversals domain (`rev
+         +ersalOf`, reversal rules, the `Reversals` use case with its tes
+         +t seam, the 23505 mapping to `AlreadyReversed`), lock-wait and 
+         +racing tests, an audit round with four Low fixes, and ADR follo
+         +w-ups marked done. |                                           
+
+⏺ Bash(npx prettier --check docs/ai/README.md)
+  ⎿  Checking formatting...
+     All matched files use Prettier code style!
+
+⏺ Bash(git add -A)
+  ⎿  (No output)
+
+⏺ Bash(git status --short)
+  ⎿  M  docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md
+     M  docs/adr/0008-read-committed-with-ordered-pessimistic-row-locks.md
+     M  docs/adr/0021-statement-timeout-function-for-maintenance-scripts.md
+     … +21 lines (ctrl+o to expand)
+
+⏺ Nothing sensitive is staged. Committing.
+
+⏺ Bash(git commit -m "feat(reversals): reversals domain and use case" -m
+      "reversalOf, reversal rules, the Reversals use case with the
+      skip-existing-reversal-check hook…)
+  ⎿  [phase/06-domain 6e91577] feat(reversals): reversals domain and use ca
+     se
+      24 files changed, 8414 insertions(+), 18 deletions(-)
+     … +10 lines (ctrl+o to expand)
+
+⏺ Bash(gitleaks git --no-banner --redact --log-opts="origin/main..HEAD")
+  ⎿  1:31PM INF 3 commits scanned.
+     1:31PM INF scanned ~687622 bytes (687.62 KB) in 197ms
+     1:31PM INF no leaks found
+⏺ Bash(git push -u origin HEAD)
+  ⎿  To https://github.com/torsello/supercool-finances.git
+        376dd5d..6e91577  HEAD -> phase/06-domain
+     branch 'phase/06-domain' set up to track 'origin/phase/06-domain'.
+
+⏺ Bash(gh pr view)
+  ⎿  Error: Exit code 1
+     no pull requests found for branch "phase/06-domain"
+
+⏺ Bash(gh pr create --base main --title "Phase 06-domain: accounts, ledger,
+      movements and reversals domain" --body-file - <<'EOF'
+      ## What the phase delivered…)
+  ⎿  https://github.com/torsello/supercool-finances/pull/6
+
+⏺ Phase 06 is committed, pushed and open as a pull request. Not merged.
+
+  - Commit: 6e91577 feat(reversals): reversals domain and use case.
+  - Gates: npm run check, npm run test:integration and npm run trace -- 
+    --require unit,integration pass. That is 149 unit and 110 integration tests,
+    with 0 missing ACs. The gitleaks scan found nothing. There is no
+    infra/terraform, so the checkov step was skipped.
+  - ACs covered: REV-AC03 and REV-AC20.
+  - Pull request: https://github.com/torsello/supercool-finances/pull/6
+  - Extra change: I added the two missing 06-domain rows to docs/ai/README.md,
+    and they went into the same commit.
+
+✻ Cogitated for 1m 13s · done 1:32 PM
