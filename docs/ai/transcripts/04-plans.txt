@@ -12920,3 +12920,127 @@
   exports this session's transcript and adds it to the AI usage log.
 
 ✻ Cooked for 1m 3s · done 10:46 AM
+
+❯ /export docs/ai/transcripts/04-plans.txt                                      
+  ⎿  Conversation exported to:
+     /Users/matiastorsello/supercool-finances/docs/ai/transcripts/04-plans.txt
+
+❯ /ship close phase 04: plans                                                   
+
+⏺ Bash(git branch --show-current)
+  ⎿  phase/04-plans
+
+⏺ Bash(npm run check)
+  ⎿  > supercool-finances@0.1.0 check
+     > npm run typecheck && npm run lint && npm run format:check && npm run
+      test
+     … +33 lines (ctrl+o to expand)
+  ⎿  (timeout 5m)
+
+⏺ Bash(npm run infra:up)
+  ⎿  > supercool-finances@0.1.0 infra:up
+     > docker compose up -d --wait postgres redis
+     … +6 lines (ctrl+o to expand)
+
+⏺ Bash(npm run test:integration)
+  ⎿  > supercool-finances@0.1.0 test:integration
+     > vitest run --project integration --reporter=default --reporter=json
+     --outputFile.json=reports/vitest-integration.json
+     … +14 lines (ctrl+o to expand)
+
+⏺ Bash(npm run trace -- --require unit,integration)
+  ⎿  > supercool-finances@0.1.0 trace
+     > tsx scripts/trace.ts --require unit,integration
+     … +266 lines (ctrl+o to expand)
+
+⏺ Gates pass so far (check, integration, trace). Now the docs-in-sync check: the
+  transcript exists, so I need its row in docs/ai/README.md.
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(docs/ai/README.md)
+  ⎿  Added 1 line
+      27  | 02 part 4 | 2026-10-07 | [02-specs-part4.txt](transcripts/02-
+          specs-part4.txt) | Specs, part 4: specs 006-auth, 007-security-
+          ops and 008-deployment with the owner's decisions, an audit rou
+          nd and its fixes, including a traceability gate that no longer 
+          counts a CI script feeding a pipe without pipefail or a `&&` li
+          st before the last line of its block, and `/ship` of the three 
+          specs. |
+      28  | 02 part 5 | 2026-10-07 | [02-specs-part5.txt](transcripts/02-
+          specs-part5.txt) | Specs, part 5: cross-spec review of specs 00
+          0-008, the owner's answers to every open question folded into t
+          he specs as rules, eight overview ACs retired, all specs set to
+           Approved, an audit round and its fixes, including a traceabili
+          ty gate that accepts a CI script only as the whole command of a
+           step, and `/ship` closing the phase. |
+      29  | 03 | 2026-10-08 | [03-adrs.txt](transcripts/03-adrs.txt) | AD
+          Rs: twenty decisions 0001-0020 with the owner's reasoning, alte
+          rnatives and consequences, the ADR index, links to and from eve
+          ry spec, the AWS RDS Proxy pinning source checked, and three au
+          dit rounds and their fixes. |
+      30 +| 04 | 2026-10-08 | [04-plans.txt](transcripts/04-plans.txt) | 
+         +Plans: plan.md and tasks.md for specs 000-008 with every AC pla
+         +ced in a phase and a test file, owner-approved spec fixes, ADR-
+         +0021 (statement-timeout function) and ADR-0022 (request timeout
+         +: answer first, then roll back), the `yaml` dev dependency, and
+         + seven audit rounds and their fixes. |                         
+
+⏺ Bash(npx prettier --check docs/ai/README.md)
+  ⎿  Checking formatting...
+     All matched files use Prettier code style!
+
+⏺ Bash(git add -A)
+  ⎿  (No output)
+
+⏺ Bash(git status --short)
+  ⎿  A  docs/adr/0021-statement-timeout-function-for-maintenance-scripts.md
+     A  docs/adr/0022-request-timeout-answer-first-then-roll-back.md
+     M  docs/adr/README.md
+     … +28 lines (ctrl+o to expand)
+
+⏺ Nothing sensitive is staged. Committing.
+
+⏺ Bash(git commit -F - <<'EOF'
+      docs(plans): plan and tasks for specs 000-008, ADR-0021 and ADR-0022…)
+  ⎿  [phase/04-plans fc2a4a5] docs(plans): plan and tasks for specs 000-008
+     , ADR-0021 and ADR-0022
+      31 files changed, 15175 insertions(+), 138 deletions(-)
+     … +20 lines (ctrl+o to expand)
+
+⏺ Bash(gitleaks git --no-banner --redact --log-opts="origin/main..HEAD")
+  ⎿  10:48AM INF 1 commits scanned.
+     10:48AM INF scanned ~1280825 bytes (1.28 MB) in 1.36s
+     10:48AM INF no leaks found
+
+⏺ Bash(git push -u origin HEAD)
+  ⎿  remote:
+     remote: Create a pull request for 'phase/04-plans' on GitHub by visiti
+     ng:
+     … +6 lines (ctrl+o to expand)
+
+⏺ Bash(gh pr view --json url)
+  ⎿  Error: Exit code 1
+     no pull requests found for branch "phase/04-plans"
+
+⏺ Bash(gh pr create --base main --title "Phase 04-plans: plan and tasks for
+      specs 000-008, ADR-0021 and ADR-0022" --body-file - <<'EOF'
+      ## What the phase delivered…)
+  ⎿  https://github.com/torsello/supercool-finances/pull/4
+
+⏺ Phase 04 is shipped as commit fc2a4a5, "docs(plans): plan and tasks for specs
+  000-008, ADR-0021 and ADR-0022", and PR #4 is open:
+  https://github.com/torsello/supercool-finances/pull/4. I did not merge it.
+
+  - Gates: npm run check, npm run test:integration and npm run trace -- 
+    --require unit,integration all pass. The trace shows 221 ACs: 0 covered, 203
+    pending, 18 e2e unverified, 0 missing. The gitleaks scan of the branch
+    found nothing.
+  - AC IDs covered: all 221 ACs of specs 000 to 008 are planned. None is proven
+    yet, since there is no code.
+  - Done beyond the checks: I added the 04 row to docs/ai/README.md. The
+    transcript was exported before this /ship run, so it ends at the export and
+    does not contain these steps.
+  - Skipped: the checkov gate, because infra/terraform doesn't exist yet.
+
+✻ Crunched for 1m 29s · done 10:48 AM
