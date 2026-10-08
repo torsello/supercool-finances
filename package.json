@@ -26,6 +26,7 @@
     "env:sync": "tsx scripts/env-sync.ts",
     "trace": "tsx scripts/trace.ts",
     "reconcile": "tsx --env-file-if-exists=.env scripts/reconcile.ts",
+    "idempotency:cleanup": "tsx --env-file-if-exists=.env src/cli/idempotency-cleanup.ts",
     "migrate:up": "node --env-file-if-exists=.env node_modules/node-pg-migrate/bin/node-pg-migrate.js up --migrations-dir migrations --migration-file-language sql --database-url-var MIGRATION_DATABASE_URL --check-order",
     "migrate:down": "node --env-file-if-exists=.env node_modules/node-pg-migrate/bin/node-pg-migrate.js down --migrations-dir migrations --migration-file-language sql --database-url-var MIGRATION_DATABASE_URL --check-order"
   },

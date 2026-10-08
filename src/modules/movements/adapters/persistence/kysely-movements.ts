@@ -160,28 +160,43 @@ export class KyselyTransactionQueries implements TransactionQueries {
 }
 
 /**
- * Movements in one transaction of the unit-of-work runner, retried on 40P01 and 40001 (SYS-R18).
- * The ledger writer comes from the composition root, since one module's adapters never import
- * another's.
+ * What a movement or reversal uses on one unit of work: steps 6 to 8 of the skeleton. The ledger
+ * writer comes from the composition root, since one module's adapters never import another's.
  */
+export interface MovementDependencies {
+  ids: IdGenerator;
+  ledger: (uow: UnitOfWork) => LedgerWriter;
+}
+
+/**
+ * The ports of a movement on the given unit of work's connection: alone, or as the operation of
+ * the idempotency module's keyed transactions, after the key step (plan 000 section 6.2).
+ */
+export function movementTransactionOn(
+  uow: UnitOfWork,
+  deps: MovementDependencies,
+): MovementTransaction {
+  return {
+    setLockTimeout: async (ms) => {
+      await uow.setLockTimeout(ms);
+    },
+    accounts: new KyselyMovementAccounts(uow.db),
+    transactions: new KyselyTransactionLookup(uow.db),
+    ledger: deps.ledger(uow),
+    audit: new KyselyAuditLog(uow.db, deps.ids),
+  };
+}
+
+/** Movements in one transaction of the unit-of-work runner, retried on 40P01 and 40001 (SYS-R18). */
 export class KyselyMovementTransactions implements MovementTransactions {
   constructor(
     private readonly unitOfWork: UnitOfWorkRunner,
-    private readonly deps: { ids: IdGenerator; ledger: (uow: UnitOfWork) => LedgerWriter },
+    private readonly deps: MovementDependencies,
   ) {}
 
   async run<T>(work: (tx: MovementTransaction) => Promise<T>): Promise<T> {
     return await this.unitOfWork.run(
-      async (uow) =>
-        await work({
-          setLockTimeout: async (ms) => {
-            await uow.setLockTimeout(ms);
-          },
-          accounts: new KyselyMovementAccounts(uow.db),
-          transactions: new KyselyTransactionLookup(uow.db),
-          ledger: this.deps.ledger(uow),
-          audit: new KyselyAuditLog(uow.db, this.deps.ids),
-        }),
+      async (uow) => await work(movementTransactionOn(uow, this.deps)),
       { retry: 'movement' },
     );
   }

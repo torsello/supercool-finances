@@ -99,6 +99,8 @@ describe('lint rules for modules (ADR-0006, ADR-0010)', () => {
     '../../adapters/http/routes.js',
     '../../../platform/db/unit-of-work.js',
     '../../../platform/db/schema.js',
+    '../../../platform/db/sqlstate.js',
+    '../../../platform/db/errors.js.map',
     '../../../platform/audit/kysely-audit-log.js',
   ])('fails on an import of %s from application code', async (specifier) => {
     const ids = await ruleIds(
@@ -129,6 +131,8 @@ describe('lint rules for modules (ADR-0006, ADR-0010)', () => {
       "import '../../../modules/accounts/domain/account.js';",
       "import '../../../modules/ledger/index.js';",
       "import 'node:crypto';",
+      // The typed errors of the platform, which import nothing (plan 005 section 3).
+      "import '../../../platform/db/errors.js';",
     ].join('\n');
     expect(await ruleIds('src/modules/accounts/application/probe.ts', code)).toEqual([]);
     expect(

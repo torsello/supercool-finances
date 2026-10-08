@@ -1,10 +1,17 @@
 import type pg from 'pg';
 import { KyselyLedgerWriter } from '../../../src/modules/ledger/adapters/persistence/kysely-ledger.js';
-import { KyselyMovementTransactions } from '../../../src/modules/movements/adapters/persistence/kysely-movements.js';
+import {
+  KyselyMovementTransactions,
+  movementTransactionOn,
+  type MovementDependencies,
+} from '../../../src/modules/movements/adapters/persistence/kysely-movements.js';
+import type { MovementTransaction } from '../../../src/modules/movements/index.js';
+import type { KyselyKeyedTransactions } from '../../../src/modules/idempotency/adapters/persistence/kysely-key-store.js';
 import { TransactionRunner, type RunnerPool } from '../../../src/platform/db/transaction-runner.js';
 import { UnitOfWorkRunner } from '../../../src/platform/db/unit-of-work.js';
 import { UuidV7Generator } from '../../../src/platform/ids/uuid-v7.js';
 import { runtimePool } from '../../support/db.js';
+import { keyedTransactions } from '../idempotency/support.js';
 
 export const C1 = '0192f0c4-0000-7000-8000-0000000000c1';
 export const C2 = '0192f0c4-0000-7000-8000-0000000000c2';
@@ -14,15 +21,31 @@ export const MAX = 9223372036854775807n;
 
 export const settings = { accountLockTimeoutMs: 2000 };
 
+function movementDependencies(): MovementDependencies {
+  const ids = new UuidV7Generator();
+  return { ids, ledger: (uow) => new KyselyLedgerWriter(uow, ids) };
+}
+
 /** Movements in one transaction of the unit-of-work runner, as the composition root wires them. */
 export function movementTransactions(
   pool: RunnerPool<pg.PoolClient> = runtimePool(),
 ): KyselyMovementTransactions {
-  const ids = new UuidV7Generator();
-  return new KyselyMovementTransactions(new UnitOfWorkRunner(new TransactionRunner({ pool })), {
-    ids,
-    ledger: (uow) => new KyselyLedgerWriter(uow, ids),
-  });
+  return new KyselyMovementTransactions(
+    new UnitOfWorkRunner(new TransactionRunner({ pool })),
+    movementDependencies(),
+  );
+}
+
+/**
+ * Keyed movements: the idempotency module's keyed transactions, retried on 40P01 and 40001, with
+ * the movement ports on the same connection as their operation, as the composition root wires
+ * them for the movement and reversal routes.
+ */
+export function keyedMovementTransactions(
+  pool: RunnerPool<pg.PoolClient>,
+): KyselyKeyedTransactions<MovementTransaction> {
+  const deps = movementDependencies();
+  return keyedTransactions(pool, (uow) => movementTransactionOn(uow, deps), 'movement');
 }
 
 /** A customer, acting on their own accounts. */

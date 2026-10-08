@@ -18,6 +18,7 @@ export interface Database {
   transactions: TransactionsTable;
   ledger_entries: LedgerEntriesTable;
   audit_records: AuditRecordsTable;
+  idempotency_keys: IdempotencyKeysTable;
 }
 
 declare const timestampText: unique symbol;
@@ -90,4 +91,23 @@ export interface AuditRecordsTable {
   new_status: Immutable<AccountStatus | null, AccountStatus | null | undefined>;
   request_id: Immutable<string>;
   created_at: DefaultTimestamp;
+}
+
+/** The stored headers of a key row, as `jsonb` (plan 005 section 2). */
+export type StoredHeadersColumn = Record<string, string>;
+
+/**
+ * Idempotency keys (plan 005 section 2). The key step's statements write them as SQL text, with
+ * `now()` for the timestamps, which are never selected directly; the stored response is null until
+ * step 9 completes the row, and a deferred trigger refuses to commit it incomplete (IDM-R18).
+ */
+export interface IdempotencyKeysTable {
+  user_id: Immutable<string>;
+  key: Immutable<string>;
+  fingerprint: string;
+  status: number | null;
+  headers: ColumnType<StoredHeadersColumn | null, string | null, string | null>;
+  body: Buffer | null;
+  created_at: ColumnType<never, never, never>;
+  expires_at: ColumnType<never, never, never>;
 }

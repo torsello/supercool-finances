@@ -20,8 +20,8 @@ No task for this spec: movements add no table. The cross-spec order of the 05-sc
 
 ## 07-idempotency
 
-- [ ] Test first in `test/integration/movements/movement-transaction.test.ts` (MOV-R06, MOV-R19, MOV-R29, IDM-R11): with the statements captured on the unit of work's connection, each movement runs the skeleton of plan 000 section 6.2 in order, the key row is its first write, the idempotency wait is set before the key insert, and the account lock timeout immediately before the first `FOR UPDATE`; then wire `deposit.ts`, `withdraw.ts` and `transfer.ts` into the idempotent runner.
-- [ ] Test first in the same file (MOV-R20, MOV-R21, IDM-R14): a lookup or business rejection rolls back to the savepoint and commits the stored response with no transaction, entry, balance change or audit record; an account lock timeout rolls back everything, key row included, and a second run with the same key is a first request.
+- [x] Test first in `test/integration/movements/movement-transaction.test.ts` (MOV-R06, MOV-R19, MOV-R29, IDM-R11): with the statements captured on the unit of work's connection, each movement runs the skeleton of plan 000 section 6.2 in order, the key row is its first write, the idempotency wait is set before the key insert, and the account lock timeout immediately before the first `FOR UPDATE`; then wire `deposit.ts`, `withdraw.ts` and `transfer.ts` into the idempotent runner.
+- [x] Test first in the same file (MOV-R20, MOV-R21, IDM-R14): a lookup or business rejection rolls back to the savepoint and commits the stored response with no transaction, entry, balance change or audit record; an account lock timeout rolls back everything, key row included, and a second run with the same key is a first request.
 
 ## 08-api
 
