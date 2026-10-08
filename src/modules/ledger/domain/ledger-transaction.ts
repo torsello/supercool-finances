@@ -5,6 +5,7 @@ import {
   MixedCurrencies,
   TooFewEntries,
   TransactionCurrencyMismatch,
+  TransactionNotReversible,
   Unbalanced,
   ZeroAmount,
 } from './errors.js';
@@ -29,6 +30,14 @@ export interface AccountRef {
   id: string;
   kind: AccountKind;
   currency: CurrencyCode;
+}
+
+/** A transaction as the ledger recorded it, under the id it was written with. */
+export interface RecordedTransaction {
+  id: string;
+  kind: TransactionKind;
+  currency: CurrencyCode;
+  entries: readonly LedgerEntryInput[];
 }
 
 export interface BalanceChange {
@@ -64,11 +73,19 @@ export class LedgerTransaction {
   readonly kind: TransactionKind;
   readonly currency: CurrencyCode;
   readonly entries: readonly LedgerEntry[];
+  /** The transaction a reversal reverses; `null` for every other kind (REV-R01). */
+  readonly reversedTransactionId: string | null;
 
-  private constructor(kind: TransactionKind, currency: CurrencyCode, entries: LedgerEntry[]) {
+  private constructor(
+    kind: TransactionKind,
+    currency: CurrencyCode,
+    entries: LedgerEntry[],
+    reversedTransactionId: string | null,
+  ) {
     this.kind = kind;
     this.currency = currency;
     this.entries = Object.freeze(entries);
+    this.reversedTransactionId = reversedTransactionId;
   }
 
   /** Checks, in this order, and throws the first failure (plan 002 section 3, LED-AC02). */
@@ -76,7 +93,13 @@ export class LedgerTransaction {
     kind: TransactionKind;
     currency: CurrencyCode;
     entries: readonly LedgerEntryInput[];
+    reversedTransactionId?: string;
   }): LedgerTransaction {
+    const reversedTransactionId = props.reversedTransactionId ?? null;
+    // The link of a reversal, as the check transactions_reversal_link holds it (REV-R01).
+    if ((props.kind === 'reversal') !== (reversedTransactionId !== null)) {
+      throw new RangeError('a reversal, and only a reversal, links the transaction it reverses');
+    }
     const entries = props.entries.map((entry) => Object.freeze({ ...entry }));
     if (entries.length < 2) throw new TooFewEntries();
     if (entries.some((entry) => typeof entry.amount !== 'bigint')) throw new InvalidAmountType();
@@ -89,7 +112,7 @@ export class LedgerTransaction {
       throw new TransactionCurrencyMismatch();
     }
     if (entries.reduce((sum, entry) => sum + entry.amount, 0n) !== 0n) throw new Unbalanced();
-    return new LedgerTransaction(props.kind, props.currency, entries);
+    return new LedgerTransaction(props.kind, props.currency, entries, reversedTransactionId);
   }
 
   /** +A on the customer account, −A on the settlement account (table 1.1 of spec 002). */
@@ -146,4 +169,20 @@ export class LedgerTransaction {
       .map(([accountId, change]) => ({ accountId, change }))
       .sort((a, b) => (a.accountId < b.accountId ? -1 : a.accountId > b.accountId ? 1 : 0));
   }
+}
+
+/**
+ * The reversal of a recorded transaction (table 1.2 of spec 004): kind `reversal`, the original's
+ * currency, the link to it, and every entry negated on the same account, built through `create`
+ * so it holds the same invariants. A reversal is never reversed (REV-R01, REV-R07); the original
+ * is never changed.
+ */
+export function reversalOf(original: RecordedTransaction): LedgerTransaction {
+  if (original.kind === 'reversal') throw new TransactionNotReversible();
+  return LedgerTransaction.create({
+    kind: 'reversal',
+    currency: original.currency,
+    entries: original.entries.map((entry) => ({ ...entry, amount: -entry.amount })),
+    reversedTransactionId: original.id,
+  });
 }

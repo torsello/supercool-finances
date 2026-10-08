@@ -1,9 +1,29 @@
 import { sql, type Kysely } from 'kysely';
+import pg from 'pg';
 import type { Database } from '../../../../platform/db/schema.js';
 import { clockTimestamp, timestampText } from '../../../../platform/db/timestamp.js';
 import type { UnitOfWork } from '../../../../platform/db/unit-of-work.js';
+import { AlreadyReversed } from '../../domain/errors.js';
 import type { LedgerTransaction } from '../../domain/ledger-transaction.js';
 import type { AppendedTransaction, BalanceQueries, LedgerWriter } from '../../application/ports.js';
+
+/** The unique constraint that keeps a transaction reversed at most once (REV-R05). */
+const REVERSAL_LINK_KEY = 'transactions_reversed_transaction_id_key';
+
+/**
+ * A second reversal refused at its insert by the unique constraint of REV-R05: `AlreadyReversed`,
+ * with only the SQLSTATE and constraint as cause, so no layer above reads a `pg` error (REV-R06).
+ */
+function asAlreadyReversed(error: unknown): unknown {
+  if (
+    error instanceof pg.DatabaseError &&
+    error.code === '23505' &&
+    error.constraint === REVERSAL_LINK_KEY
+  ) {
+    return new AlreadyReversed({ cause: { sqlstate: error.code, constraint: error.constraint } });
+  }
+  return error;
+}
 
 /**
  * Step 8 of the movement skeleton on the unit of work's connection, after the row locks (plan 002
@@ -20,9 +40,17 @@ export class KyselyLedgerWriter implements LedgerWriter {
     const transactionId = this.ids.next();
     const inserted = await this.uow.db
       .insertInto('transactions')
-      .values({ id: transactionId, kind: transaction.kind, currency: transaction.currency })
+      .values({
+        id: transactionId,
+        kind: transaction.kind,
+        currency: transaction.currency,
+        reversed_transaction_id: transaction.reversedTransactionId,
+      })
       .returning(timestampText('created_at').as('created_at'))
-      .executeTakeFirstOrThrow();
+      .executeTakeFirstOrThrow()
+      .catch((error: unknown) => {
+        throw asAlreadyReversed(error);
+      });
 
     // One statement for every entry; created_at is the column default, taken now (LED-R18).
     await this.uow.db

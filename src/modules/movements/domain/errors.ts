@@ -35,3 +35,15 @@ export class DestinationUnavailable extends Error {
     super('the destination cannot receive this transfer');
   }
 }
+
+/**
+ * A reversal would debit a customer account by more than its balance (REV-R08): 422
+ * `/problems/insufficient-funds-for-reversal`.
+ */
+export class InsufficientFundsForReversal extends Error {
+  override readonly name = 'InsufficientFundsForReversal';
+
+  constructor() {
+    super('the balance does not cover the reversal');
+  }
+}

@@ -14,3 +14,14 @@ export interface AccountMovementResult extends MovementResult {
   accountId: string;
   balance: bigint;
 }
+
+/** A reversal that was applied (section 1.3 of spec 004): no balance and no reason (REV-R16). */
+export interface ReversalResult {
+  transactionId: string;
+  kind: 'reversal';
+  /** The original's amount. */
+  amount: bigint;
+  currency: CurrencyCode;
+  createdAt: string;
+  reversedTransactionId: string;
+}

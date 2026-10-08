@@ -3,7 +3,7 @@ import { KyselyAuditLog } from '../../../../platform/audit/kysely-audit-log.js';
 import type { Database } from '../../../../platform/db/schema.js';
 import { timestampText } from '../../../../platform/db/timestamp.js';
 import type { UnitOfWork, UnitOfWorkRunner } from '../../../../platform/db/unit-of-work.js';
-import type { LedgerWriter } from '../../../ledger/index.js';
+import type { LedgerWriter, RecordedTransaction } from '../../../ledger/index.js';
 import type {
   AccountLookup,
   AccountWithSettlement,
@@ -13,6 +13,7 @@ import type {
   MovementTransaction,
   MovementTransactions,
   StoredTransaction,
+  TransactionLookup,
   TransactionQueries,
 } from '../../application/ports.js';
 
@@ -68,6 +69,54 @@ export class KyselyMovementAccounts implements MovementAccounts {
       throw new Error(`account ${id} is not a customer account`);
     }
     return { id: row.id, status: row.status, balance: BigInt(row.balance) };
+  }
+}
+
+/** The ledger reads of a reversal (plan 004 section 3), on the executor it is given, without locks. */
+export class KyselyTransactionLookup implements TransactionLookup {
+  constructor(private readonly db: Kysely<Database>) {}
+
+  async findTransaction(id: string): Promise<RecordedTransaction | undefined> {
+    const rows = await this.db
+      .selectFrom('transactions as t')
+      .innerJoin('ledger_entries as e', 'e.transaction_id', 't.id')
+      .innerJoin('accounts as a', 'a.id', 'e.account_id')
+      .select([
+        't.id',
+        't.kind',
+        't.currency',
+        'e.account_id',
+        'e.amount',
+        'e.currency as entry_currency',
+        'a.kind as account_kind',
+        'a.currency as account_currency',
+      ])
+      .where('t.id', '=', id)
+      .orderBy('e.id')
+      .execute();
+    const first = rows[0];
+    if (first === undefined) return undefined;
+    return {
+      id: first.id,
+      kind: first.kind,
+      currency: first.currency,
+      entries: rows.map((row) => ({
+        accountId: row.account_id,
+        accountKind: row.account_kind,
+        accountCurrency: row.account_currency,
+        amount: BigInt(row.amount),
+        currency: row.entry_currency,
+      })),
+    };
+  }
+
+  async findReversalOf(id: string): Promise<string | undefined> {
+    const row = await this.db
+      .selectFrom('transactions')
+      .select('id')
+      .where('reversed_transaction_id', '=', id)
+      .executeTakeFirst();
+    return row?.id;
   }
 }
 
@@ -129,6 +178,7 @@ export class KyselyMovementTransactions implements MovementTransactions {
             await uow.setLockTimeout(ms);
           },
           accounts: new KyselyMovementAccounts(uow.db),
+          transactions: new KyselyTransactionLookup(uow.db),
           ledger: this.deps.ledger(uow),
           audit: new KyselyAuditLog(uow.db, this.deps.ids),
         }),

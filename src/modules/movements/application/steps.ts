@@ -21,7 +21,7 @@ export function parseUuid(raw: string): string | undefined {
 export async function lockAccounts(
   tx: MovementTransaction,
   settings: MovementSettings,
-  accounts: readonly AccountLookup[],
+  accounts: readonly Pick<AccountLookup, 'id' | 'kind'>[],
 ): Promise<Map<string, LockedAccount>> {
   await tx.setLockTimeout(settings.accountLockTimeoutMs);
   const locked = new Map<string, LockedAccount>();

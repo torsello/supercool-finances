@@ -1,5 +1,10 @@
 import type { AccountStatus } from '../../accounts/index.js';
-import type { CurrencyCode, LedgerWriter, TransactionKind } from '../../ledger/index.js';
+import type {
+  CurrencyCode,
+  LedgerWriter,
+  RecordedTransaction,
+  TransactionKind,
+} from '../../ledger/index.js';
 
 /** The columns of an account that never change, read without a lock (plan 003 section 3). */
 export interface AccountLookup {
@@ -30,16 +35,30 @@ export interface MovementAccounts {
   lock(id: string): Promise<LockedAccount | undefined>;
 }
 
-/** The audit record of a movement (MOV-R24). */
-export interface MovementAuditRecord {
+interface AuditRecordBase {
   actorId: string;
   actorRole: 'customer' | 'operator';
-  action: 'deposit' | 'withdrawal' | 'transfer';
   /** The customer accounts involved; the settlement account follows from the action. */
   accountIds: readonly string[];
   transactionId: string;
   requestId: string;
 }
+
+/** The ledger reads of a reversal (plan 004 section 3), without locks. */
+export interface TransactionLookup {
+  /**
+   * Step 6: a transaction with its entries, each with its account's kind and currency, in the
+   * order they were written; a transaction and its entries never change.
+   */
+  findTransaction(id: string): Promise<RecordedTransaction | undefined>;
+  /** Step 7, after every lock is held: the id of the transaction's reversal, if it has one. */
+  findReversalOf(id: string): Promise<string | undefined>;
+}
+
+/** The audit record of a movement (MOV-R24), or of a reversal with its reason (REV-R15). */
+export type MovementAuditRecord =
+  | (AuditRecordBase & { action: 'deposit' | 'withdrawal' | 'transfer' })
+  | (AuditRecordBase & { action: 'reversal'; reversedTransactionId: string; reason: string });
 
 export interface AuditLog {
   record(record: MovementAuditRecord): Promise<void>;
@@ -54,6 +73,7 @@ export interface MovementTransaction {
   /** Bounds the account lock waits of this transaction (MOV-R19). */
   setLockTimeout(ms: number): Promise<void>;
   accounts: MovementAccounts;
+  transactions: TransactionLookup;
   ledger: LedgerWriter;
   audit: AuditLog;
 }

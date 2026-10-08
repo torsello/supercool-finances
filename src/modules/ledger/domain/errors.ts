@@ -86,3 +86,32 @@ export class InvalidAmountType extends Error {
     super('amounts and balances are bigint minor units');
   }
 }
+
+/** Reversing a transaction of kind `reversal` (REV-R07): 422 `/problems/transaction-not-reversible`. */
+export class TransactionNotReversible extends Error {
+  override readonly name = 'TransactionNotReversible';
+
+  constructor() {
+    super('a reversal cannot be reversed');
+  }
+}
+
+/** The database's refusal of a second reversal: SQLSTATE and constraint, never the driver error. */
+export interface AlreadyReversedCause {
+  sqlstate: string;
+  constraint: string;
+}
+
+/**
+ * The transaction already has a reversal (REV-R06): 409 `/problems/already-reversed`. Found by the
+ * check after the locks, without a cause, or raised by the unique constraint of REV-R05 at the
+ * reversal's insert, with its SQLSTATE and constraint as `cause` (plan 002 section 4).
+ */
+export class AlreadyReversed extends Error {
+  override readonly name = 'AlreadyReversed';
+  declare readonly cause: AlreadyReversedCause | undefined;
+
+  constructor(options?: { cause: AlreadyReversedCause }) {
+    super('the transaction already has a reversal', options);
+  }
+}
