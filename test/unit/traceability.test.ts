@@ -10,11 +10,13 @@ import {
   listFailures,
   npmRunScripts,
   provenScripts,
+  provenStepScripts,
   parseArgs,
   parseSpec,
   parseTasks,
   run,
   workflowCommands,
+  workflowSteps,
   type Output,
 } from '../../scripts/traceability.js';
 
@@ -57,6 +59,12 @@ describe('traceability: spec parsing', () => {
             spec: '001-alpha',
             level: 'ci',
             verifiedBy: 'CI job `ci`, step `npm run zz-check`, run after `npm run zz:prepare`.',
+          },
+          {
+            id: 'ZZA-AC06',
+            spec: '001-alpha',
+            level: 'ci',
+            verifiedBy: 'CI job `ci`, steps `npm run zz-piped` and `npm run zz-listed`',
           },
         ],
       },
@@ -189,6 +197,7 @@ describe('traceability: report', () => {
       ['ZZA-AC03', 'covered', ['test/integration/alpha.test.ts']],
       ['ZZA-AC04', 'covered', ['test/unit/alpha.test.ts']],
       ['ZZA-AC05', 'covered', []],
+      ['ZZA-AC06', 'covered', []],
       ['ZZB-AC01', 'pending', []],
       ['ZZB-AC02', 'covered', ['test/integration/beta.test.ts']],
       ['ZZB-AC03', 'pending', []],
@@ -223,6 +232,8 @@ describe('traceability: report', () => {
       'FAIL ZZC-AC14 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-continue is not run by a step of .github/workflows/ci.yml that can fail the build',
       'FAIL ZZC-AC15 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-if-false is not run by a step of .github/workflows/ci.yml that can fail the build',
       'FAIL ZZC-AC16 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-job-off is not run by a step of .github/workflows/ci.yml that can fail the build',
+      'FAIL ZZC-AC17 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-piped is not run by a step of .github/workflows/ci.yml that can fail the build',
+      'FAIL ZZC-AC18 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-listed-early is not run by a step of .github/workflows/ci.yml that can fail the build',
       'FAIL ZZD-AC01 (specs/002-delta, ticked in specs/002-delta/tasks.md) has no passing unit test whose name contains its ID',
       'FAIL ZZC-AC04 (specs/001-gamma, Implemented) is named by a test that did not pass: "ZZC-AC04 is skipped" (skipped, test/unit/gamma.test.ts)',
       'FAIL ZZC-AC04 (specs/001-gamma, Implemented) is named by a test that did not pass: "ZZC-AC04 is todo" (todo, test/unit/gamma.test.ts)',
@@ -301,7 +312,7 @@ describe('traceability: report', () => {
     expect(first).toContain(
       '| ZZB-AC02 | 002-beta | Draft, task ticked | integration | covered | test/integration/beta.test.ts |',
     );
-    expect(first).toContain('8 ACs in 2 specs: 6 covered, 2 pending, 0 missing, 0 unverified.');
+    expect(first).toContain('9 ACs in 2 specs: 7 covered, 2 pending, 0 missing, 0 unverified.');
   });
 });
 
@@ -379,7 +390,67 @@ describe('traceability: ci-level proof', () => {
       '        || echo skipped',
       '  - run: npm run kept',
     ].join('\n');
-    expect(workflowCommands(workflow).flatMap(provenScripts)).toEqual(['kept']);
+    expect(workflowCommands(workflow).flatMap((command) => provenScripts(command))).toEqual([
+      'kept',
+    ]);
+  });
+
+  it('counts a script that feeds a pipe only when pipefail is on', () => {
+    for (const command of [
+      'npm run a | tee out.log',
+      'npm run a |& tee out.log',
+      'npm run a | tee out.log && echo done',
+    ]) {
+      expect(provenScripts(command)).not.toContain('a');
+      expect(provenScripts(command, { pipefail: true })).toContain('a');
+    }
+    expect(provenScripts('cat input | npm run a')).toEqual(['a']);
+    expect(provenScripts('npm run a | npm run b')).toEqual(['b']);
+  });
+
+  it('counts a script before the last && of a list only on the last command line of its block', () => {
+    expect(provenScripts('npm run a && echo ok', { last: false })).toEqual([]);
+    expect(provenScripts('npm run a && echo ok', { last: true })).toEqual(['a']);
+    expect(provenScripts('npm run a && npm run b', { last: false })).toEqual(['b']);
+    expect(provenScripts('npm run a && echo ok; echo done', { last: true })).toEqual([]);
+    expect(provenScripts('npm run a && npm run b; echo done', { last: false })).toEqual(['b']);
+    expect(provenScripts('npm run a; echo done', { last: false })).toEqual(['a']);
+  });
+
+  it('reads pipefail from shell: bash or a set line, and the position of each command in its step', () => {
+    const workflow = [
+      'steps:',
+      '  - run: |',
+      '      npm run piped-default | tee out.log',
+      '      npm run listed-early && echo listed',
+      '      set -euo pipefail',
+      '      npm run piped-after-set | tee out.log',
+      '      npm run listed-last && echo listed',
+      '  - shell: bash',
+      '    run: npm run piped-bash | tee out.log',
+      '  - shell: bash {0}',
+      '    run: npm run piped-custom-shell | tee out.log',
+    ].join('\n');
+
+    expect(workflowSteps(workflow)).toEqual([
+      {
+        commands: [
+          'npm run piped-default | tee out.log',
+          'npm run listed-early && echo listed',
+          'set -euo pipefail',
+          'npm run piped-after-set | tee out.log',
+          'npm run listed-last && echo listed',
+        ],
+        pipefail: false,
+      },
+      { commands: ['npm run piped-bash | tee out.log'], pipefail: true },
+      { commands: ['npm run piped-custom-shell | tee out.log'], pipefail: false },
+    ]);
+    expect(workflowSteps(workflow).flatMap(provenStepScripts)).toEqual([
+      'piped-after-set',
+      'listed-last',
+      'piped-bash',
+    ]);
   });
 
   it('leaves out every step of a job that may fail or never runs', () => {

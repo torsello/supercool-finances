@@ -305,7 +305,7 @@ Unless stated otherwise: customer user C1 owns account A1 (EUR), customer user C
 - **Covers:** ACC-R28, ACC-R29
 - **Given** the service started with `ACCOUNT_LOCK_TIMEOUT_MS` "200"; C1 owns A1, `active` with balance "0" EUR; and a separate database session that holds `SELECT ... FOR UPDATE` on A1's row
 - **When** O1 freezes A1 and then closes A1 while that session keeps its lock; then the session releases it and O1 freezes A1 again
-- **Then** the first freeze and the close each answer 503 with type `/problems/service-unavailable` and `Retry-After: 1`, in less than 1 second; A1 stays `active` with no audit record for either; and the last freeze answers 200 with A1 `frozen`
+- **Then** the first freeze and the close each answer 503 with type `/problems/service-unavailable` and `Retry-After: 1`, after at least 200 ms and in less than 5 seconds; A1 stays `active` with no audit record for either; and the last freeze answers 200 with A1 `frozen`
 
 ## 4. Error catalogue
 

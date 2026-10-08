@@ -54,7 +54,7 @@ Use the `spec` skill (`/spec NNN-name PFX`). It follows [the template](../.claud
 ```
 
 - `Level` is exactly `unit`, `integration`, `e2e` or `ci`.
-- Only when no test can prove an AC (for example Terraform validated in CI), the level is `ci` and the AC adds `- **Verified by:** <CI job and the npm run script its step runs>`. Any other AC with a `Verified by` line fails the check. The line must name at least one `npm run <script>`, and every script it names must be in `package.json` and run by a step of `.github/workflows/ci.yml` that can fail the build: a `run:` command, comments excluded, with no `||` anywhere after the `npm run <script>` (a line ending in a backslash continues on the next), in a step and a job without `continue-on-error` (other than `false`) or `if: false`. Until all of that holds, the AC is not covered.
+- Only when no test can prove an AC (for example Terraform validated in CI), the level is `ci` and the AC adds `- **Verified by:** <CI job and the npm run script its step runs>`. Any other AC with a `Verified by` line fails the check. The line must name at least one `npm run <script>`, and every script it names must be in `package.json` and run by a step of `.github/workflows/ci.yml` that can fail the build: a `run:` command, comments excluded, with no `||` anywhere after the `npm run <script>`; not feeding a pipe (`|` or `|&`) unless the step sets `shell: bash` or an earlier line of its block runs `set -o pipefail`, because GitHub's default shell is `bash -e` without pipefail; and, when it is followed by `&&` in its list, only on the last command line of its block, because `bash -e` ignores a failure anywhere else in a `&&` list (a line ending in a backslash continues on the next). The step and its job must be without `continue-on-error` (other than `false`) or `if: false`. Until all of that holds, the AC is not covered.
 - An AC heading may be indented by up to three spaces, as any Markdown heading. A heading that starts like an AC ID, in any case and at any indent, but is not exactly `### PFX-ACnn` followed by a space or the end of the line (for example `### MOV-AC3`, `#### MOV-AC03`, `### MOV-AC03:`, `### mov-ac03` or a heading indented by four spaces) fails the check, and so does an AC ID whose prefix is not the spec's `ID prefix`.
 - Headings inside fenced code blocks are examples, not ACs. A fence closes only with the same character (backtick or tilde) repeated at least as many times.
 
@@ -109,11 +109,14 @@ Tick a task in `tasks.md` as soon as it is done, so its ACs are enforced from th
 
 Keep this table up to date whenever a spec is added or its status changes.
 
-| #   | Spec                                           | Prefix | Status |
-| --- | ---------------------------------------------- | ------ | ------ |
-| 000 | [overview](000-overview/spec.md)               | SYS    | Draft  |
-| 001 | [accounts](001-accounts/spec.md)               | ACC    | Draft  |
-| 002 | [ledger](002-ledger/spec.md)                   | LED    | Draft  |
-| 003 | [money movements](003-money-movements/spec.md) | MOV    | Draft  |
-| 004 | [reversals](004-reversals/spec.md)             | REV    | Draft  |
-| 005 | [idempotency](005-idempotency/spec.md)         | IDM    | Draft  |
+| #   | Spec                                                 | Prefix | Status |
+| --- | ---------------------------------------------------- | ------ | ------ |
+| 000 | [overview](000-overview/spec.md)                     | SYS    | Draft  |
+| 001 | [accounts](001-accounts/spec.md)                     | ACC    | Draft  |
+| 002 | [ledger](002-ledger/spec.md)                         | LED    | Draft  |
+| 003 | [money movements](003-money-movements/spec.md)       | MOV    | Draft  |
+| 004 | [reversals](004-reversals/spec.md)                   | REV    | Draft  |
+| 005 | [idempotency](005-idempotency/spec.md)               | IDM    | Draft  |
+| 006 | [auth](006-auth/spec.md)                             | AUT    | Draft  |
+| 007 | [security and operability](007-security-ops/spec.md) | SEC    | Draft  |
+| 008 | [deployment](008-deployment/spec.md)                 | DEP    | Draft  |

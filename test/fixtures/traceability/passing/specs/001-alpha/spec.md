@@ -27,6 +27,11 @@
 - **Level:** ci
 - **Verified by:** CI job `ci`, step `npm run zz-check`, run after `npm run zz:prepare`.
 
+### ZZA-AC06 · Proven by a piped step with pipefail and a && list on the last line
+
+- **Level:** ci
+- **Verified by:** CI job `ci`, steps `npm run zz-piped` and `npm run zz-listed`
+
 ## 4. Examples
 
 ```markdown

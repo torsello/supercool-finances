@@ -11,6 +11,11 @@ jobs:
           DATABASE_URL=postgres://localhost/zz npm run zz:prepare
       - run: npm run zz-check # the check
         continue-on-error: false
+      - shell: bash
+        run: npm run zz-piped | tee piped.log
+      - run: |
+          echo listing
+          npm run zz-listed && echo listed
   terraform:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest

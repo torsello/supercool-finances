@@ -259,7 +259,7 @@ Unless stated otherwise: customer user C1 owns account A1 (EUR), customer user C
 - **Covers:** REV-R19
 - **Given** the service started with `ACCOUNT_LOCK_TIMEOUT_MS` "200"; A1 with "0" EUR; O1 deposits "1000" EUR into A1 as D; and a separate database session that holds `SELECT ... FOR UPDATE` on A1's row
 - **When** O1 reverses D with Idempotency-Key k1; then the session releases its lock; then O1 repeats the reversal with k1
-- **Then** the first answers 503 with type `/problems/service-unavailable` and `Retry-After: 1`, in less than 1 second, and afterwards no transaction, ledger entry, idempotency record or audit record exists for k1 and A1 is "1000" EUR; the repeat answers 201; and A1 is "0" EUR with exactly one reversal of D
+- **Then** the first answers 503 with type `/problems/service-unavailable` and `Retry-After: 1`, after at least 200 ms and in less than 5 seconds, and afterwards no transaction, ledger entry, idempotency record or audit record exists for k1 and A1 is "1000" EUR; the repeat answers 201; and A1 is "0" EUR with exactly one reversal of D
 
 ### REV-AC22 · A reversal racing a transfer never overdraws
 

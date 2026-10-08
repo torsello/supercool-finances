@@ -39,6 +39,10 @@ const NPM_RUN = /\bnpm run ([\w:-]+(?:\.[\w:-]+)*)/g;
 const WORKFLOW_KEY = /^( *)(- +)?([\w-]+):(?:\s(.*)|$)/;
 // "||" runs its right side when the left side fails, so a script before it can never fail the build.
 const OR_ELSE = '||';
+// A pipe ("|" or "|&", not "||"): without pipefail, a pipeline fails only when its last command does.
+const PIPE = /(?<!\|)\|(?!\|)/;
+// "set" turning pipefail on, such as "set -o pipefail" or "set -euo pipefail".
+const SET_PIPEFAIL = /^set\s+(?:-[A-Za-z]+\s+)*-[A-Za-z]*o\s+pipefail\b/;
 // A block scalar header such as "|", ">" or "|-": the command is on the more indented lines below.
 const BLOCK_SCALAR = /^[|>][+-]?\d*$/;
 // A comment: "#" at the start or after whitespace, to the end of the line.
@@ -422,17 +426,29 @@ function isFalse(value: string | undefined): boolean {
   return bare.trim().toLowerCase() === 'false';
 }
 
+function unquoted(value: string | undefined): string {
+  return (value ?? '').trim().replace(/^(['"])(.*)\1$/, '$2');
+}
+
+/** A "run:" step: its commands in order, and whether its shell starts with pipefail on. */
+export interface WorkflowStep {
+  commands: string[];
+  pipefail: boolean;
+}
+
 /**
- * The commands of every "run:" step of a GitHub Actions workflow that can fail the build, one
- * per command, without comments; a line ending in a backslash continues on the next one. A step is left
+ * Every "run:" step of a GitHub Actions workflow that can fail the build, with one command per
+ * line, without comments; a line ending in a backslash continues on the next one. A step is left
  * out when it, or the job holding it, has "continue-on-error" set to anything but false or
- * "if: false".
+ * "if: false". GitHub runs "shell: bash" as "bash -eo pipefail", but its default shell as
+ * "bash -e", without pipefail.
  */
-export function workflowCommands(content: string): string[] {
+export function workflowSteps(content: string): WorkflowStep[] {
   const entries = parseWorkflow(content);
-  const commands: string[] = [];
+  const steps: WorkflowStep[] = [];
   entries.forEach((entry, index) => {
     if (entry.key !== 'run') return;
+    const shell = mappingOf(entries, index).keys.get('shell');
     for (let at: number | undefined = index; at !== undefined;) {
       const { keys, parent } = mappingOf(entries, at);
       const continueOnError = keys.get('continue-on-error');
@@ -442,6 +458,7 @@ export function workflowCommands(content: string): string[] {
       at = parent;
     }
     const lines = entry.block.length > 0 ? entry.block : [entry.value];
+    const commands: string[] = [];
     let pending = '';
     for (const line of lines) {
       const command = `${pending}${line.replace(COMMENT, '').trim()}`;
@@ -453,20 +470,51 @@ export function workflowCommands(content: string): string[] {
       if (command !== '') commands.push(command);
     }
     if (pending.trim() !== '') commands.push(pending.trim());
+    steps.push({ commands, pipefail: unquoted(shell) === 'bash' });
   });
-  return commands;
+  return steps;
+}
+
+/** The commands of every "run:" step of a workflow that can fail the build (see workflowSteps). */
+export function workflowCommands(content: string): string[] {
+  return workflowSteps(content).flatMap((step) => step.commands);
 }
 
 /**
- * The scripts that a CI command runs in a way that can fail the build: every "npm run <script>"
- * with no "||" anywhere after it in the command.
+ * The scripts that a CI command runs in a way that can fail the build under "bash -e": every
+ * "npm run <script>" with no "||" anywhere after it; not feeding a pipe, unless pipefail is on;
+ * and, when it is not the last command of its "&&" list, only if that list ends the last command
+ * line of its block, because "bash -e" ignores a failure anywhere else in such a list.
  */
-export function provenScripts(command: string): string[] {
+export function provenScripts(
+  command: string,
+  { last = true, pipefail = false }: { last?: boolean; pipefail?: boolean } = {},
+): string[] {
   return [
     ...new Set(
       [...command.matchAll(NPM_RUN)]
-        .filter((match) => !command.slice(match.index + match[0].length).includes(OR_ELSE))
+        .filter((match) => {
+          const rest = command.slice(match.index + match[0].length);
+          if (rest.includes(OR_ELSE)) return false;
+          const list = rest.split(';')[0] ?? '';
+          const pipeline = list.split('&&')[0] ?? '';
+          if (!pipefail && PIPE.test(pipeline)) return false;
+          return !list.includes('&&') || (last && !rest.includes(';'));
+        })
         .map(([, name]) => name ?? ''),
+    ),
+  ];
+}
+
+/** The scripts that a step runs in a way that can fail the build, tracking "set -o pipefail". */
+export function provenStepScripts(step: WorkflowStep): string[] {
+  let pipefail = step.pipefail;
+  return [
+    ...new Set(
+      step.commands.flatMap((command, index) => {
+        if (SET_PIPEFAIL.test(command)) pipefail = true;
+        return provenScripts(command, { last: index === step.commands.length - 1, pipefail });
+      }),
     ),
   ];
 }
@@ -496,7 +544,7 @@ export function loadCiContext(root: string): {
   const workflowPath = join(root, CI_WORKFLOW);
   const workflowScripts = new Set(
     existsSync(workflowPath)
-      ? workflowCommands(readFileSync(workflowPath, 'utf8')).flatMap(provenScripts)
+      ? workflowSteps(readFileSync(workflowPath, 'utf8')).flatMap(provenStepScripts)
       : [],
   );
   return { packageScripts, workflowScripts, problems };

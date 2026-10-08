@@ -15,6 +15,10 @@ jobs:
         run: npm run zz-continue
       - run: npm run zz-if-false
         if: ${{ false }}
+      - run: |
+          npm run zz-piped | tee piped.log
+          npm run zz-listed-early && echo listed
+          echo done
     env:
       NOTE: npm run zz-commented is not a step
   optional:

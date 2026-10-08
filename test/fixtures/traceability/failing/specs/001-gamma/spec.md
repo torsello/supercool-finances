@@ -77,3 +77,13 @@
 
 - **Level:** ci
 - **Verified by:** CI job `optional`, step `npm run zz-job-off`
+
+### ZZC-AC17 · A step whose script feeds a pipe without pipefail
+
+- **Level:** ci
+- **Verified by:** CI job `ci`, step `npm run zz-piped`
+
+### ZZC-AC18 · A && list on a line that is not the last of its block
+
+- **Level:** ci
+- **Verified by:** CI job `ci`, step `npm run zz-listed-early`

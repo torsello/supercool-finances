@@ -5,6 +5,8 @@
     "zz-or-true": "true",
     "zz-continue": "true",
     "zz-if-false": "true",
-    "zz-job-off": "true"
+    "zz-job-off": "true",
+    "zz-piped": "true",
+    "zz-listed-early": "true"
   }
 }
