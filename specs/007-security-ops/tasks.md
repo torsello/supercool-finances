@@ -22,6 +22,7 @@ These tasks run in the cross-spec order of plan 000 section 1 for 08-api: authen
 
 - [x] Test first: SEC-AC16 in `test/integration/security/json-logs.test.ts`, against the logger of plan 000.
 - [x] Test first: SEC-AC34 in `test/integration/security/api-docs.test.ts`; then `src/platform/http/docs.ts` with the route schemas of plans 001, 003 and 004.
+- [x] Export the OpenAPI document to `docs/api/openapi.yaml` with `npm run openapi:export`, lint it with `npm run openapi:lint` (Redocly) in a step of the CI job `ci`, and add `test/unit/openapi.test.ts` (SEC-R44), which fails when the committed file is out of date with the routes. The document lists only the problem types the service answers today; the 12-infra docs task adds the rest.
 
 ## 09-hardening
 

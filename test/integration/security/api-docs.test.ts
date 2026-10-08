@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildProductionApp, type BuiltApp } from '../../support/app.js';
 import { problemOf } from '../../support/http.js';
+import { buildTestApp } from '../../support/test-app.js';
 
 /** The endpoints of specs 001, 003 and 004, as the OpenAPI document names them. */
 const ENDPOINTS = [
@@ -50,5 +51,19 @@ describe('API documentation (SEC-R44)', () => {
     const prefixed = await built.app.inject({ method: 'GET', url: '/v1/docs' });
     expect(prefixed.statusCode).toBe(404);
     expect(problemOf(prefixed).type).toBe('/problems/not-found');
+  });
+
+  it('SEC-R44 SYS-R37 the test app, with its seams, serves the same document without the throwing route', async () => {
+    const test = buildTestApp();
+    try {
+      await test.app.ready();
+      const json = await test.app.inject({ method: 'GET', url: '/docs/json' });
+      expect(json.statusCode).toBe(200);
+      const document = json.json<OpenApiDocument>();
+      expect(Object.keys(document.paths)).toEqual(expect.arrayContaining(ENDPOINTS));
+      expect(Object.keys(document.paths)).not.toContain('/v1/test/throw');
+    } finally {
+      await test.app.close();
+    }
   });
 });

@@ -29,7 +29,9 @@
     "idempotency:cleanup": "tsx --env-file-if-exists=.env src/cli/idempotency-cleanup.ts",
     "token": "tsx --env-file-if-exists=.env scripts/token.ts",
     "migrate:up": "node --env-file-if-exists=.env node_modules/node-pg-migrate/bin/node-pg-migrate.js up --migrations-dir migrations --migration-file-language sql --database-url-var MIGRATION_DATABASE_URL --check-order",
-    "migrate:down": "node --env-file-if-exists=.env node_modules/node-pg-migrate/bin/node-pg-migrate.js down --migrations-dir migrations --migration-file-language sql --database-url-var MIGRATION_DATABASE_URL --check-order"
+    "migrate:down": "node --env-file-if-exists=.env node_modules/node-pg-migrate/bin/node-pg-migrate.js down --migrations-dir migrations --migration-file-language sql --database-url-var MIGRATION_DATABASE_URL --check-order",
+    "openapi:export": "tsx scripts/openapi-export.ts",
+    "openapi:lint": "redocly lint docs/api/openapi.yaml"
   },
   "dependencies": {
     "@fastify/helmet": "^13.1.1",

@@ -61,6 +61,8 @@ jobs:
 
       - run: npm run check
 
+      - run: npm run openapi:lint
+
       - name: Create the roles and databases (same SQL as local Docker Compose)
         run: docker exec -i ${{ job.services.postgres.id }} psql -v ON_ERROR_STOP=1 -U postgres < docker/postgres/init/01-databases.sql
 

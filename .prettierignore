@@ -7,3 +7,4 @@ docs/ai/
 docs/challenge.md
 # Malformed on purpose: Prettier would rewrite what the traceability tests check
 test/fixtures/traceability/invalid/
+docs/api/openapi.yaml

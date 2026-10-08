@@ -5,6 +5,7 @@ import {
   type ZodTypeProvider,
 } from 'fastify-type-provider-zod';
 import { z } from 'zod';
+import { ACCOUNT_OPERATION_DOCS } from './modules/accounts/adapters/http/openapi.js';
 import { accountRoutes } from './modules/accounts/adapters/http/routes.js';
 import { CursorCodec } from './modules/accounts/adapters/http/cursor.js';
 import {
@@ -23,6 +24,7 @@ import {
 import { KyselyKeyedTransactions } from './modules/idempotency/adapters/persistence/kysely-key-store.js';
 import { IdempotentRunner } from './modules/idempotency/index.js';
 import { KyselyLedgerWriter } from './modules/ledger/adapters/persistence/kysely-ledger.js';
+import { MOVEMENT_OPERATION_DOCS } from './modules/movements/adapters/http/openapi.js';
 import { movementRoutes } from './modules/movements/adapters/http/routes.js';
 import {
   KyselyTransactionQueries,
@@ -218,7 +220,10 @@ export function buildApp(config: Config, options: AppOptions = {}) {
   app.decorate('testSeams', testSeams);
   app.decorate('attachedTestHooks', attachedTestHooks);
 
-  registerDocs(app);
+  registerDocs(app, {
+    operations: { ...ACCOUNT_OPERATION_DOCS, ...MOVEMENT_OPERATION_DOCS },
+    idempotencyKeyTtlSeconds: config.idempotencyKeyTtlSeconds,
+  });
   registerRoutes(app, {
     protect: (scope) => {
       registerAuthentication(scope, config.jwt, options.clock);

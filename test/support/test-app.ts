@@ -33,9 +33,14 @@ export const THROWING_ROUTE_PATH = '/v1/test/throw';
 
 /** `throwing-route`: `GET /v1/test/throw`, open to both roles, throws a plain error. */
 const throwingRoute: RouteModule = (scope) => {
-  scope.get('/test/throw', { config: { roles: ['customer', 'operator'] } }, () => {
-    throw new Error(THROWING_ROUTE_MESSAGE);
-  });
+  // Hidden from the OpenAPI document: it is a test seam, not part of the API.
+  scope.get(
+    '/test/throw',
+    { schema: { hide: true }, config: { roles: ['customer', 'operator'] } },
+    () => {
+      throw new Error(THROWING_ROUTE_MESSAGE);
+    },
+  );
 };
 
 /**

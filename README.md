@@ -22,7 +22,7 @@ Every behaviour is specified before it is built: the specs, with their requireme
 
 ## API
 
-Every endpoint is served under `/v1` and needs `Authorization: Bearer <JWT>` with the role `customer` or `operator` (`npm run token -- --sub <uuid> --role customer` prints one for local use). Swagger UI is at `/docs` and the OpenAPI document at `/docs/json`, without credentials. Every error is `application/problem+json` (RFC 9457), and every response carries an `X-Request-Id`.
+Every endpoint is served under `/v1` and needs `Authorization: Bearer <JWT>` with the role `customer` or `operator` (`npm run token -- --sub <uuid> --role customer` prints one for local use). Swagger UI is at `/docs` and the OpenAPI document at `/docs/json`, without credentials; the same document is committed as [`docs/api/openapi.yaml`](docs/api/openapi.yaml), regenerated with `npm run openapi:export` and linted with `npm run openapi:lint`. The committed file is generated with the default settings, while `/docs/json` shows the running values of `MAX_AMOUNT_MINOR` and `IDEMPOTENCY_KEY_TTL_SECONDS`. Every error is `application/problem+json` (RFC 9457), and every response carries an `X-Request-Id`.
 
 ## Accounts
 

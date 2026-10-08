@@ -1,0 +1,3761 @@
+openapi: 3.1.0
+info:
+  title: SuperCool Finances balance service
+  version: "1"
+  description: >-
+    Customer accounts, a double-entry ledger, deposits, withdrawals, transfers
+    and reversals.
+
+
+    **Versioning.** Every endpoint is served under the version prefix `/v1`; the
+    health checks and this documentation (`/docs`, `/docs/json`) are not.
+
+
+    **Authentication.** Every `/v1` request needs `Authorization: Bearer <JWT>`,
+    an HS256 token with `sub` (the user id, a UUID) and `role` (`customer` or
+    `operator`). The API issues no tokens. A missing or invalid token answers
+    401; a role not permitted the operation answers 403.
+
+
+    **Amounts.** Strings of decimal digits in minor units of the currency, with
+    an ISO 4217 code: "1050" is 10.50 EUR, and JPY has no minor units. Ledger
+    entries carry signed amounts.
+
+
+    **Idempotency.** Every deposit, withdrawal, transfer and reversal requires
+    an `Idempotency-Key` header; account creation takes one optionally. A key
+    the client generates for each new request, such as a UUID: 1 to 255 visible
+    ASCII characters (U+0021 to U+007E), sent once. A missing or malformed key
+    answers 400 `/problems/malformed-request`. Keys are scoped to the
+    authenticated user and kept for 24 hours (86400 seconds) from the first
+    request. A repeat with the same key, method, path and body within that time
+    answers the response stored for the first one, status, headers and body,
+    with `Idempotent-Replayed: true`; the same key with another method, path or
+    body answers 422 `/problems/idempotency-key-reused`; while the first request
+    is still running, 409 `/problems/request-in-progress`. After the TTL the key
+    is free and starts a new request. Retry policy: on a connection error, a
+    502, 503 or 504, or a 409 `/problems/request-in-progress`, retry the same
+    request with the same `Idempotency-Key`, waiting the `Retry-After` of the
+    response when it has one and 200 ms otherwise, up to 60 times. Never retry
+    any other 4xx. A GET may be re-sent after an error or a timeout.
+
+
+    **Correlation.** Every response carries `X-Request-Id`: the client's value
+    when it is 1 to 128 characters of `A-Z a-z 0-9 . _ : -`, a generated UUIDv7
+    otherwise.
+
+
+    **Errors.** Every error answer is `application/problem+json` (RFC 9457),
+    with one of these types:
+
+
+    | Type | Status | Title | When |
+
+    | --- | --- | --- | --- |
+
+    | `/problems/not-found` | 404 | Not Found | The path is not a route, or the
+    account or transaction does not exist, belongs to another customer, is a
+    system account, or its id is not a UUID. One body for every case. |
+
+    | `/problems/unauthenticated` | 401 | Unauthenticated | No `Authorization:
+    Bearer` token, or a token that fails verification: signature, algorithm,
+    issuer, audience, expiry or claims. Every case gets the same body and
+    `WWW-Authenticate` header. |
+
+    | `/problems/forbidden` | 403 | Forbidden | The caller’s role is not
+    permitted the operation, whatever ids the request names. |
+
+    | `/problems/malformed-request` | 400 | Malformed Request | The body is not
+    parseable JSON or was cut short, a required header such as `Idempotency-Key`
+    is missing or malformed, or a pagination cursor is invalid. `detail` names
+    what is broken. |
+
+    | `/problems/validation-error` | 422 | Validation Error | The request
+    parses, but a body member or query parameter is missing, unknown or
+    malformed, including amount and currency. `errors` has one entry per field.
+    |
+
+    | `/problems/idempotency-key-reused` | 422 | Idempotency Key Reused | The
+    `Idempotency-Key` was already used by the same user for a request with
+    another method, path or body. Not stored: use a new key for a new request. |
+
+    | `/problems/request-in-progress` | 409 | Request In Progress | Another
+    request with the same `Idempotency-Key` is still running after
+    `IDEMPOTENCY_WAIT_TIMEOUT_MS`. Retry with the same key after `Retry-After`.
+    |
+
+    | `/problems/invalid-status-transition` | 409 | Invalid Status Transition |
+    The status change is not in the lifecycle: freezing or unfreezing a closed
+    account. |
+
+    | `/problems/account-balance-not-zero` | 409 | Account Balance Not Zero |
+    Closing an account whose balance is not "0". |
+
+    | `/problems/already-reversed` | 409 | Already Reversed | The transaction
+    has already been reversed; a transaction is reversed at most once. |
+
+    | `/problems/account-not-active` | 422 | Account Not Active | One of the
+    caller's own accounts that the movement debits or credits is frozen or
+    closed (another customer's frozen or closed destination answers
+    `/problems/destination-unavailable`); a reversal is refused only on a closed
+    account. |
+
+    | `/problems/currency-mismatch` | 422 | Currency Mismatch | The request
+    currency differs from the account’s, or a transfer to one of the caller’s
+    own accounts in another currency. |
+
+    | `/problems/insufficient-funds` | 422 | Insufficient Funds | The source
+    balance does not cover the amount. |
+
+    | `/problems/destination-unavailable` | 422 | Destination Unavailable | A
+    transfer destination that cannot be credited: unknown, a system account,
+    another customer’s frozen, closed or other-currency account, or a balance
+    that would exceed 9223372036854775807. One answer for every case. |
+
+    | `/problems/balance-limit-exceeded` | 422 | Balance Limit Exceeded | A
+    deposit or reversal would make a cached balance exceed 9223372036854775807.
+    |
+
+    | `/problems/transaction-not-reversible` | 422 | Transaction Not Reversible
+    | The transaction is itself a reversal. |
+
+    | `/problems/insufficient-funds-for-reversal` | 422 | Insufficient Funds For
+    Reversal | A customer account the reversal debits does not hold enough. |
+
+    | `/problems/service-unavailable` | 503 | Service Unavailable | A transient
+    condition: an account lock not acquired in time, a deadlock still present
+    after 3 attempts, or a statement timeout. Retry after `Retry-After`, with
+    the same `Idempotency-Key` for a POST. |
+
+    | `/problems/internal-error` | 500 | Internal Error | A defect. The body
+    never holds internals; report the `requestId`. |
+components:
+  headers:
+    RequestId:
+      description: "The correlation id of the request: the client's `X-Request-Id`
+        when valid, a generated UUIDv7 otherwise."
+      schema:
+        type: string
+      example: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+    RetryAfter:
+      description: "Seconds to wait before retrying, sent with
+        `/problems/request-in-progress`, `/problems/service-unavailable`. Retry
+        policy: on a connection error, a 502, 503 or 504, or a 409
+        `/problems/request-in-progress`, retry the same request with the same
+        `Idempotency-Key`, waiting the `Retry-After` of the response when it has
+        one and 200 ms otherwise, up to 60 times. Never retry any other 4xx. A
+        GET may be re-sent after an error or a timeout."
+      schema:
+        type: string
+      example: "1"
+    WwwAuthenticate:
+      description: The bearer challenge, the same for every 401.
+      schema:
+        type: string
+      example: Bearer realm="supercool-finances"
+    IdempotentReplayed:
+      description: Present, with value `true`, only when the response is the stored
+        response of an earlier request with the same `Idempotency-Key`.
+      schema:
+        type: string
+      example: "true"
+  parameters:
+    IdempotencyKey:
+      in: header
+      name: Idempotency-Key
+      required: true
+      schema: &a1
+        type: string
+        minLength: 1
+        maxLength: 255
+        pattern: ^[!-~]+$
+      description: "Required. A key the client generates for each new request, such as
+        a UUID: 1 to 255 visible ASCII characters (U+0021 to U+007E), sent once.
+        A missing or malformed key answers 400 `/problems/malformed-request`.
+        Keys are scoped to the authenticated user and kept for 24 hours (86400
+        seconds) from the first request. A repeat with the same key, method,
+        path and body within that time answers the response stored for the first
+        one, status, headers and body, with `Idempotent-Replayed: true`; the
+        same key with another method, path or body answers 422
+        `/problems/idempotency-key-reused`; while the first request is still
+        running, 409 `/problems/request-in-progress`. After the TTL the key is
+        free and starts a new request. Retry policy: on a connection error, a
+        502, 503 or 504, or a 409 `/problems/request-in-progress`, retry the
+        same request with the same `Idempotency-Key`, waiting the `Retry-After`
+        of the response when it has one and 200 ms otherwise, up to 60 times.
+        Never retry any other 4xx. A GET may be re-sent after an error or a
+        timeout."
+      example: 5b0d7f1e-6c2a-4e8b-9f3d-2a1c4e6b8d0f
+    OptionalIdempotencyKey:
+      in: header
+      name: Idempotency-Key
+      required: false
+      schema: *a1
+      description: "Optional. With one, the account is created at most once for the
+        key; without one, every request creates an account. 1 to 255 visible
+        ASCII characters (U+0021 to U+007E), sent once. A missing or malformed
+        key answers 400 `/problems/malformed-request`. Keys are scoped to the
+        authenticated user and kept for 24 hours (86400 seconds) from the first
+        request. A repeat with the same key, method, path and body within that
+        time answers the response stored for the first one, status, headers and
+        body, with `Idempotent-Replayed: true`; the same key with another
+        method, path or body answers 422 `/problems/idempotency-key-reused`;
+        while the first request is still running, 409
+        `/problems/request-in-progress`. After the TTL the key is free and
+        starts a new request. Retry policy: on a connection error, a 502, 503 or
+        504, or a 409 `/problems/request-in-progress`, retry the same request
+        with the same `Idempotency-Key`, waiting the `Retry-After` of the
+        response when it has one and 200 ms otherwise, up to 60 times. Never
+        retry any other 4xx. A GET may be re-sent after an error or a timeout."
+      example: 5b0d7f1e-6c2a-4e8b-9f3d-2a1c4e6b8d0f
+    RequestId:
+      in: header
+      name: X-Request-Id
+      required: false
+      schema:
+        type: string
+        pattern: ^[A-Za-z0-9._:-]{1,128}$
+      description: An optional correlation id, returned in `X-Request-Id`, written on
+        every log line of the request and in a problem body; any other value is
+        replaced by a generated UUIDv7.
+  schemas:
+    ProblemDetails:
+      type: object
+      description: An error answer as RFC 9457 problem details, with content type
+        `application/problem+json`. `title` and `detail` are fixed per type, so
+        two answers of one type differ only in `requestId`; only
+        `/problems/malformed-request` names what is broken in its `detail`.
+      required:
+        - type
+        - title
+        - status
+        - detail
+        - requestId
+      properties:
+        type:
+          type: string
+          description: The problem type, one of the types listed in the description of
+            this API.
+          enum:
+            - /problems/not-found
+            - /problems/unauthenticated
+            - /problems/forbidden
+            - /problems/malformed-request
+            - /problems/validation-error
+            - /problems/idempotency-key-reused
+            - /problems/request-in-progress
+            - /problems/invalid-status-transition
+            - /problems/account-balance-not-zero
+            - /problems/already-reversed
+            - /problems/account-not-active
+            - /problems/currency-mismatch
+            - /problems/insufficient-funds
+            - /problems/destination-unavailable
+            - /problems/balance-limit-exceeded
+            - /problems/transaction-not-reversible
+            - /problems/insufficient-funds-for-reversal
+            - /problems/service-unavailable
+            - /problems/internal-error
+        title:
+          type: string
+          description: A fixed summary of the type.
+        status:
+          type: integer
+          description: The HTTP status of the answer.
+        detail:
+          type: string
+          description: A fixed explanation of the type.
+        requestId:
+          type: string
+          description: The correlation id of the request, also sent as `X-Request-Id`; a
+            replay keeps the original one.
+        errors:
+          type: array
+          description: "Only on `/problems/validation-error`: one entry per failing field,
+            the body member as a JSON Pointer or the query string parameter by
+            name."
+          items:
+            type: object
+            required:
+              - detail
+            properties:
+              pointer:
+                type: string
+              parameter:
+                type: string
+              detail:
+                type: string
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: An HS256 JWT with `sub` (the user id, a UUID), `role` (`customer`
+        or `operator`), `iat`, `exp`, `iss` and `aud`. Locally, `npm run token
+        -- --sub <uuid> --role customer` prints one.
+paths:
+  /v1/accounts:
+    post:
+      operationId: createAccount
+      summary: Open an account
+      tags:
+        - accounts
+      description: A customer opens an account of their own in one currency, `active`
+        with balance "0". `Idempotency-Key` is optional here; with one, a repeat
+        answers the first response. Operators get 403.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                currency:
+                  type: string
+                  enum:
+                    - USD
+                    - MXN
+                    - EUR
+                    - COP
+                    - JPY
+              required:
+                - currency
+              additionalProperties: false
+            example:
+              currency: EUR
+        description: The currency of the account, fixed for its life.
+      responses:
+        "201":
+          description: The new account, `active` with balance "0"; `Location` is its path.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Location:
+              description: The path of the created resource, under `/v1`.
+              schema:
+                type: string
+              example: /v1/accounts/0199c3a1-2f40-7a3b-8c1d-5e6f7a8b9c0d
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$
+                  currency:
+                    type: string
+                    enum:
+                      - USD
+                      - MXN
+                      - EUR
+                      - COP
+                      - JPY
+                  status:
+                    type: string
+                    enum:
+                      - active
+                      - frozen
+                      - closed
+                  balance:
+                    type: string
+                    pattern: ^(0|[1-9][0-9]*)$
+                  createdAt:
+                    type: string
+                    pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+                  updatedAt:
+                    type: string
+                    pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+                required:
+                  - id
+                  - currency
+                  - status
+                  - balance
+                  - createdAt
+                  - updatedAt
+                additionalProperties: false
+              example:
+                id: 0199c3a1-2f40-7a3b-8c1d-5e6f7a8b9c0d
+                currency: EUR
+                status: active
+                balance: "0"
+                createdAt: 2026-10-08T14:03:00.123Z
+                updatedAt: 2026-10-08T14:03:00.123Z
+        "400":
+          description: "Bad Request, as problem details. `/problems/malformed-request`:
+            The body is not parseable JSON or was cut short, a required header
+            such as `Idempotency-Key` is missing or malformed, or a pagination
+            cursor is invalid. `detail` names what is broken."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                malformed-request:
+                  summary: Malformed Request
+                  value:
+                    type: /problems/malformed-request
+                    title: Malformed Request
+                    status: 400
+                    detail: The request is malformed.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "401":
+          description: "Unauthorized, as problem details. `/problems/unauthenticated`: No
+            `Authorization: Bearer` token, or a token that fails verification:
+            signature, algorithm, issuer, audience, expiry or claims. Every case
+            gets the same body and `WWW-Authenticate` header."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            WWW-Authenticate:
+              $ref: "#/components/headers/WwwAuthenticate"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                unauthenticated:
+                  summary: Unauthenticated
+                  value:
+                    type: /problems/unauthenticated
+                    title: Unauthenticated
+                    status: 401
+                    detail: A valid bearer token is required.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "403":
+          description: "Forbidden, as problem details. `/problems/forbidden`: The caller’s
+            role is not permitted the operation, whatever ids the request
+            names."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                forbidden:
+                  summary: Forbidden
+                  value:
+                    type: /problems/forbidden
+                    title: Forbidden
+                    status: 403
+                    detail: Your role is not permitted this operation.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "409":
+          description: "Conflict, as problem details. `/problems/request-in-progress`:
+            Another request with the same `Idempotency-Key` is still running
+            after `IDEMPOTENCY_WAIT_TIMEOUT_MS`. Retry with the same key after
+            `Retry-After`."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                request-in-progress:
+                  summary: Request In Progress
+                  value:
+                    type: /problems/request-in-progress
+                    title: Request In Progress
+                    status: 409
+                    detail: A request with this Idempotency-Key is still in progress; retry with the
+                      same key.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "422":
+          description: "Unprocessable Entity, as problem details.
+            `/problems/idempotency-key-reused`: The `Idempotency-Key` was
+            already used by the same user for a request with another method,
+            path or body. Not stored: use a new key for a new request.
+            `/problems/validation-error`: The request parses, but a body member
+            or query parameter is missing, unknown or malformed, including
+            amount and currency. `errors` has one entry per field."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                idempotency-key-reused:
+                  summary: Idempotency Key Reused
+                  value:
+                    type: /problems/idempotency-key-reused
+                    title: Idempotency Key Reused
+                    status: 422
+                    detail: This Idempotency-Key was already used for a different request.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                validation-error:
+                  summary: Validation Error
+                  value:
+                    type: /problems/validation-error
+                    title: Validation Error
+                    status: 422
+                    detail: The request content is not valid; see errors.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                    errors:
+                      - pointer: /amount
+                        detail: Must be a string of decimal digits.
+        "500":
+          description: "Internal Server Error, as problem details.
+            `/problems/internal-error`: A defect. The body never holds
+            internals; report the `requestId`."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                internal-error:
+                  summary: Internal Error
+                  value:
+                    type: /problems/internal-error
+                    title: Internal Error
+                    status: 500
+                    detail: The service failed to process the request.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "503":
+          description: "Service Unavailable, as problem details.
+            `/problems/service-unavailable`: A transient condition: an account
+            lock not acquired in time, a deadlock still present after 3
+            attempts, or a statement timeout. Retry after `Retry-After`, with
+            the same `Idempotency-Key` for a POST."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                service-unavailable:
+                  summary: Service Unavailable
+                  value:
+                    type: /problems/service-unavailable
+                    title: Service Unavailable
+                    status: 503
+                    detail: The service could not complete the request in time; retry later, with
+                      the same Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+      parameters:
+        - $ref: "#/components/parameters/OptionalIdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      security:
+        - bearer: []
+    get:
+      operationId: listAccounts
+      summary: List own accounts
+      tags:
+        - accounts
+      description: 'A customer lists their own accounts. Operators look accounts up by
+        id and get 403 here. Newest first by (`createdAt`, `id`), one page as
+        `{"items": [...], "nextCursor": "..."}`; `nextCursor` is absent on the
+        last page. `limit` is an integer from 1 to 100, 20 when absent; any
+        other value answers 422 `/problems/validation-error`. Pass `nextCursor`
+        back as `cursor` for the next page: it is opaque, signed by the service,
+        valid on every replica, and only for the same list and user; an altered
+        or foreign cursor answers 400 `/problems/malformed-request`.'
+      parameters:
+        - schema:
+            type: string
+            pattern: ^[1-9][0-9]*$
+          in: query
+          name: limit
+          required: false
+          description: The page size, an integer from 1 to 100; 20 when absent.
+          example: "20"
+        - schema:
+            type: string
+          in: query
+          name: cursor
+          required: false
+          description: The `nextCursor` of the previous page of the same list, as given;
+            absent for the first page.
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: One page of the caller’s accounts, newest first.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$
+                        currency:
+                          type: string
+                          enum:
+                            - USD
+                            - MXN
+                            - EUR
+                            - COP
+                            - JPY
+                        status:
+                          type: string
+                          enum:
+                            - active
+                            - frozen
+                            - closed
+                        balance:
+                          type: string
+                          pattern: ^(0|[1-9][0-9]*)$
+                        createdAt:
+                          type: string
+                          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+                        updatedAt:
+                          type: string
+                          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+                      required:
+                        - id
+                        - currency
+                        - status
+                        - balance
+                        - createdAt
+                        - updatedAt
+                      additionalProperties: false
+                  nextCursor:
+                    type: string
+                required:
+                  - items
+                additionalProperties: false
+              example:
+                items:
+                  - &a2
+                    id: 0199c3a1-2f40-7a3b-8c1d-5e6f7a8b9c0d
+                    currency: EUR
+                    status: active
+                    balance: "1050"
+                    createdAt: 2026-10-08T14:03:00.123Z
+                    updatedAt: 2026-10-08T15:20:41.007Z
+                nextCursor: eyJsIjoiYWNjb3VudHMiLCJ1IjoiMDE5OWMzYTAifQ.5mQfZ3Vb2Xr0Lk8pT1nWcA
+        "400":
+          description: "Bad Request, as problem details. `/problems/malformed-request`:
+            The body is not parseable JSON or was cut short, a required header
+            such as `Idempotency-Key` is missing or malformed, or a pagination
+            cursor is invalid. `detail` names what is broken."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                malformed-request:
+                  summary: Malformed Request
+                  value:
+                    type: /problems/malformed-request
+                    title: Malformed Request
+                    status: 400
+                    detail: The request is malformed.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "401":
+          description: "Unauthorized, as problem details. `/problems/unauthenticated`: No
+            `Authorization: Bearer` token, or a token that fails verification:
+            signature, algorithm, issuer, audience, expiry or claims. Every case
+            gets the same body and `WWW-Authenticate` header."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            WWW-Authenticate:
+              $ref: "#/components/headers/WwwAuthenticate"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                unauthenticated:
+                  summary: Unauthenticated
+                  value:
+                    type: /problems/unauthenticated
+                    title: Unauthenticated
+                    status: 401
+                    detail: A valid bearer token is required.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "403":
+          description: "Forbidden, as problem details. `/problems/forbidden`: The caller’s
+            role is not permitted the operation, whatever ids the request
+            names."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                forbidden:
+                  summary: Forbidden
+                  value:
+                    type: /problems/forbidden
+                    title: Forbidden
+                    status: 403
+                    detail: Your role is not permitted this operation.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "422":
+          description: "Unprocessable Entity, as problem details.
+            `/problems/validation-error`: The request parses, but a body member
+            or query parameter is missing, unknown or malformed, including
+            amount and currency. `errors` has one entry per field."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                validation-error:
+                  summary: Validation Error
+                  value:
+                    type: /problems/validation-error
+                    title: Validation Error
+                    status: 422
+                    detail: The request content is not valid; see errors.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                    errors:
+                      - pointer: /amount
+                        detail: Must be a string of decimal digits.
+        "500":
+          description: "Internal Server Error, as problem details.
+            `/problems/internal-error`: A defect. The body never holds
+            internals; report the `requestId`."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                internal-error:
+                  summary: Internal Error
+                  value:
+                    type: /problems/internal-error
+                    title: Internal Error
+                    status: 500
+                    detail: The service failed to process the request.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "503":
+          description: "Service Unavailable, as problem details.
+            `/problems/service-unavailable`: A transient condition: an account
+            lock not acquired in time, a deadlock still present after 3
+            attempts, or a statement timeout. Retry after `Retry-After`, with
+            the same `Idempotency-Key` for a POST."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                service-unavailable:
+                  summary: Service Unavailable
+                  value:
+                    type: /problems/service-unavailable
+                    title: Service Unavailable
+                    status: 503
+                    detail: The service could not complete the request in time; retry later, with
+                      the same Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+      security:
+        - bearer: []
+  /v1/accounts/{id}:
+    get:
+      operationId: readAccount
+      summary: Read an account
+      tags:
+        - accounts
+      description: Details and cached balance, a string of decimal digits in minor
+        units. A customer reads their own accounts; an operator reads any
+        customer account and also sees `ownerId`. Another customer's account, a
+        system account, an unknown id and an id that is not a UUID all answer
+        the same 404 `/problems/not-found`.
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+          description: The account id, a UUID.
+          example: 0199c3a1-2f40-7a3b-8c1d-5e6f7a8b9c0d
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: The account with its cached balance in minor units; an operator
+            also sees `ownerId`.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$
+                      currency:
+                        type: string
+                        enum:
+                          - USD
+                          - MXN
+                          - EUR
+                          - COP
+                          - JPY
+                      status:
+                        type: string
+                        enum:
+                          - active
+                          - frozen
+                          - closed
+                      balance:
+                        type: string
+                        pattern: ^(0|[1-9][0-9]*)$
+                      createdAt:
+                        type: string
+                        pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+                      updatedAt:
+                        type: string
+                        pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+                      ownerId:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$
+                    required:
+                      - id
+                      - currency
+                      - status
+                      - balance
+                      - createdAt
+                      - updatedAt
+                      - ownerId
+                    additionalProperties: false
+                  - type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$
+                      currency:
+                        type: string
+                        enum:
+                          - USD
+                          - MXN
+                          - EUR
+                          - COP
+                          - JPY
+                      status:
+                        type: string
+                        enum:
+                          - active
+                          - frozen
+                          - closed
+                      balance:
+                        type: string
+                        pattern: ^(0|[1-9][0-9]*)$
+                      createdAt:
+                        type: string
+                        pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+                      updatedAt:
+                        type: string
+                        pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+                    required:
+                      - id
+                      - currency
+                      - status
+                      - balance
+                      - createdAt
+                      - updatedAt
+                    additionalProperties: false
+              example: *a2
+        "401":
+          description: "Unauthorized, as problem details. `/problems/unauthenticated`: No
+            `Authorization: Bearer` token, or a token that fails verification:
+            signature, algorithm, issuer, audience, expiry or claims. Every case
+            gets the same body and `WWW-Authenticate` header."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            WWW-Authenticate:
+              $ref: "#/components/headers/WwwAuthenticate"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                unauthenticated:
+                  summary: Unauthenticated
+                  value:
+                    type: /problems/unauthenticated
+                    title: Unauthenticated
+                    status: 401
+                    detail: A valid bearer token is required.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "404":
+          description: "Not Found, as problem details. `/problems/not-found`: The path is
+            not a route, or the account or transaction does not exist, belongs
+            to another customer, is a system account, or its id is not a UUID.
+            One body for every case."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                not-found:
+                  summary: Not Found
+                  value:
+                    type: /problems/not-found
+                    title: Not Found
+                    status: 404
+                    detail: The requested resource does not exist.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "422":
+          description: "Unprocessable Entity, as problem details.
+            `/problems/validation-error`: The request parses, but a body member
+            or query parameter is missing, unknown or malformed, including
+            amount and currency. `errors` has one entry per field."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                validation-error:
+                  summary: Validation Error
+                  value:
+                    type: /problems/validation-error
+                    title: Validation Error
+                    status: 422
+                    detail: The request content is not valid; see errors.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                    errors:
+                      - pointer: /amount
+                        detail: Must be a string of decimal digits.
+        "500":
+          description: "Internal Server Error, as problem details.
+            `/problems/internal-error`: A defect. The body never holds
+            internals; report the `requestId`."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                internal-error:
+                  summary: Internal Error
+                  value:
+                    type: /problems/internal-error
+                    title: Internal Error
+                    status: 500
+                    detail: The service failed to process the request.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "503":
+          description: "Service Unavailable, as problem details.
+            `/problems/service-unavailable`: A transient condition: an account
+            lock not acquired in time, a deadlock still present after 3
+            attempts, or a statement timeout. Retry after `Retry-After`, with
+            the same `Idempotency-Key` for a POST."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                service-unavailable:
+                  summary: Service Unavailable
+                  value:
+                    type: /problems/service-unavailable
+                    title: Service Unavailable
+                    status: 503
+                    detail: The service could not complete the request in time; retry later, with
+                      the same Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+      security:
+        - bearer: []
+  /v1/accounts/{id}/entries:
+    get:
+      operationId: listAccountEntries
+      summary: List an account's history
+      tags:
+        - accounts
+      description: "The account's ledger entries, each with a signed amount in minor
+        units (\"5000\" adds to the balance, \"-1200\" subtracts), without
+        counterparty or running balance. A customer lists their own accounts; an
+        operator any customer account. Newest first by (`createdAt`, `id`), one
+        page as `{\"items\": [...], \"nextCursor\": \"...\"}`; `nextCursor` is
+        absent on the last page. `limit` is an integer from 1 to 100, 20 when
+        absent; any other value answers 422 `/problems/validation-error`. Pass
+        `nextCursor` back as `cursor` for the next page: it is opaque, signed by
+        the service, valid on every replica, and only for the same list and
+        user; an altered or foreign cursor answers 400
+        `/problems/malformed-request`."
+      parameters:
+        - schema:
+            type: string
+            pattern: ^[1-9][0-9]*$
+          in: query
+          name: limit
+          required: false
+          description: The page size, an integer from 1 to 100; 20 when absent.
+          example: "20"
+        - schema:
+            type: string
+          in: query
+          name: cursor
+          required: false
+          description: The `nextCursor` of the previous page of the same list, as given;
+            absent for the first page.
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+          description: The account id, a UUID.
+          example: 0199c3a1-2f40-7a3b-8c1d-5e6f7a8b9c0d
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: One page of the account’s ledger entries, newest first.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$
+                        transactionId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$
+                        kind:
+                          type: string
+                          enum:
+                            - deposit
+                            - withdrawal
+                            - transfer
+                            - reversal
+                        amount:
+                          type: string
+                          pattern: ^-?[1-9][0-9]*$
+                          description: 'The signed amount of the entry in minor units, as a string of
+                            decimal digits: "5000" added to the balance, "-1200"
+                            subtracted from it.'
+                        currency:
+                          type: string
+                          enum:
+                            - USD
+                            - MXN
+                            - EUR
+                            - COP
+                            - JPY
+                        createdAt:
+                          type: string
+                          pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+                      required:
+                        - id
+                        - transactionId
+                        - kind
+                        - amount
+                        - currency
+                        - createdAt
+                      additionalProperties: false
+                  nextCursor:
+                    type: string
+                required:
+                  - items
+                additionalProperties: false
+              example:
+                items:
+                  - id: 0199c3a2-0b61-7e6f-8a41-8c9d0e1f2a3b
+                    transactionId: 0199c3a2-0b60-7d5e-9f30-7b8c9d0e1f2a
+                    kind: withdrawal
+                    amount: "-1200"
+                    currency: EUR
+                    createdAt: 2026-10-08T15:20:41.007Z
+                nextCursor: eyJsIjoiYWNjb3VudHMiLCJ1IjoiMDE5OWMzYTAifQ.5mQfZ3Vb2Xr0Lk8pT1nWcA
+        "400":
+          description: "Bad Request, as problem details. `/problems/malformed-request`:
+            The body is not parseable JSON or was cut short, a required header
+            such as `Idempotency-Key` is missing or malformed, or a pagination
+            cursor is invalid. `detail` names what is broken."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                malformed-request:
+                  summary: Malformed Request
+                  value:
+                    type: /problems/malformed-request
+                    title: Malformed Request
+                    status: 400
+                    detail: The request is malformed.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "401":
+          description: "Unauthorized, as problem details. `/problems/unauthenticated`: No
+            `Authorization: Bearer` token, or a token that fails verification:
+            signature, algorithm, issuer, audience, expiry or claims. Every case
+            gets the same body and `WWW-Authenticate` header."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            WWW-Authenticate:
+              $ref: "#/components/headers/WwwAuthenticate"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                unauthenticated:
+                  summary: Unauthenticated
+                  value:
+                    type: /problems/unauthenticated
+                    title: Unauthenticated
+                    status: 401
+                    detail: A valid bearer token is required.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "404":
+          description: "Not Found, as problem details. `/problems/not-found`: The path is
+            not a route, or the account or transaction does not exist, belongs
+            to another customer, is a system account, or its id is not a UUID.
+            One body for every case."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                not-found:
+                  summary: Not Found
+                  value:
+                    type: /problems/not-found
+                    title: Not Found
+                    status: 404
+                    detail: The requested resource does not exist.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "422":
+          description: "Unprocessable Entity, as problem details.
+            `/problems/validation-error`: The request parses, but a body member
+            or query parameter is missing, unknown or malformed, including
+            amount and currency. `errors` has one entry per field."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                validation-error:
+                  summary: Validation Error
+                  value:
+                    type: /problems/validation-error
+                    title: Validation Error
+                    status: 422
+                    detail: The request content is not valid; see errors.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                    errors:
+                      - pointer: /amount
+                        detail: Must be a string of decimal digits.
+        "500":
+          description: "Internal Server Error, as problem details.
+            `/problems/internal-error`: A defect. The body never holds
+            internals; report the `requestId`."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                internal-error:
+                  summary: Internal Error
+                  value:
+                    type: /problems/internal-error
+                    title: Internal Error
+                    status: 500
+                    detail: The service failed to process the request.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "503":
+          description: "Service Unavailable, as problem details.
+            `/problems/service-unavailable`: A transient condition: an account
+            lock not acquired in time, a deadlock still present after 3
+            attempts, or a statement timeout. Retry after `Retry-After`, with
+            the same `Idempotency-Key` for a POST."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                service-unavailable:
+                  summary: Service Unavailable
+                  value:
+                    type: /problems/service-unavailable
+                    title: Service Unavailable
+                    status: 503
+                    detail: The service could not complete the request in time; retry later, with
+                      the same Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+      security:
+        - bearer: []
+  /v1/accounts/{id}/freeze:
+    post:
+      operationId: freezeAccount
+      summary: Freeze an account
+      tags:
+        - account status
+      description: 'Blocks deposits, withdrawals and transfers on either side;
+        reversals stay allowed. Lifecycle: `active` → `frozen` (freeze),
+        `frozen` → `active` (unfreeze), `active` or `frozen` → `closed` (close,
+        only with balance "0"); `closed` is final. Asking for the status the
+        account already has answers 200 with the account unchanged; a change
+        outside the lifecycle answers 409 `/problems/invalid-status-transition`;
+        closing an account whose balance is not "0" answers 409
+        `/problems/account-balance-not-zero`. Takes no `Idempotency-Key`; one
+        sent is ignored. Operators only; a customer gets 403. A system account,
+        an unknown id or an id that is not a UUID answers 404. The account row
+        lock is waited for at most `ACCOUNT_LOCK_TIMEOUT_MS`, then 503
+        `/problems/service-unavailable` with `Retry-After: 1`.'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              anyOf:
+                - type: object
+                  properties: {}
+                  additionalProperties: false
+                - type: "null"
+            example: &a3 {}
+        description: No body, or an empty JSON object.
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+          description: The account id, a UUID.
+          example: 0199c3a1-2f40-7a3b-8c1d-5e6f7a8b9c0d
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: The account, now `frozen`, with its `ownerId`.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$
+                  currency:
+                    type: string
+                    enum:
+                      - USD
+                      - MXN
+                      - EUR
+                      - COP
+                      - JPY
+                  status:
+                    type: string
+                    enum:
+                      - active
+                      - frozen
+                      - closed
+                  balance:
+                    type: string
+                    pattern: ^(0|[1-9][0-9]*)$
+                  createdAt:
+                    type: string
+                    pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+                  updatedAt:
+                    type: string
+                    pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+                  ownerId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$
+                required:
+                  - id
+                  - currency
+                  - status
+                  - balance
+                  - createdAt
+                  - updatedAt
+                  - ownerId
+                additionalProperties: false
+              example:
+                id: 0199c3a1-2f40-7a3b-8c1d-5e6f7a8b9c0d
+                currency: EUR
+                status: frozen
+                balance: "1050"
+                createdAt: 2026-10-08T14:03:00.123Z
+                updatedAt: 2026-10-08T15:20:41.007Z
+                ownerId: 0199c3a0-1e30-7b2a-9c0d-4e5f6a7b8c9d
+        "400":
+          description: "Bad Request, as problem details. `/problems/malformed-request`:
+            The body is not parseable JSON or was cut short, a required header
+            such as `Idempotency-Key` is missing or malformed, or a pagination
+            cursor is invalid. `detail` names what is broken."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                malformed-request:
+                  summary: Malformed Request
+                  value:
+                    type: /problems/malformed-request
+                    title: Malformed Request
+                    status: 400
+                    detail: The request is malformed.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "401":
+          description: "Unauthorized, as problem details. `/problems/unauthenticated`: No
+            `Authorization: Bearer` token, or a token that fails verification:
+            signature, algorithm, issuer, audience, expiry or claims. Every case
+            gets the same body and `WWW-Authenticate` header."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            WWW-Authenticate:
+              $ref: "#/components/headers/WwwAuthenticate"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                unauthenticated:
+                  summary: Unauthenticated
+                  value:
+                    type: /problems/unauthenticated
+                    title: Unauthenticated
+                    status: 401
+                    detail: A valid bearer token is required.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "403":
+          description: "Forbidden, as problem details. `/problems/forbidden`: The caller’s
+            role is not permitted the operation, whatever ids the request
+            names."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                forbidden:
+                  summary: Forbidden
+                  value:
+                    type: /problems/forbidden
+                    title: Forbidden
+                    status: 403
+                    detail: Your role is not permitted this operation.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "404":
+          description: "Not Found, as problem details. `/problems/not-found`: The path is
+            not a route, or the account or transaction does not exist, belongs
+            to another customer, is a system account, or its id is not a UUID.
+            One body for every case."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                not-found:
+                  summary: Not Found
+                  value:
+                    type: /problems/not-found
+                    title: Not Found
+                    status: 404
+                    detail: The requested resource does not exist.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "409":
+          description: "Conflict, as problem details.
+            `/problems/invalid-status-transition`: The status change is not in
+            the lifecycle: freezing or unfreezing a closed account."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                invalid-status-transition:
+                  summary: Invalid Status Transition
+                  value:
+                    type: /problems/invalid-status-transition
+                    title: Invalid Status Transition
+                    status: 409
+                    detail: The account status does not allow this change.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "422":
+          description: "Unprocessable Entity, as problem details.
+            `/problems/validation-error`: The request parses, but a body member
+            or query parameter is missing, unknown or malformed, including
+            amount and currency. `errors` has one entry per field."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                validation-error:
+                  summary: Validation Error
+                  value:
+                    type: /problems/validation-error
+                    title: Validation Error
+                    status: 422
+                    detail: The request content is not valid; see errors.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                    errors:
+                      - pointer: /amount
+                        detail: Must be a string of decimal digits.
+        "500":
+          description: "Internal Server Error, as problem details.
+            `/problems/internal-error`: A defect. The body never holds
+            internals; report the `requestId`."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                internal-error:
+                  summary: Internal Error
+                  value:
+                    type: /problems/internal-error
+                    title: Internal Error
+                    status: 500
+                    detail: The service failed to process the request.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "503":
+          description: "Service Unavailable, as problem details.
+            `/problems/service-unavailable`: A transient condition: an account
+            lock not acquired in time, a deadlock still present after 3
+            attempts, or a statement timeout. Retry after `Retry-After`, with
+            the same `Idempotency-Key` for a POST."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                service-unavailable:
+                  summary: Service Unavailable
+                  value:
+                    type: /problems/service-unavailable
+                    title: Service Unavailable
+                    status: 503
+                    detail: The service could not complete the request in time; retry later, with
+                      the same Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+      security:
+        - bearer: []
+  /v1/accounts/{id}/unfreeze:
+    post:
+      operationId: unfreezeAccount
+      summary: Unfreeze an account
+      tags:
+        - account status
+      description: 'Makes a frozen account active again. Lifecycle: `active` →
+        `frozen` (freeze), `frozen` → `active` (unfreeze), `active` or `frozen`
+        → `closed` (close, only with balance "0"); `closed` is final. Asking for
+        the status the account already has answers 200 with the account
+        unchanged; a change outside the lifecycle answers 409
+        `/problems/invalid-status-transition`; closing an account whose balance
+        is not "0" answers 409 `/problems/account-balance-not-zero`. Takes no
+        `Idempotency-Key`; one sent is ignored. Operators only; a customer gets
+        403. A system account, an unknown id or an id that is not a UUID answers
+        404. The account row lock is waited for at most
+        `ACCOUNT_LOCK_TIMEOUT_MS`, then 503 `/problems/service-unavailable` with
+        `Retry-After: 1`.'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              anyOf:
+                - type: object
+                  properties: {}
+                  additionalProperties: false
+                - type: "null"
+            example: *a3
+        description: No body, or an empty JSON object.
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+          description: The account id, a UUID.
+          example: 0199c3a1-2f40-7a3b-8c1d-5e6f7a8b9c0d
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: The account, now `active`, with its `ownerId`.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$
+                  currency:
+                    type: string
+                    enum:
+                      - USD
+                      - MXN
+                      - EUR
+                      - COP
+                      - JPY
+                  status:
+                    type: string
+                    enum:
+                      - active
+                      - frozen
+                      - closed
+                  balance:
+                    type: string
+                    pattern: ^(0|[1-9][0-9]*)$
+                  createdAt:
+                    type: string
+                    pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+                  updatedAt:
+                    type: string
+                    pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+                  ownerId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$
+                required:
+                  - id
+                  - currency
+                  - status
+                  - balance
+                  - createdAt
+                  - updatedAt
+                  - ownerId
+                additionalProperties: false
+              example:
+                id: 0199c3a1-2f40-7a3b-8c1d-5e6f7a8b9c0d
+                currency: EUR
+                status: active
+                balance: "1050"
+                createdAt: 2026-10-08T14:03:00.123Z
+                updatedAt: 2026-10-08T15:20:41.007Z
+                ownerId: 0199c3a0-1e30-7b2a-9c0d-4e5f6a7b8c9d
+        "400":
+          description: "Bad Request, as problem details. `/problems/malformed-request`:
+            The body is not parseable JSON or was cut short, a required header
+            such as `Idempotency-Key` is missing or malformed, or a pagination
+            cursor is invalid. `detail` names what is broken."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                malformed-request:
+                  summary: Malformed Request
+                  value:
+                    type: /problems/malformed-request
+                    title: Malformed Request
+                    status: 400
+                    detail: The request is malformed.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "401":
+          description: "Unauthorized, as problem details. `/problems/unauthenticated`: No
+            `Authorization: Bearer` token, or a token that fails verification:
+            signature, algorithm, issuer, audience, expiry or claims. Every case
+            gets the same body and `WWW-Authenticate` header."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            WWW-Authenticate:
+              $ref: "#/components/headers/WwwAuthenticate"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                unauthenticated:
+                  summary: Unauthenticated
+                  value:
+                    type: /problems/unauthenticated
+                    title: Unauthenticated
+                    status: 401
+                    detail: A valid bearer token is required.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "403":
+          description: "Forbidden, as problem details. `/problems/forbidden`: The caller’s
+            role is not permitted the operation, whatever ids the request
+            names."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                forbidden:
+                  summary: Forbidden
+                  value:
+                    type: /problems/forbidden
+                    title: Forbidden
+                    status: 403
+                    detail: Your role is not permitted this operation.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "404":
+          description: "Not Found, as problem details. `/problems/not-found`: The path is
+            not a route, or the account or transaction does not exist, belongs
+            to another customer, is a system account, or its id is not a UUID.
+            One body for every case."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                not-found:
+                  summary: Not Found
+                  value:
+                    type: /problems/not-found
+                    title: Not Found
+                    status: 404
+                    detail: The requested resource does not exist.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "409":
+          description: "Conflict, as problem details.
+            `/problems/invalid-status-transition`: The status change is not in
+            the lifecycle: freezing or unfreezing a closed account."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                invalid-status-transition:
+                  summary: Invalid Status Transition
+                  value:
+                    type: /problems/invalid-status-transition
+                    title: Invalid Status Transition
+                    status: 409
+                    detail: The account status does not allow this change.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "422":
+          description: "Unprocessable Entity, as problem details.
+            `/problems/validation-error`: The request parses, but a body member
+            or query parameter is missing, unknown or malformed, including
+            amount and currency. `errors` has one entry per field."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                validation-error:
+                  summary: Validation Error
+                  value:
+                    type: /problems/validation-error
+                    title: Validation Error
+                    status: 422
+                    detail: The request content is not valid; see errors.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                    errors:
+                      - pointer: /amount
+                        detail: Must be a string of decimal digits.
+        "500":
+          description: "Internal Server Error, as problem details.
+            `/problems/internal-error`: A defect. The body never holds
+            internals; report the `requestId`."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                internal-error:
+                  summary: Internal Error
+                  value:
+                    type: /problems/internal-error
+                    title: Internal Error
+                    status: 500
+                    detail: The service failed to process the request.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "503":
+          description: "Service Unavailable, as problem details.
+            `/problems/service-unavailable`: A transient condition: an account
+            lock not acquired in time, a deadlock still present after 3
+            attempts, or a statement timeout. Retry after `Retry-After`, with
+            the same `Idempotency-Key` for a POST."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                service-unavailable:
+                  summary: Service Unavailable
+                  value:
+                    type: /problems/service-unavailable
+                    title: Service Unavailable
+                    status: 503
+                    detail: The service could not complete the request in time; retry later, with
+                      the same Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+      security:
+        - bearer: []
+  /v1/accounts/{id}/close:
+    post:
+      operationId: closeAccount
+      summary: Close an account
+      tags:
+        - account status
+      description: 'Closes an account whose balance is "0"; it stays readable.
+        Lifecycle: `active` → `frozen` (freeze), `frozen` → `active` (unfreeze),
+        `active` or `frozen` → `closed` (close, only with balance "0"); `closed`
+        is final. Asking for the status the account already has answers 200 with
+        the account unchanged; a change outside the lifecycle answers 409
+        `/problems/invalid-status-transition`; closing an account whose balance
+        is not "0" answers 409 `/problems/account-balance-not-zero`. Takes no
+        `Idempotency-Key`; one sent is ignored. Operators only; a customer gets
+        403. A system account, an unknown id or an id that is not a UUID answers
+        404. The account row lock is waited for at most
+        `ACCOUNT_LOCK_TIMEOUT_MS`, then 503 `/problems/service-unavailable` with
+        `Retry-After: 1`.'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              anyOf:
+                - type: object
+                  properties: {}
+                  additionalProperties: false
+                - type: "null"
+            example: *a3
+        description: No body, or an empty JSON object.
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+          description: The account id, a UUID.
+          example: 0199c3a1-2f40-7a3b-8c1d-5e6f7a8b9c0d
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: The account, now `closed`, with its `ownerId`.
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$
+                  currency:
+                    type: string
+                    enum:
+                      - USD
+                      - MXN
+                      - EUR
+                      - COP
+                      - JPY
+                  status:
+                    type: string
+                    enum:
+                      - active
+                      - frozen
+                      - closed
+                  balance:
+                    type: string
+                    pattern: ^(0|[1-9][0-9]*)$
+                  createdAt:
+                    type: string
+                    pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+                  updatedAt:
+                    type: string
+                    pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+                  ownerId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$
+                required:
+                  - id
+                  - currency
+                  - status
+                  - balance
+                  - createdAt
+                  - updatedAt
+                  - ownerId
+                additionalProperties: false
+              example:
+                id: 0199c3a1-2f40-7a3b-8c1d-5e6f7a8b9c0d
+                currency: EUR
+                status: closed
+                balance: "0"
+                createdAt: 2026-10-08T14:03:00.123Z
+                updatedAt: 2026-10-08T15:20:41.007Z
+                ownerId: 0199c3a0-1e30-7b2a-9c0d-4e5f6a7b8c9d
+        "400":
+          description: "Bad Request, as problem details. `/problems/malformed-request`:
+            The body is not parseable JSON or was cut short, a required header
+            such as `Idempotency-Key` is missing or malformed, or a pagination
+            cursor is invalid. `detail` names what is broken."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                malformed-request:
+                  summary: Malformed Request
+                  value:
+                    type: /problems/malformed-request
+                    title: Malformed Request
+                    status: 400
+                    detail: The request is malformed.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "401":
+          description: "Unauthorized, as problem details. `/problems/unauthenticated`: No
+            `Authorization: Bearer` token, or a token that fails verification:
+            signature, algorithm, issuer, audience, expiry or claims. Every case
+            gets the same body and `WWW-Authenticate` header."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            WWW-Authenticate:
+              $ref: "#/components/headers/WwwAuthenticate"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                unauthenticated:
+                  summary: Unauthenticated
+                  value:
+                    type: /problems/unauthenticated
+                    title: Unauthenticated
+                    status: 401
+                    detail: A valid bearer token is required.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "403":
+          description: "Forbidden, as problem details. `/problems/forbidden`: The caller’s
+            role is not permitted the operation, whatever ids the request
+            names."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                forbidden:
+                  summary: Forbidden
+                  value:
+                    type: /problems/forbidden
+                    title: Forbidden
+                    status: 403
+                    detail: Your role is not permitted this operation.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "404":
+          description: "Not Found, as problem details. `/problems/not-found`: The path is
+            not a route, or the account or transaction does not exist, belongs
+            to another customer, is a system account, or its id is not a UUID.
+            One body for every case."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                not-found:
+                  summary: Not Found
+                  value:
+                    type: /problems/not-found
+                    title: Not Found
+                    status: 404
+                    detail: The requested resource does not exist.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "409":
+          description: 'Conflict, as problem details.
+            `/problems/account-balance-not-zero`: Closing an account whose
+            balance is not "0".'
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                account-balance-not-zero:
+                  summary: Account Balance Not Zero
+                  value:
+                    type: /problems/account-balance-not-zero
+                    title: Account Balance Not Zero
+                    status: 409
+                    detail: Only an account with a balance of 0 can be closed.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "422":
+          description: "Unprocessable Entity, as problem details.
+            `/problems/validation-error`: The request parses, but a body member
+            or query parameter is missing, unknown or malformed, including
+            amount and currency. `errors` has one entry per field."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                validation-error:
+                  summary: Validation Error
+                  value:
+                    type: /problems/validation-error
+                    title: Validation Error
+                    status: 422
+                    detail: The request content is not valid; see errors.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                    errors:
+                      - pointer: /amount
+                        detail: Must be a string of decimal digits.
+        "500":
+          description: "Internal Server Error, as problem details.
+            `/problems/internal-error`: A defect. The body never holds
+            internals; report the `requestId`."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                internal-error:
+                  summary: Internal Error
+                  value:
+                    type: /problems/internal-error
+                    title: Internal Error
+                    status: 500
+                    detail: The service failed to process the request.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "503":
+          description: "Service Unavailable, as problem details.
+            `/problems/service-unavailable`: A transient condition: an account
+            lock not acquired in time, a deadlock still present after 3
+            attempts, or a statement timeout. Retry after `Retry-After`, with
+            the same `Idempotency-Key` for a POST."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                service-unavailable:
+                  summary: Service Unavailable
+                  value:
+                    type: /problems/service-unavailable
+                    title: Service Unavailable
+                    status: 503
+                    detail: The service could not complete the request in time; retry later, with
+                      the same Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+      security:
+        - bearer: []
+  /v1/accounts/{id}/deposits:
+    post:
+      operationId: deposit
+      summary: Deposit
+      tags:
+        - movements
+      description: "Operators only: simulates money arriving from a payment rail into
+        any customer account, credited to the account and debited to the
+        currency's settlement account. The response has no balance. The currency
+        must be the account's (422 `/problems/currency-mismatch`); a frozen or
+        closed account answers 422 `/problems/account-not-active`. Another
+        customer's account, a system account, an unknown id and an id that is
+        not a UUID answer 404. A balance that would pass the maximum answers 422
+        `/problems/balance-limit-exceeded`. Requires an `Idempotency-Key` header
+        of 1 to 255 visible ASCII characters, fresh for each new request; a
+        missing or malformed one answers 400 `/problems/malformed-request`. A
+        repeat with the same key and body answers the stored response with
+        `Idempotent-Replayed: true`; the same key with another body answers 422
+        `/problems/idempotency-key-reused`; while the first request is still
+        running, 409 `/problems/request-in-progress`. Answers 201 with
+        `Location: /v1/transactions/{id}`. A lock or retry that runs out answers
+        503 `/problems/service-unavailable` with `Retry-After: 1`; retry with
+        the same key."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount:
+                  description: "A positive amount in minor units of the currency (cents for EUR,
+                    whole yen for JPY), as a string of decimal digits without
+                    sign, leading zero, separator or exponent: \"1050\" is 10.50
+                    EUR. At most 100000000000, the service's MAX_AMOUNT_MINOR; a
+                    larger amount answers 422."
+                  type: string
+                currency:
+                  type: string
+                  enum:
+                    - USD
+                    - MXN
+                    - EUR
+                    - COP
+                    - JPY
+              required:
+                - amount
+                - currency
+              additionalProperties: false
+            example:
+              amount: "1050"
+              currency: EUR
+        description: The amount in minor units of the currency, and the account’s currency.
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+          description: The account id, a UUID.
+          example: 0199c3a1-2f40-7a3b-8c1d-5e6f7a8b9c0d
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "201":
+          description: "The deposit transaction, without a balance; `Location` is its
+            path. A replay carries `Idempotent-Replayed: true`."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Location:
+              description: The path of the created resource, under `/v1`.
+              schema:
+                type: string
+              example: /v1/transactions/0199c3a2-0b60-7d5e-9f30-7b8c9d0e1f2a
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$
+                  kind:
+                    type: string
+                    enum:
+                      - deposit
+                  amount:
+                    type: string
+                    pattern: ^[1-9][0-9]*$
+                  currency:
+                    type: string
+                    enum:
+                      - USD
+                      - MXN
+                      - EUR
+                      - COP
+                      - JPY
+                  createdAt:
+                    type: string
+                    pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+                required:
+                  - id
+                  - kind
+                  - amount
+                  - currency
+                  - createdAt
+                additionalProperties: false
+              example:
+                id: 0199c3a2-0b60-7d5e-9f30-7b8c9d0e1f2a
+                amount: "1050"
+                currency: EUR
+                createdAt: 2026-10-08T14:03:00.123Z
+                kind: deposit
+        "400":
+          description: "Bad Request, as problem details. `/problems/malformed-request`:
+            The body is not parseable JSON or was cut short, a required header
+            such as `Idempotency-Key` is missing or malformed, or a pagination
+            cursor is invalid. `detail` names what is broken."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                malformed-request:
+                  summary: Malformed Request
+                  value:
+                    type: /problems/malformed-request
+                    title: Malformed Request
+                    status: 400
+                    detail: The request is malformed.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "401":
+          description: "Unauthorized, as problem details. `/problems/unauthenticated`: No
+            `Authorization: Bearer` token, or a token that fails verification:
+            signature, algorithm, issuer, audience, expiry or claims. Every case
+            gets the same body and `WWW-Authenticate` header."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            WWW-Authenticate:
+              $ref: "#/components/headers/WwwAuthenticate"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                unauthenticated:
+                  summary: Unauthenticated
+                  value:
+                    type: /problems/unauthenticated
+                    title: Unauthenticated
+                    status: 401
+                    detail: A valid bearer token is required.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "403":
+          description: "Forbidden, as problem details. `/problems/forbidden`: The caller’s
+            role is not permitted the operation, whatever ids the request
+            names."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                forbidden:
+                  summary: Forbidden
+                  value:
+                    type: /problems/forbidden
+                    title: Forbidden
+                    status: 403
+                    detail: Your role is not permitted this operation.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "404":
+          description: "Not Found, as problem details. `/problems/not-found`: The path is
+            not a route, or the account or transaction does not exist, belongs
+            to another customer, is a system account, or its id is not a UUID.
+            One body for every case."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                not-found:
+                  summary: Not Found
+                  value:
+                    type: /problems/not-found
+                    title: Not Found
+                    status: 404
+                    detail: The requested resource does not exist.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "409":
+          description: "Conflict, as problem details. `/problems/request-in-progress`:
+            Another request with the same `Idempotency-Key` is still running
+            after `IDEMPOTENCY_WAIT_TIMEOUT_MS`. Retry with the same key after
+            `Retry-After`."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                request-in-progress:
+                  summary: Request In Progress
+                  value:
+                    type: /problems/request-in-progress
+                    title: Request In Progress
+                    status: 409
+                    detail: A request with this Idempotency-Key is still in progress; retry with the
+                      same key.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "422":
+          description: "Unprocessable Entity, as problem details.
+            `/problems/idempotency-key-reused`: The `Idempotency-Key` was
+            already used by the same user for a request with another method,
+            path or body. Not stored: use a new key for a new request.
+            `/problems/currency-mismatch`: The request currency differs from the
+            account’s, or a transfer to one of the caller’s own accounts in
+            another currency. `/problems/account-not-active`: One of the
+            caller's own accounts that the movement debits or credits is frozen
+            or closed (another customer's frozen or closed destination answers
+            `/problems/destination-unavailable`); a reversal is refused only on
+            a closed account. `/problems/balance-limit-exceeded`: A deposit or
+            reversal would make a cached balance exceed 9223372036854775807.
+            `/problems/validation-error`: The request parses, but a body member
+            or query parameter is missing, unknown or malformed, including
+            amount and currency. `errors` has one entry per field."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                idempotency-key-reused:
+                  summary: Idempotency Key Reused
+                  value:
+                    type: /problems/idempotency-key-reused
+                    title: Idempotency Key Reused
+                    status: 422
+                    detail: This Idempotency-Key was already used for a different request.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                currency-mismatch:
+                  summary: Currency Mismatch
+                  value:
+                    type: /problems/currency-mismatch
+                    title: Currency Mismatch
+                    status: 422
+                    detail: The currency does not match the account's currency.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                account-not-active:
+                  summary: Account Not Active
+                  value:
+                    type: /problems/account-not-active
+                    title: Account Not Active
+                    status: 422
+                    detail: The account is frozen or closed.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                balance-limit-exceeded:
+                  summary: Balance Limit Exceeded
+                  value:
+                    type: /problems/balance-limit-exceeded
+                    title: Balance Limit Exceeded
+                    status: 422
+                    detail: The movement would take a balance above its limit.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                validation-error:
+                  summary: Validation Error
+                  value:
+                    type: /problems/validation-error
+                    title: Validation Error
+                    status: 422
+                    detail: The request content is not valid; see errors.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                    errors:
+                      - pointer: /amount
+                        detail: Must be a string of decimal digits.
+        "500":
+          description: "Internal Server Error, as problem details.
+            `/problems/internal-error`: A defect. The body never holds
+            internals; report the `requestId`."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                internal-error:
+                  summary: Internal Error
+                  value:
+                    type: /problems/internal-error
+                    title: Internal Error
+                    status: 500
+                    detail: The service failed to process the request.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "503":
+          description: "Service Unavailable, as problem details.
+            `/problems/service-unavailable`: A transient condition: an account
+            lock not acquired in time, a deadlock still present after 3
+            attempts, or a statement timeout. Retry after `Retry-After`, with
+            the same `Idempotency-Key` for a POST."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                service-unavailable:
+                  summary: Service Unavailable
+                  value:
+                    type: /problems/service-unavailable
+                    title: Service Unavailable
+                    status: 503
+                    detail: The service could not complete the request in time; retry later, with
+                      the same Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+      security:
+        - bearer: []
+  /v1/accounts/{id}/withdrawals:
+    post:
+      operationId: withdraw
+      summary: Withdraw
+      tags:
+        - movements
+      description: "Customers only, from their own accounts: debits the account, never
+        below \"0\" (422 `/problems/insufficient-funds`). The response carries
+        the account's new balance. The currency must be the account's (422
+        `/problems/currency-mismatch`); a frozen or closed account answers 422
+        `/problems/account-not-active`. Another customer's account, a system
+        account, an unknown id and an id that is not a UUID answer 404. Requires
+        an `Idempotency-Key` header of 1 to 255 visible ASCII characters, fresh
+        for each new request; a missing or malformed one answers 400
+        `/problems/malformed-request`. A repeat with the same key and body
+        answers the stored response with `Idempotent-Replayed: true`; the same
+        key with another body answers 422 `/problems/idempotency-key-reused`;
+        while the first request is still running, 409
+        `/problems/request-in-progress`. Answers 201 with `Location:
+        /v1/transactions/{id}`. A lock or retry that runs out answers 503
+        `/problems/service-unavailable` with `Retry-After: 1`; retry with the
+        same key."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount:
+                  description: "A positive amount in minor units of the currency (cents for EUR,
+                    whole yen for JPY), as a string of decimal digits without
+                    sign, leading zero, separator or exponent: \"1050\" is 10.50
+                    EUR. At most 100000000000, the service's MAX_AMOUNT_MINOR; a
+                    larger amount answers 422."
+                  type: string
+                currency:
+                  type: string
+                  enum:
+                    - USD
+                    - MXN
+                    - EUR
+                    - COP
+                    - JPY
+              required:
+                - amount
+                - currency
+              additionalProperties: false
+            example:
+              amount: "1050"
+              currency: EUR
+        description: The amount in minor units of the currency, and the account’s currency.
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+          description: The account id, a UUID.
+          example: 0199c3a1-2f40-7a3b-8c1d-5e6f7a8b9c0d
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "201":
+          description: "The withdrawal transaction and the account’s new balance;
+            `Location` is its path. A replay carries `Idempotent-Replayed:
+            true`."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Location:
+              description: The path of the created resource, under `/v1`.
+              schema:
+                type: string
+              example: /v1/transactions/0199c3a2-0b60-7d5e-9f30-7b8c9d0e1f2a
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$
+                  kind:
+                    type: string
+                    enum:
+                      - withdrawal
+                      - transfer
+                  amount:
+                    type: string
+                    pattern: ^[1-9][0-9]*$
+                  currency:
+                    type: string
+                    enum:
+                      - USD
+                      - MXN
+                      - EUR
+                      - COP
+                      - JPY
+                  createdAt:
+                    type: string
+                    pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+                  accountId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$
+                  balance:
+                    type: string
+                    pattern: ^(0|[1-9][0-9]*)$
+                required:
+                  - id
+                  - kind
+                  - amount
+                  - currency
+                  - createdAt
+                  - accountId
+                  - balance
+                additionalProperties: false
+              example:
+                id: 0199c3a2-0b60-7d5e-9f30-7b8c9d0e1f2a
+                amount: "1050"
+                currency: EUR
+                createdAt: 2026-10-08T14:03:00.123Z
+                kind: withdrawal
+                accountId: 0199c3a1-2f40-7a3b-8c1d-5e6f7a8b9c0d
+                balance: "3950"
+        "400":
+          description: "Bad Request, as problem details. `/problems/malformed-request`:
+            The body is not parseable JSON or was cut short, a required header
+            such as `Idempotency-Key` is missing or malformed, or a pagination
+            cursor is invalid. `detail` names what is broken."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                malformed-request:
+                  summary: Malformed Request
+                  value:
+                    type: /problems/malformed-request
+                    title: Malformed Request
+                    status: 400
+                    detail: The request is malformed.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "401":
+          description: "Unauthorized, as problem details. `/problems/unauthenticated`: No
+            `Authorization: Bearer` token, or a token that fails verification:
+            signature, algorithm, issuer, audience, expiry or claims. Every case
+            gets the same body and `WWW-Authenticate` header."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            WWW-Authenticate:
+              $ref: "#/components/headers/WwwAuthenticate"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                unauthenticated:
+                  summary: Unauthenticated
+                  value:
+                    type: /problems/unauthenticated
+                    title: Unauthenticated
+                    status: 401
+                    detail: A valid bearer token is required.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "403":
+          description: "Forbidden, as problem details. `/problems/forbidden`: The caller’s
+            role is not permitted the operation, whatever ids the request
+            names."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                forbidden:
+                  summary: Forbidden
+                  value:
+                    type: /problems/forbidden
+                    title: Forbidden
+                    status: 403
+                    detail: Your role is not permitted this operation.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "404":
+          description: "Not Found, as problem details. `/problems/not-found`: The path is
+            not a route, or the account or transaction does not exist, belongs
+            to another customer, is a system account, or its id is not a UUID.
+            One body for every case."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                not-found:
+                  summary: Not Found
+                  value:
+                    type: /problems/not-found
+                    title: Not Found
+                    status: 404
+                    detail: The requested resource does not exist.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "409":
+          description: "Conflict, as problem details. `/problems/request-in-progress`:
+            Another request with the same `Idempotency-Key` is still running
+            after `IDEMPOTENCY_WAIT_TIMEOUT_MS`. Retry with the same key after
+            `Retry-After`."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                request-in-progress:
+                  summary: Request In Progress
+                  value:
+                    type: /problems/request-in-progress
+                    title: Request In Progress
+                    status: 409
+                    detail: A request with this Idempotency-Key is still in progress; retry with the
+                      same key.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "422":
+          description: "Unprocessable Entity, as problem details.
+            `/problems/idempotency-key-reused`: The `Idempotency-Key` was
+            already used by the same user for a request with another method,
+            path or body. Not stored: use a new key for a new request.
+            `/problems/currency-mismatch`: The request currency differs from the
+            account’s, or a transfer to one of the caller’s own accounts in
+            another currency. `/problems/account-not-active`: One of the
+            caller's own accounts that the movement debits or credits is frozen
+            or closed (another customer's frozen or closed destination answers
+            `/problems/destination-unavailable`); a reversal is refused only on
+            a closed account. `/problems/insufficient-funds`: The source balance
+            does not cover the amount. `/problems/validation-error`: The request
+            parses, but a body member or query parameter is missing, unknown or
+            malformed, including amount and currency. `errors` has one entry per
+            field."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                idempotency-key-reused:
+                  summary: Idempotency Key Reused
+                  value:
+                    type: /problems/idempotency-key-reused
+                    title: Idempotency Key Reused
+                    status: 422
+                    detail: This Idempotency-Key was already used for a different request.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                currency-mismatch:
+                  summary: Currency Mismatch
+                  value:
+                    type: /problems/currency-mismatch
+                    title: Currency Mismatch
+                    status: 422
+                    detail: The currency does not match the account's currency.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                account-not-active:
+                  summary: Account Not Active
+                  value:
+                    type: /problems/account-not-active
+                    title: Account Not Active
+                    status: 422
+                    detail: The account is frozen or closed.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                insufficient-funds:
+                  summary: Insufficient Funds
+                  value:
+                    type: /problems/insufficient-funds
+                    title: Insufficient Funds
+                    status: 422
+                    detail: The account balance does not cover the amount.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                validation-error:
+                  summary: Validation Error
+                  value:
+                    type: /problems/validation-error
+                    title: Validation Error
+                    status: 422
+                    detail: The request content is not valid; see errors.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                    errors:
+                      - pointer: /amount
+                        detail: Must be a string of decimal digits.
+        "500":
+          description: "Internal Server Error, as problem details.
+            `/problems/internal-error`: A defect. The body never holds
+            internals; report the `requestId`."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                internal-error:
+                  summary: Internal Error
+                  value:
+                    type: /problems/internal-error
+                    title: Internal Error
+                    status: 500
+                    detail: The service failed to process the request.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "503":
+          description: "Service Unavailable, as problem details.
+            `/problems/service-unavailable`: A transient condition: an account
+            lock not acquired in time, a deadlock still present after 3
+            attempts, or a statement timeout. Retry after `Retry-After`, with
+            the same `Idempotency-Key` for a POST."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                service-unavailable:
+                  summary: Service Unavailable
+                  value:
+                    type: /problems/service-unavailable
+                    title: Service Unavailable
+                    status: 503
+                    detail: The service could not complete the request in time; retry later, with
+                      the same Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+      security:
+        - bearer: []
+  /v1/accounts/{id}/transfers:
+    post:
+      operationId: transfer
+      summary: Transfer
+      tags:
+        - movements
+      description: "Customers only, out of their own accounts, to another active
+        customer account in the same currency; the source never goes below \"0\"
+        (422 `/problems/insufficient-funds`). To one of the caller's own
+        accounts, a frozen or closed destination answers 422
+        `/problems/account-not-active` and another currency 422
+        `/problems/currency-mismatch`. Any other destination that cannot be
+        credited (unknown, a system account, another customer's frozen, closed
+        or other-currency account, or a balance that would pass the maximum)
+        gets one answer: 422 `/problems/destination-unavailable`. The response
+        carries the source account's new balance. The currency must be the
+        account's (422 `/problems/currency-mismatch`); a frozen or closed
+        account answers 422 `/problems/account-not-active`. Another customer's
+        account, a system account, an unknown id and an id that is not a UUID
+        answer 404. Requires an `Idempotency-Key` header of 1 to 255 visible
+        ASCII characters, fresh for each new request; a missing or malformed one
+        answers 400 `/problems/malformed-request`. A repeat with the same key
+        and body answers the stored response with `Idempotent-Replayed: true`;
+        the same key with another body answers 422
+        `/problems/idempotency-key-reused`; while the first request is still
+        running, 409 `/problems/request-in-progress`. Answers 201 with
+        `Location: /v1/transactions/{id}`. A lock or retry that runs out answers
+        503 `/problems/service-unavailable` with `Retry-After: 1`; retry with
+        the same key."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                destinationAccountId:
+                  type: string
+                  pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+                amount:
+                  description: "A positive amount in minor units of the currency (cents for EUR,
+                    whole yen for JPY), as a string of decimal digits without
+                    sign, leading zero, separator or exponent: \"1050\" is 10.50
+                    EUR. At most 100000000000, the service's MAX_AMOUNT_MINOR; a
+                    larger amount answers 422."
+                  type: string
+                currency:
+                  type: string
+                  enum:
+                    - USD
+                    - MXN
+                    - EUR
+                    - COP
+                    - JPY
+              required:
+                - destinationAccountId
+                - amount
+                - currency
+              additionalProperties: false
+            example:
+              destinationAccountId: 0199c3a1-3a50-7c4d-8e2f-6a7b8c9d0e1f
+              amount: "1050"
+              currency: EUR
+        description: The destination account id, another account than the source, the
+          amount in minor units and the source account’s currency.
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+          description: The account id, a UUID.
+          example: 0199c3a1-2f40-7a3b-8c1d-5e6f7a8b9c0d
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "201":
+          description: "The transfer transaction and the source account’s new balance,
+            nothing of the destination; `Location` is its path. A replay carries
+            `Idempotent-Replayed: true`."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Location:
+              description: The path of the created resource, under `/v1`.
+              schema:
+                type: string
+              example: /v1/transactions/0199c3a2-0b60-7d5e-9f30-7b8c9d0e1f2a
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$
+                  kind:
+                    type: string
+                    enum:
+                      - withdrawal
+                      - transfer
+                  amount:
+                    type: string
+                    pattern: ^[1-9][0-9]*$
+                  currency:
+                    type: string
+                    enum:
+                      - USD
+                      - MXN
+                      - EUR
+                      - COP
+                      - JPY
+                  createdAt:
+                    type: string
+                    pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+                  accountId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$
+                  balance:
+                    type: string
+                    pattern: ^(0|[1-9][0-9]*)$
+                required:
+                  - id
+                  - kind
+                  - amount
+                  - currency
+                  - createdAt
+                  - accountId
+                  - balance
+                additionalProperties: false
+              example:
+                id: 0199c3a2-0b60-7d5e-9f30-7b8c9d0e1f2a
+                amount: "1050"
+                currency: EUR
+                createdAt: 2026-10-08T14:03:00.123Z
+                kind: transfer
+                accountId: 0199c3a1-2f40-7a3b-8c1d-5e6f7a8b9c0d
+                balance: "3950"
+        "400":
+          description: "Bad Request, as problem details. `/problems/malformed-request`:
+            The body is not parseable JSON or was cut short, a required header
+            such as `Idempotency-Key` is missing or malformed, or a pagination
+            cursor is invalid. `detail` names what is broken."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                malformed-request:
+                  summary: Malformed Request
+                  value:
+                    type: /problems/malformed-request
+                    title: Malformed Request
+                    status: 400
+                    detail: The request is malformed.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "401":
+          description: "Unauthorized, as problem details. `/problems/unauthenticated`: No
+            `Authorization: Bearer` token, or a token that fails verification:
+            signature, algorithm, issuer, audience, expiry or claims. Every case
+            gets the same body and `WWW-Authenticate` header."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            WWW-Authenticate:
+              $ref: "#/components/headers/WwwAuthenticate"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                unauthenticated:
+                  summary: Unauthenticated
+                  value:
+                    type: /problems/unauthenticated
+                    title: Unauthenticated
+                    status: 401
+                    detail: A valid bearer token is required.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "403":
+          description: "Forbidden, as problem details. `/problems/forbidden`: The caller’s
+            role is not permitted the operation, whatever ids the request
+            names."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                forbidden:
+                  summary: Forbidden
+                  value:
+                    type: /problems/forbidden
+                    title: Forbidden
+                    status: 403
+                    detail: Your role is not permitted this operation.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "404":
+          description: "Not Found, as problem details. `/problems/not-found`: The path is
+            not a route, or the account or transaction does not exist, belongs
+            to another customer, is a system account, or its id is not a UUID.
+            One body for every case."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                not-found:
+                  summary: Not Found
+                  value:
+                    type: /problems/not-found
+                    title: Not Found
+                    status: 404
+                    detail: The requested resource does not exist.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "409":
+          description: "Conflict, as problem details. `/problems/request-in-progress`:
+            Another request with the same `Idempotency-Key` is still running
+            after `IDEMPOTENCY_WAIT_TIMEOUT_MS`. Retry with the same key after
+            `Retry-After`."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                request-in-progress:
+                  summary: Request In Progress
+                  value:
+                    type: /problems/request-in-progress
+                    title: Request In Progress
+                    status: 409
+                    detail: A request with this Idempotency-Key is still in progress; retry with the
+                      same key.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "422":
+          description: "Unprocessable Entity, as problem details.
+            `/problems/idempotency-key-reused`: The `Idempotency-Key` was
+            already used by the same user for a request with another method,
+            path or body. Not stored: use a new key for a new request.
+            `/problems/currency-mismatch`: The request currency differs from the
+            account’s, or a transfer to one of the caller’s own accounts in
+            another currency. `/problems/account-not-active`: One of the
+            caller's own accounts that the movement debits or credits is frozen
+            or closed (another customer's frozen or closed destination answers
+            `/problems/destination-unavailable`); a reversal is refused only on
+            a closed account. `/problems/insufficient-funds`: The source balance
+            does not cover the amount. `/problems/destination-unavailable`: A
+            transfer destination that cannot be credited: unknown, a system
+            account, another customer’s frozen, closed or other-currency
+            account, or a balance that would exceed 9223372036854775807. One
+            answer for every case. `/problems/validation-error`: The request
+            parses, but a body member or query parameter is missing, unknown or
+            malformed, including amount and currency. `errors` has one entry per
+            field."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                idempotency-key-reused:
+                  summary: Idempotency Key Reused
+                  value:
+                    type: /problems/idempotency-key-reused
+                    title: Idempotency Key Reused
+                    status: 422
+                    detail: This Idempotency-Key was already used for a different request.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                currency-mismatch:
+                  summary: Currency Mismatch
+                  value:
+                    type: /problems/currency-mismatch
+                    title: Currency Mismatch
+                    status: 422
+                    detail: The currency does not match the account's currency.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                account-not-active:
+                  summary: Account Not Active
+                  value:
+                    type: /problems/account-not-active
+                    title: Account Not Active
+                    status: 422
+                    detail: The account is frozen or closed.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                insufficient-funds:
+                  summary: Insufficient Funds
+                  value:
+                    type: /problems/insufficient-funds
+                    title: Insufficient Funds
+                    status: 422
+                    detail: The account balance does not cover the amount.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                destination-unavailable:
+                  summary: Destination Unavailable
+                  value:
+                    type: /problems/destination-unavailable
+                    title: Destination Unavailable
+                    status: 422
+                    detail: The destination account cannot receive this transfer.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                validation-error:
+                  summary: Validation Error
+                  value:
+                    type: /problems/validation-error
+                    title: Validation Error
+                    status: 422
+                    detail: The request content is not valid; see errors.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                    errors:
+                      - pointer: /amount
+                        detail: Must be a string of decimal digits.
+        "500":
+          description: "Internal Server Error, as problem details.
+            `/problems/internal-error`: A defect. The body never holds
+            internals; report the `requestId`."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                internal-error:
+                  summary: Internal Error
+                  value:
+                    type: /problems/internal-error
+                    title: Internal Error
+                    status: 500
+                    detail: The service failed to process the request.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "503":
+          description: "Service Unavailable, as problem details.
+            `/problems/service-unavailable`: A transient condition: an account
+            lock not acquired in time, a deadlock still present after 3
+            attempts, or a statement timeout. Retry after `Retry-After`, with
+            the same `Idempotency-Key` for a POST."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                service-unavailable:
+                  summary: Service Unavailable
+                  value:
+                    type: /problems/service-unavailable
+                    title: Service Unavailable
+                    status: 503
+                    detail: The service could not complete the request in time; retry later, with
+                      the same Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+      security:
+        - bearer: []
+  /v1/transactions/{id}:
+    get:
+      operationId: readTransaction
+      summary: Read a transaction
+      tags:
+        - transactions
+      description: An operator sees every entry of any transaction; a customer sees a
+        transaction with an entry on one of their own accounts, and only those
+        entries. Entry amounts are signed minor units. Anything else answers 404
+        `/problems/not-found`.
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+          description: The transaction id, a UUID.
+          example: 0199c3a2-0b60-7d5e-9f30-7b8c9d0e1f2a
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "200":
+          description: "The transaction and its entries, signed amounts in minor units:
+            every entry for an operator, only those on the caller’s own accounts
+            for a customer."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$
+                  kind:
+                    type: string
+                    enum:
+                      - deposit
+                      - withdrawal
+                      - transfer
+                      - reversal
+                  amount:
+                    type: string
+                    pattern: ^[1-9][0-9]*$
+                  currency:
+                    type: string
+                    enum:
+                      - USD
+                      - MXN
+                      - EUR
+                      - COP
+                      - JPY
+                  createdAt:
+                    type: string
+                    pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+                  reversedTransactionId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$
+                  entries:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        accountId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$
+                        amount:
+                          type: string
+                          pattern: ^-?[1-9][0-9]*$
+                      required:
+                        - accountId
+                        - amount
+                      additionalProperties: false
+                required:
+                  - id
+                  - kind
+                  - amount
+                  - currency
+                  - createdAt
+                  - entries
+                additionalProperties: false
+              example:
+                id: 0199c3a2-0b60-7d5e-9f30-7b8c9d0e1f2a
+                amount: "1050"
+                currency: EUR
+                createdAt: 2026-10-08T14:03:00.123Z
+                kind: transfer
+                entries:
+                  - accountId: 0199c3a1-2f40-7a3b-8c1d-5e6f7a8b9c0d
+                    amount: "-1050"
+                  - accountId: 0199c3a1-3a50-7c4d-8e2f-6a7b8c9d0e1f
+                    amount: "1050"
+        "401":
+          description: "Unauthorized, as problem details. `/problems/unauthenticated`: No
+            `Authorization: Bearer` token, or a token that fails verification:
+            signature, algorithm, issuer, audience, expiry or claims. Every case
+            gets the same body and `WWW-Authenticate` header."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            WWW-Authenticate:
+              $ref: "#/components/headers/WwwAuthenticate"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                unauthenticated:
+                  summary: Unauthenticated
+                  value:
+                    type: /problems/unauthenticated
+                    title: Unauthenticated
+                    status: 401
+                    detail: A valid bearer token is required.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "404":
+          description: "Not Found, as problem details. `/problems/not-found`: The path is
+            not a route, or the account or transaction does not exist, belongs
+            to another customer, is a system account, or its id is not a UUID.
+            One body for every case."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                not-found:
+                  summary: Not Found
+                  value:
+                    type: /problems/not-found
+                    title: Not Found
+                    status: 404
+                    detail: The requested resource does not exist.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "422":
+          description: "Unprocessable Entity, as problem details.
+            `/problems/validation-error`: The request parses, but a body member
+            or query parameter is missing, unknown or malformed, including
+            amount and currency. `errors` has one entry per field."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                validation-error:
+                  summary: Validation Error
+                  value:
+                    type: /problems/validation-error
+                    title: Validation Error
+                    status: 422
+                    detail: The request content is not valid; see errors.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                    errors:
+                      - pointer: /amount
+                        detail: Must be a string of decimal digits.
+        "500":
+          description: "Internal Server Error, as problem details.
+            `/problems/internal-error`: A defect. The body never holds
+            internals; report the `requestId`."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                internal-error:
+                  summary: Internal Error
+                  value:
+                    type: /problems/internal-error
+                    title: Internal Error
+                    status: 500
+                    detail: The service failed to process the request.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "503":
+          description: "Service Unavailable, as problem details.
+            `/problems/service-unavailable`: A transient condition: an account
+            lock not acquired in time, a deadlock still present after 3
+            attempts, or a statement timeout. Retry after `Retry-After`, with
+            the same `Idempotency-Key` for a POST."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                service-unavailable:
+                  summary: Service Unavailable
+                  value:
+                    type: /problems/service-unavailable
+                    title: Service Unavailable
+                    status: 503
+                    detail: The service could not complete the request in time; retry later, with
+                      the same Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+      security:
+        - bearer: []
+  /v1/transactions/{id}/reversals:
+    post:
+      operationId: reverseTransaction
+      summary: Reverse a transaction
+      tags:
+        - transactions
+      description: 'Operators only: writes a compensating transaction with every entry
+        of the original negated, and a `reason` of 3 to 500 characters. A
+        transaction is reversed at most once (409 `/problems/already-reversed`);
+        a reversal cannot be reversed (422
+        `/problems/transaction-not-reversible`); a customer balance the reversal
+        would take below "0" answers 422
+        `/problems/insufficient-funds-for-reversal`, and one it would take above
+        the maximum 422 `/problems/balance-limit-exceeded`. Allowed on a frozen
+        account; a closed one answers 422 `/problems/account-not-active`. An
+        unknown transaction or an id that is not a UUID answers 404. Requires an
+        `Idempotency-Key` header of 1 to 255 visible ASCII characters, fresh for
+        each new request; a missing or malformed one answers 400
+        `/problems/malformed-request`. A repeat with the same key and body
+        answers the stored response with `Idempotent-Replayed: true`; the same
+        key with another body answers 422 `/problems/idempotency-key-reused`;
+        while the first request is still running, 409
+        `/problems/request-in-progress`. Answers 201 with `Location:
+        /v1/transactions/{id}`. A lock or retry that runs out answers 503
+        `/problems/service-unavailable` with `Retry-After: 1`; retry with the
+        same key.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+              required:
+                - reason
+              additionalProperties: false
+            example:
+              reason: Deposit credited to the wrong account
+        description: "Why the transaction is reversed: 3 to 500 characters, no control
+          characters, not only whitespace."
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+          description: The transaction id, a UUID.
+          example: 0199c3a2-0b60-7d5e-9f30-7b8c9d0e1f2a
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/RequestId"
+      responses:
+        "201":
+          description: "The reversal transaction, linked to the original; the reason is
+            stored, never returned. `Location` is its path. A replay carries
+            `Idempotent-Replayed: true`."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Location:
+              description: The path of the created resource, under `/v1`.
+              schema:
+                type: string
+              example: /v1/transactions/0199c3a5-4c70-7f80-9b52-9d0e1f2a3b4c
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$
+                  kind:
+                    type: string
+                    enum:
+                      - reversal
+                  amount:
+                    type: string
+                    pattern: ^[1-9][0-9]*$
+                  currency:
+                    type: string
+                    enum:
+                      - USD
+                      - MXN
+                      - EUR
+                      - COP
+                      - JPY
+                  createdAt:
+                    type: string
+                    pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$
+                  reversedTransactionId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$
+                required:
+                  - id
+                  - kind
+                  - amount
+                  - currency
+                  - createdAt
+                  - reversedTransactionId
+                additionalProperties: false
+              example:
+                id: 0199c3a5-4c70-7f80-9b52-9d0e1f2a3b4c
+                kind: reversal
+                amount: "1050"
+                currency: EUR
+                createdAt: 2026-10-08T15:20:41.007Z
+                reversedTransactionId: 0199c3a2-0b60-7d5e-9f30-7b8c9d0e1f2a
+        "400":
+          description: "Bad Request, as problem details. `/problems/malformed-request`:
+            The body is not parseable JSON or was cut short, a required header
+            such as `Idempotency-Key` is missing or malformed, or a pagination
+            cursor is invalid. `detail` names what is broken."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                malformed-request:
+                  summary: Malformed Request
+                  value:
+                    type: /problems/malformed-request
+                    title: Malformed Request
+                    status: 400
+                    detail: The request is malformed.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "401":
+          description: "Unauthorized, as problem details. `/problems/unauthenticated`: No
+            `Authorization: Bearer` token, or a token that fails verification:
+            signature, algorithm, issuer, audience, expiry or claims. Every case
+            gets the same body and `WWW-Authenticate` header."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            WWW-Authenticate:
+              $ref: "#/components/headers/WwwAuthenticate"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                unauthenticated:
+                  summary: Unauthenticated
+                  value:
+                    type: /problems/unauthenticated
+                    title: Unauthenticated
+                    status: 401
+                    detail: A valid bearer token is required.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "403":
+          description: "Forbidden, as problem details. `/problems/forbidden`: The caller’s
+            role is not permitted the operation, whatever ids the request
+            names."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                forbidden:
+                  summary: Forbidden
+                  value:
+                    type: /problems/forbidden
+                    title: Forbidden
+                    status: 403
+                    detail: Your role is not permitted this operation.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "404":
+          description: "Not Found, as problem details. `/problems/not-found`: The path is
+            not a route, or the account or transaction does not exist, belongs
+            to another customer, is a system account, or its id is not a UUID.
+            One body for every case."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                not-found:
+                  summary: Not Found
+                  value:
+                    type: /problems/not-found
+                    title: Not Found
+                    status: 404
+                    detail: The requested resource does not exist.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "409":
+          description: "Conflict, as problem details. `/problems/request-in-progress`:
+            Another request with the same `Idempotency-Key` is still running
+            after `IDEMPOTENCY_WAIT_TIMEOUT_MS`. Retry with the same key after
+            `Retry-After`. `/problems/already-reversed`: The transaction has
+            already been reversed; a transaction is reversed at most once."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                request-in-progress:
+                  summary: Request In Progress
+                  value:
+                    type: /problems/request-in-progress
+                    title: Request In Progress
+                    status: 409
+                    detail: A request with this Idempotency-Key is still in progress; retry with the
+                      same key.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                already-reversed:
+                  summary: Already Reversed
+                  value:
+                    type: /problems/already-reversed
+                    title: Already Reversed
+                    status: 409
+                    detail: The transaction has already been reversed.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "422":
+          description: "Unprocessable Entity, as problem details.
+            `/problems/idempotency-key-reused`: The `Idempotency-Key` was
+            already used by the same user for a request with another method,
+            path or body. Not stored: use a new key for a new request.
+            `/problems/transaction-not-reversible`: The transaction is itself a
+            reversal. `/problems/account-not-active`: One of the caller's own
+            accounts that the movement debits or credits is frozen or closed
+            (another customer's frozen or closed destination answers
+            `/problems/destination-unavailable`); a reversal is refused only on
+            a closed account. `/problems/insufficient-funds-for-reversal`: A
+            customer account the reversal debits does not hold enough.
+            `/problems/balance-limit-exceeded`: A deposit or reversal would make
+            a cached balance exceed 9223372036854775807.
+            `/problems/validation-error`: The request parses, but a body member
+            or query parameter is missing, unknown or malformed, including
+            amount and currency. `errors` has one entry per field."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                idempotency-key-reused:
+                  summary: Idempotency Key Reused
+                  value:
+                    type: /problems/idempotency-key-reused
+                    title: Idempotency Key Reused
+                    status: 422
+                    detail: This Idempotency-Key was already used for a different request.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                transaction-not-reversible:
+                  summary: Transaction Not Reversible
+                  value:
+                    type: /problems/transaction-not-reversible
+                    title: Transaction Not Reversible
+                    status: 422
+                    detail: A reversal cannot be reversed.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                account-not-active:
+                  summary: Account Not Active
+                  value:
+                    type: /problems/account-not-active
+                    title: Account Not Active
+                    status: 422
+                    detail: The account is frozen or closed.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                insufficient-funds-for-reversal:
+                  summary: Insufficient Funds For Reversal
+                  value:
+                    type: /problems/insufficient-funds-for-reversal
+                    title: Insufficient Funds For Reversal
+                    status: 422
+                    detail: An account balance does not cover the reversal.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                balance-limit-exceeded:
+                  summary: Balance Limit Exceeded
+                  value:
+                    type: /problems/balance-limit-exceeded
+                    title: Balance Limit Exceeded
+                    status: 422
+                    detail: The movement would take a balance above its limit.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                validation-error:
+                  summary: Validation Error
+                  value:
+                    type: /problems/validation-error
+                    title: Validation Error
+                    status: 422
+                    detail: The request content is not valid; see errors.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                    errors:
+                      - pointer: /amount
+                        detail: Must be a string of decimal digits.
+        "500":
+          description: "Internal Server Error, as problem details.
+            `/problems/internal-error`: A defect. The body never holds
+            internals; report the `requestId`."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                internal-error:
+                  summary: Internal Error
+                  value:
+                    type: /problems/internal-error
+                    title: Internal Error
+                    status: 500
+                    detail: The service failed to process the request.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "503":
+          description: "Service Unavailable, as problem details.
+            `/problems/service-unavailable`: A transient condition: an account
+            lock not acquired in time, a deadlock still present after 3
+            attempts, or a statement timeout. Retry after `Retry-After`, with
+            the same `Idempotency-Key` for a POST."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                service-unavailable:
+                  summary: Service Unavailable
+                  value:
+                    type: /problems/service-unavailable
+                    title: Service Unavailable
+                    status: 503
+                    detail: The service could not complete the request in time; retry later, with
+                      the same Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+      security:
+        - bearer: []
+servers:
+  - url: /
+    description: This service; every API path starts with /v1.
+security:
+  - bearer: []
+tags:
+  - name: accounts
+    description: Open, list and read accounts and their history.
+  - name: account status
+    description: Freeze, unfreeze and close accounts (operators).
+  - name: movements
+    description: Deposits, withdrawals and transfers.
+  - name: transactions
+    description: Read and reverse transactions.
