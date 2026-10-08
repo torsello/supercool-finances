@@ -116,12 +116,21 @@ export function toProblem(error: unknown): Problem {
   return problemOf('/problems/internal-error');
 }
 
+/** A change to a new response body before it is serialized: the hook point of a test seam. */
+export type BodyExtension = (body: Record<string, unknown>) => Record<string, unknown>;
+
 /**
  * The response of a problem for one request: `application/problem+json` with `type`, `title`,
  * `status`, `detail`, `requestId` and, for validation, `errors` (SYS-R22, SYS-R24, SYS-R27).
+ * `extend` is set only by the keyed handler, for the `extra-response-member` test seam (plan 000
+ * section 8).
  */
-export function problemResponse(problem: Problem, requestId: string): ProblemHttpResponse {
-  const body = {
+export function problemResponse(
+  problem: Problem,
+  requestId: string,
+  extend?: BodyExtension,
+): ProblemHttpResponse {
+  const body: Record<string, unknown> = {
     type: problem.type,
     title: problem.title,
     status: problem.status,
@@ -133,7 +142,7 @@ export function problemResponse(problem: Problem, requestId: string): ProblemHtt
     status: problem.status,
     type: problem.type,
     headers: { 'content-type': PROBLEM_CONTENT_TYPE, ...problem.headers },
-    body: Buffer.from(JSON.stringify(body), 'utf8'),
+    body: Buffer.from(JSON.stringify(extend === undefined ? body : extend(body)), 'utf8'),
   };
 }
 
@@ -146,10 +155,9 @@ export async function sendProblem(
 }
 
 /**
- * Fastify's error handler: answers every error with its problem. A 500 is logged at `error` with
- * the error, which stays in the log only; a `LedgerWriteRejected` also names its SQLSTATE and
- * constraint (LED-R28). Other answers are not logged here: authentication logs its own `warn` line
- * with the reason (AUT-R19).
+ * Fastify's error handler: answers every error with its problem, and logs a 500 (`logFailure`).
+ * Other answers are not logged here: authentication logs its own `warn` line with the reason
+ * (AUT-R19).
  */
 export async function handleError(
   error: unknown,
@@ -157,6 +165,16 @@ export async function handleError(
   reply: FastifyReply,
 ): Promise<FastifyReply> {
   const problem = toProblem(error);
+  logFailure(request, error, problem);
+  return await sendProblem(reply, problemResponse(problem, request.id));
+}
+
+/**
+ * Logs an error answered as a 500 at `error`, with the error, which stays in the log only; a
+ * `LedgerWriteRejected` also names its SQLSTATE and constraint (LED-R28). Every other answer is
+ * not logged here.
+ */
+export function logFailure(request: FastifyRequest, error: unknown, problem: Problem): void {
   if (problem.status >= 500 && problem.type === '/problems/internal-error') {
     const fields =
       error instanceof LedgerWriteRejected
@@ -164,5 +182,4 @@ export async function handleError(
         : { err: error };
     request.log.error(fields, 'request failed');
   }
-  return await sendProblem(reply, problemResponse(problem, request.id));
 }

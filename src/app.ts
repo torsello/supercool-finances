@@ -14,6 +14,25 @@ import {
 } from './modules/accounts/adapters/persistence/kysely-accounts.js';
 import { registerAuthentication } from './modules/auth/adapters/http/authenticate.js';
 import { registerAuthorization } from './modules/auth/adapters/http/authorize.js';
+import {
+  KeyedHandler,
+  type AfterCommitHook,
+  type ResponseBodyHook,
+} from './modules/idempotency/adapters/http/keyed-handler.js';
+import { KyselyKeyedTransactions } from './modules/idempotency/adapters/persistence/kysely-key-store.js';
+import { IdempotentRunner } from './modules/idempotency/index.js';
+import { KyselyLedgerWriter } from './modules/ledger/adapters/persistence/kysely-ledger.js';
+import { movementRoutes } from './modules/movements/adapters/http/routes.js';
+import {
+  KyselyTransactionQueries,
+  movementTransactionOn,
+  type MovementDependencies,
+} from './modules/movements/adapters/persistence/kysely-movements.js';
+import {
+  Reversals,
+  type MovementTransaction,
+  type SkipExistingReversalCheck,
+} from './modules/movements/index.js';
 import { loadConfig, type Config, type Environment } from './platform/config/config.js';
 import { createDatabase, createPool } from './platform/db/database.js';
 import { TransactionRunner } from './platform/db/transaction-runner.js';
@@ -39,6 +58,12 @@ export interface TestSeams {
   unitOfWorkFaults?: UnitOfWorkFaults;
   /** `throwing-route`: a route registered under `/v1` with the module routes. */
   throwingRoute?: RouteModule;
+  /** `extra-response-member`: the keyed handler's hook on every new response body. */
+  responseBody?: ResponseBodyHook;
+  /** `destroy-connection-after-commit`: the keyed handler's hook after a commit. */
+  afterCommit?: AfterCommitHook;
+  /** `skip-existing-reversal-check`: the reversal use case's hook (plan 004 section 1). */
+  skipExistingReversalCheck?: SkipExistingReversalCheck;
 }
 
 export interface AppOptions {
@@ -80,20 +105,61 @@ export function buildApp(config: Config, options: AppOptions = {}) {
       : { faults: options.seams.unitOfWorkFaults }),
   });
 
+  const keyed = new KeyedHandler(
+    new IdempotentRunner({
+      waitTimeoutMs: config.idempotencyWaitTimeoutMs,
+      keyTtlSeconds: config.idempotencyKeyTtlSeconds,
+    }),
+    {
+      ...(options.seams?.responseBody === undefined
+        ? {}
+        : { responseBody: options.seams.responseBody }),
+      ...(options.seams?.afterCommit === undefined
+        ? {}
+        : { afterCommit: options.seams.afterCommit }),
+    },
+  );
+
   app.get(
     '/health/live',
     { schema: { response: { 200: liveResponse } } },
     () => ({ status: 'ok' }) as const,
   );
 
+  const movementDependencies: MovementDependencies = {
+    ids,
+    ledger: (uow) => new KyselyLedgerWriter(uow, ids),
+  };
+
   const modules: RouteModule[] = [
     accountRoutes({
       repository: new KyselyAccountRepository(db),
+      keyed,
+      // Account creation with a key is never retried (plan 000 section 6.1).
+      keyedTransactions: new KyselyKeyedTransactions(unitOfWork, {
+        retry: 'none',
+        operation: (uow) => ({ accounts: new KyselyAccountRepository(uow.db) }),
+      }),
       ids,
       queries: new KyselyAccountQueries(db),
       transactions: new KyselyAccountTransactions(unitOfWork, ids),
       cursors: new CursorCodec(config.cursorSecret),
       accountLockTimeoutMs: config.accountLockTimeoutMs,
+    }),
+    movementRoutes({
+      keyed,
+      transactions: new KyselyKeyedTransactions<MovementTransaction>(unitOfWork, {
+        retry: 'movement',
+        operation: (uow) => movementTransactionOn(uow, movementDependencies),
+      }),
+      queries: new KyselyTransactionQueries(db),
+      reversals: new Reversals({
+        ...(options.seams?.skipExistingReversalCheck === undefined
+          ? {}
+          : { skipExistingReversalCheck: options.seams.skipExistingReversalCheck }),
+      }),
+      settings: { accountLockTimeoutMs: config.accountLockTimeoutMs },
+      maxAmountMinor: config.maxAmountMinor,
     }),
   ];
   if (options.seams?.throwingRoute !== undefined) modules.push(options.seams.throwingRoute);

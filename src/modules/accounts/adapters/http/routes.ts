@@ -3,8 +3,9 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { MalformedRequest } from '../../../../platform/http/errors.js';
 import { parseUuid } from '../../../../platform/http/schemas/ids.js';
-import { toValidationFailed } from '../../../../platform/http/validation.js';
+import { toValidationFailed, validateRequest } from '../../../../platform/http/validation.js';
 import { callerOf, Forbidden, rolesFor, type RouteKey } from '../../../auth/index.js';
+import type { KeyedHandler, KeyedTransactions } from '../../../idempotency/index.js';
 import type { StatusAction } from '../../domain/account.js';
 import { changeAccountStatus } from '../../application/change-account-status.js';
 import { createAccount } from '../../application/create-account.js';
@@ -33,6 +34,9 @@ import {
 export interface AccountRoutesDeps {
   /** Inserts accounts created without an Idempotency-Key, each in its own statement. */
   repository: AccountRepository;
+  /** Account creation with an Idempotency-Key: the key step, never retried (plan 001 section 3.1). */
+  keyed: KeyedHandler;
+  keyedTransactions: KeyedTransactions<{ accounts: AccountRepository }>;
   ids: IdGenerator;
   queries: AccountQueries;
   transactions: AccountTransactions;
@@ -69,8 +73,8 @@ function cursorPosition(
  * The seven routes of section 1.1 of spec 001 under `/v1`, each with its roles for the role check
  * (plan 001 section 1). Every route registers its schemas with `attachValidation`, so a schema
  * error is answered at the validation step of SYS-R31, after the malformed-request step (ADR-0004).
- * The `Idempotency-Key` of account creation is read once the idempotency wiring is in place
- * (plan 000 section 1, 08-api step 4).
+ * Only account creation takes an `Idempotency-Key`, which is optional there (IDM-R02); the other
+ * routes never read the header (SYS-R39).
  */
 export function accountRoutes(deps: AccountRoutesDeps): (scope: FastifyInstance) => void {
   return (scope) => {
@@ -86,16 +90,29 @@ export function accountRoutes(deps: AccountRoutesDeps): (scope: FastifyInstance)
         },
         attachValidation: true,
         config: { roles: rolesFor('POST /accounts') },
+        ...deps.keyed.hooks({ required: false }),
       },
       async (request, reply) => {
-        if (request.validationError !== undefined) {
-          throw toValidationFailed(request.validationError);
-        }
         const caller = callerOf(request);
-        const account = await createAccount(
-          { accounts: deps.repository, ids: deps.ids },
-          { ownerId: caller.userId, currency: request.body.currency },
-        );
+        // With a key, validation runs inside the key step, after the savepoint (IDM-R06, IDM-R16).
+        const create = async (accounts: AccountRepository) => {
+          validateRequest(request);
+          return await createAccount(
+            { accounts, ids: deps.ids },
+            { ownerId: caller.userId, currency: request.body.currency },
+          );
+        };
+        if (deps.keyed.isKeyed(request)) {
+          return await deps.keyed.answer(request, reply, caller.userId, {
+            transactions: deps.keyedTransactions,
+            operation: async (tx) => await create(tx.accounts),
+            created: (account) => ({
+              location: `/v1/accounts/${account.id}`,
+              body: accountBody(account),
+            }),
+          });
+        }
+        const account = await create(deps.repository);
         return await reply
           .code(201)
           .header('location', `/v1/accounts/${account.id}`)
@@ -190,9 +207,7 @@ export function accountRoutes(deps: AccountRoutesDeps): (scope: FastifyInstance)
           const caller = callerOf(request);
           // The role check already refused customers; this keeps the audit record's role exact.
           if (caller.role !== 'operator') throw new Forbidden();
-          if (request.validationError !== undefined) {
-            throw toValidationFailed(request.validationError);
-          }
+          validateRequest(request);
           const account = await changeAccountStatus(
             { transactions: deps.transactions, accountLockTimeoutMs: deps.accountLockTimeoutMs },
             {

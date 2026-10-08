@@ -97,7 +97,10 @@ describe('keyed reversal transactions', () => {
     const constraint = runReversal(`rev-${randomUUID()}`, d.transactionId, {
       reversals: {
         skipExistingReversalCheck: {
-          skipped: (id) => skipped.push(id),
+          skips: (id) => {
+            skipped.push(id);
+            return true;
+          },
           insertRefused: (cause) => refused.push(cause),
         },
       },

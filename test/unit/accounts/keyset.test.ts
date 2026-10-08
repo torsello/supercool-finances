@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CursorCodec } from '../../../src/modules/accounts/adapters/http/cursor.js';
-import { apiTimestamp } from '../../../src/modules/accounts/adapters/http/presenters.js';
+import { apiTimestamp } from '../../../src/platform/http/timestamp.js';
 import {
   compareNewestFirst,
   isAfter,

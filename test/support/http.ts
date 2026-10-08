@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { LightMyRequestResponse } from 'fastify';
 import type { BuiltApp } from './app.js';
 
@@ -72,4 +73,105 @@ export async function changeStatus(
     url: `/v1/accounts/${accountId}/${action}`,
     headers: bearer(token),
   });
+}
+
+/** A fresh `Idempotency-Key`, unique to one request. */
+export function freshKey(): string {
+  return randomUUID();
+}
+
+/** Headers of a keyed request: the bearer token and the key, fresh unless given. */
+function keyed(token: string, key: string | undefined): Record<string, string> {
+  return { ...bearer(token), 'idempotency-key': key ?? freshKey() };
+}
+
+export interface MovementOptions {
+  currency?: string;
+  key?: string;
+}
+
+/** Deposits `amount` into an account through the API, with a fresh Idempotency-Key. */
+export async function deposit(
+  app: App,
+  token: string,
+  accountId: string,
+  amount: string,
+  options: MovementOptions = {},
+): Promise<LightMyRequestResponse> {
+  return await app.inject({
+    method: 'POST',
+    url: `/v1/accounts/${accountId}/deposits`,
+    headers: keyed(token, options.key),
+    payload: { amount, currency: options.currency ?? 'EUR' },
+  });
+}
+
+/** Withdraws `amount` from an account through the API, with a fresh Idempotency-Key. */
+export async function withdraw(
+  app: App,
+  token: string,
+  accountId: string,
+  amount: string,
+  options: MovementOptions = {},
+): Promise<LightMyRequestResponse> {
+  return await app.inject({
+    method: 'POST',
+    url: `/v1/accounts/${accountId}/withdrawals`,
+    headers: keyed(token, options.key),
+    payload: { amount, currency: options.currency ?? 'EUR' },
+  });
+}
+
+/** Transfers `amount` between accounts through the API, with a fresh Idempotency-Key. */
+export async function transfer(
+  app: App,
+  token: string,
+  sourceId: string,
+  destinationAccountId: string,
+  amount: string,
+  options: MovementOptions = {},
+): Promise<LightMyRequestResponse> {
+  return await app.inject({
+    method: 'POST',
+    url: `/v1/accounts/${sourceId}/transfers`,
+    headers: keyed(token, options.key),
+    payload: { destinationAccountId, amount, currency: options.currency ?? 'EUR' },
+  });
+}
+
+/** Reverses a transaction through the API, with a fresh Idempotency-Key. */
+export async function reverse(
+  app: App,
+  token: string,
+  transactionId: string,
+  options: { reason?: string; key?: string } = {},
+): Promise<LightMyRequestResponse> {
+  return await app.inject({
+    method: 'POST',
+    url: `/v1/transactions/${transactionId}/reversals`,
+    headers: keyed(token, options.key),
+    payload: { reason: options.reason ?? 'Operator correction' },
+  });
+}
+
+/** The movement response of section 1.2 of spec 003. */
+export interface MovementJson {
+  id: string;
+  kind: string;
+  amount: string;
+  currency: string;
+  createdAt: string;
+  accountId?: string;
+  balance?: string;
+}
+
+/** The transaction representation of section 1.3 of spec 003. */
+export interface TransactionJson {
+  id: string;
+  kind: string;
+  amount: string;
+  currency: string;
+  createdAt: string;
+  reversedTransactionId?: string;
+  entries: { accountId: string; amount: string }[];
 }

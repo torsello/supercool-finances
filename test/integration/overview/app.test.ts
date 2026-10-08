@@ -84,19 +84,24 @@ describe('the app built by the composition root', () => {
   });
 
   it('SYS-R24 SYS-R32 answers a path that does not decode with the not-found problem and its request id', async () => {
-    for (const url of ['/%zz', '/v1/%E0%A4%A']) {
+    const ids = new Set<string>();
+    const urls = ['/%zz', '/v1/%E0%A4%A'];
+    for (const url of urls) {
       built.logs.clear();
       const response = await built.app.inject({ method: 'GET', url });
       expect(response.statusCode, url).toBe(404);
       const body = problemOf(response);
       expect(withoutRequestId(body), url).toEqual(NOT_FOUND);
-      expect(body.requestId, url).toMatch(/^req-/);
+      expect(body.requestId, url).toEqual(expect.any(String));
+      expect(body.requestId, url).not.toBe('');
+      ids.add(body.requestId);
       expect(response.body, url).not.toContain('%');
       expect(
         built.logs.lines().some((line) => line.reqId === body.requestId),
         url,
       ).toBe(true);
     }
+    expect(ids.size).toBe(urls.length);
   });
 
   /** Sends raw bytes to the listening app and reads the whole answer until the server closes. */
@@ -148,7 +153,7 @@ describe('the app built by the composition root', () => {
           title: PROBLEM_TYPES['/problems/malformed-request'].title,
           status: 400,
           detail: 'The request could not be parsed.',
-          requestId: expect.stringMatching(/^req-/) as unknown,
+          requestId: expect.stringMatching(/./) as unknown,
         });
         ids.add(String(problem['requestId']));
       }

@@ -25,8 +25,8 @@ These tasks run in the cross-spec order of plan 000 section 1, across every `spe
 
 These tasks run in the cross-spec order of plan 000 section 1 for 08-api: authentication, error handler and pipeline, account routes, idempotency wiring, movement and reversal routes, then the ACs that need them.
 
-- [ ] Test first: REV-AC16 in `test/unit/movements/reversal-schema.test.ts`; then the reversal body schema in `src/modules/movements/adapters/http/schemas.ts`.
-- [ ] Build the reversal presenter and route, registered by the composition root, with `test/integration/reversals/routes.test.ts` (REV-R16) proving the response has the fields of section 1.3 and no `reason`.
+- [x] Test first: REV-AC16 in `test/unit/movements/reversal-schema.test.ts`; then the reversal body schema in `src/modules/movements/adapters/http/schemas.ts`.
+- [x] Build the reversal presenter and route, registered by the composition root, with `test/integration/reversals/routes.test.ts` (REV-R16) proving the response has the fields of section 1.3 and no `reason`.
 - [ ] Test first: REV-AC01 and REV-AC02 in `test/integration/reversals/reversals.test.ts`.
 - [ ] Test first: REV-AC04 and REV-AC05 in `test/integration/reversals/authorization.test.ts`.
 - [ ] Test first: REV-AC06 and REV-AC09 in `test/integration/reversals/at-most-once.test.ts`.

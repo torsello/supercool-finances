@@ -31,8 +31,8 @@ No task for this spec.
 These tasks run in the cross-spec order of plan 000 section 1 for 08-api: authentication, error handler and pipeline, account routes, idempotency wiring, movement and reversal routes, then the ACs that need them.
 
 - [x] Test first: IDM-AC25 in `test/unit/platform/config.test.ts`; then `IDEMPOTENCY_WAIT_TIMEOUT_MS` and `IDEMPOTENCY_KEY_TTL_SECONDS` in `src/platform/config/config.ts`.
-- [ ] Extend `test/unit/idempotency/idempotent-runner.test.ts` so both typed errors are mapped by `toProblem` to 409 `/problems/request-in-progress` and 503 `/problems/service-unavailable`, each with `Retry-After: 1`: IDM-AC14.
-- [ ] Build `key-header.ts` and `replay.ts` and wire the runner into the composition root, with `test/integration/idempotency/http-replay.test.ts` (IDM-R07) proving a replay carries the stored `Content-Type` and `Location`, the current `X-Request-Id` and `Idempotent-Replayed: true`.
+- [x] Extend `test/unit/idempotency/idempotent-runner.test.ts` so both typed errors are mapped by `toProblem` to 409 `/problems/request-in-progress` and 503 `/problems/service-unavailable`, each with `Retry-After: 1`: IDM-AC14.
+- [x] Build `key-header.ts` and `replay.ts` and wire the runner into the composition root, with `test/integration/idempotency/http-replay.test.ts` (IDM-R07) proving a replay carries the stored `Content-Type` and `Location`, the current `X-Request-Id` and `Idempotent-Replayed: true`.
 - [ ] Test first: IDM-AC01 and IDM-AC03 in `test/integration/idempotency/key-required.test.ts`.
 - [ ] Test first: IDM-AC04 in `test/integration/idempotency/account-creation.test.ts`.
 - [ ] Test first: IDM-AC05 in `test/integration/idempotency/key-scope.test.ts`.

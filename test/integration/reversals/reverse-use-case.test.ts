@@ -264,7 +264,10 @@ describe('reverse use case', () => {
     };
     const options: ReversalsOptions = {
       skipExistingReversalCheck: {
-        skipped: (id) => record.skipped.push(id),
+        skips: (id) => {
+          record.skipped.push(id);
+          return true;
+        },
         insertRefused: (cause) => record.refused.push(cause),
       },
     };
@@ -286,5 +289,32 @@ describe('reverse use case', () => {
     expect(await writtenRows()).toEqual(before);
     expect(await reversalsOf(d)).toEqual([first.transactionId]);
     expect(await balanceOf(a1)).toBe('1000');
+  });
+  it('SYS-R37 a hook that answers false for a transaction leaves the existing-reversal check in place, so the check refuses the second reversal and the hook records no refused insert', async () => {
+    const a1 = (await createCustomerAccount({ currency: 'EUR', ownerId: C1 })).id;
+    const d = await depositInto(a1, 1000n);
+    await depositInto(a1, 1000n);
+    await reverseTransaction(d);
+    const before = await writtenRows();
+
+    const asked: string[] = [];
+    const refused: (AlreadyReversedCause | undefined)[] = [];
+    const inactive = new Reversals({
+      skipExistingReversalCheck: {
+        skips: (id) => {
+          asked.push(id);
+          return false;
+        },
+        insertRefused: (cause) => refused.push(cause),
+      },
+    });
+
+    const second: unknown = await reverseTransaction(d, inactive).catch((error: unknown) => error);
+    expect(second).toBeInstanceOf(AlreadyReversed);
+    // Raised by the check, not mapped from a refused insert, so it has no cause.
+    expect((second as AlreadyReversed).cause).toBeUndefined();
+    expect(asked).toEqual([d]);
+    expect(refused).toEqual([]);
+    expect(await writtenRows()).toEqual(before);
   });
 });

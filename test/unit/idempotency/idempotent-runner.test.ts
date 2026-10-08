@@ -21,6 +21,7 @@ import {
   type RunnerClient,
 } from '../../../src/platform/db/transaction-runner.js';
 import { UnitOfWork } from '../../../src/platform/db/unit-of-work.js';
+import { toProblem } from '../../../src/platform/http/error-handler.js';
 
 function databaseError(code: string): pg.DatabaseError {
   const error = new pg.DatabaseError(`fake ${code}`, 0, 'error');
@@ -264,6 +265,48 @@ describe('idempotent runner', () => {
     ]);
     expect(keys.completed).toEqual([]);
     expect(delays).toEqual([]);
+  });
+
+  it('IDM-AC14 a 55P03 at the key insert and one at an account lock after it end in the typed errors toProblem maps to 409 request-in-progress and 503 service-unavailable, each with Retry-After: 1, both rolled back entirely and neither retried', async () => {
+    const atKey = setup();
+    atKey.client.fails = (text) => (text === CLAIM ? '55P03' : undefined);
+    const keyError: unknown = await atKey.run().catch((error: unknown) => error);
+    expect(keyError).toBeInstanceOf(IdempotencyWaitTimeout);
+    expect(toProblem(keyError)).toMatchObject({
+      status: 409,
+      type: '/problems/request-in-progress',
+      headers: { 'retry-after': '1' },
+    });
+    expect(atKey.client.statements).toEqual([BEGIN, SET_LOCK_TIMEOUT, CLAIM, 'ROLLBACK']);
+    expect(atKey.delays).toEqual([]);
+
+    const atLock = setup();
+    atLock.client.fails = (text) => (text === LOCK ? '55P03' : undefined);
+    const lockError: unknown = await atLock
+      .run(async (tx) => {
+        await tx.setLockTimeout(4000);
+        await tx.lockAccount();
+        return 't1';
+      })
+      .catch((error: unknown) => error);
+    expect(lockError).toBeInstanceOf(AccountLockTimeout);
+    expect(toProblem(lockError)).toMatchObject({
+      status: 503,
+      type: '/problems/service-unavailable',
+      headers: { 'retry-after': '1' },
+    });
+    expect(atLock.client.statements).toEqual([
+      BEGIN,
+      SET_LOCK_TIMEOUT,
+      CLAIM,
+      'SAVEPOINT "work"',
+      SET_LOCK_TIMEOUT,
+      LOCK,
+      'ROLLBACK',
+    ]);
+    expect(atLock.client.statements).not.toContain('COMMIT');
+    expect(atLock.keys.completed).toEqual([]);
+    expect(atLock.delays).toEqual([]);
   });
 
   it('IDM-R15 a first request runs the key step, the savepoint and the operation, stores the 201 and commits', async () => {
