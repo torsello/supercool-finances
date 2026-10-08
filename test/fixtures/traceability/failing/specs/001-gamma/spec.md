@@ -78,12 +78,52 @@
 - **Level:** ci
 - **Verified by:** CI job `optional`, step `npm run zz-job-off`
 
-### ZZC-AC17 · A step whose script feeds a pipe without pipefail
+### ZZC-AC17 · A step whose script feeds a pipe, even with pipefail
 
 - **Level:** ci
 - **Verified by:** CI job `ci`, step `npm run zz-piped`
 
-### ZZC-AC18 · A && list on a line that is not the last of its block
+### ZZC-AC18 · A step with another command after the script in a && list
 
 - **Level:** ci
 - **Verified by:** CI job `ci`, step `npm run zz-listed-early`
+
+### ZZC-AC19 · A step with an environment assignment before the script
+
+- **Level:** ci
+- **Verified by:** CI job `ci`, step `npm run zz-assigned`
+
+### ZZC-AC20 · A step that runs the script as an if condition
+
+- **Level:** ci
+- **Verified by:** CI job `ci`, step `npm run zz-condition`
+
+### ZZC-AC21 · A step that only echoes the command
+
+- **Level:** ci
+- **Verified by:** CI job `ci`, step `npm run zz-echoed`
+
+### ZZC-AC22 · A step that runs the script in the background
+
+- **Level:** ci
+- **Verified by:** CI job `ci`, step `npm run zz-background`
+
+### ZZC-AC23 · A block with another command before the script
+
+- **Level:** ci
+- **Verified by:** CI job `ci`, step `npm run zz-second-line`
+
+### ZZC-AC24 · A step with an npm flag before the script name
+
+- **Level:** ci
+- **Verified by:** CI job `ci`, step `npm run zz-flagged`, written with `--silent` before the name
+
+### ZZC-AC25 · A step that redirects the script's output
+
+- **Level:** ci
+- **Verified by:** CI job `ci`, step `npm run zz-redirected`
+
+### ZZC-AC26 · A step that negates the script's exit code
+
+- **Level:** ci
+- **Verified by:** CI job `ci`, step `npm run zz-negated`

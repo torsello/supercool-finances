@@ -6,16 +6,16 @@ jobs:
     continue-on-error: false
     steps:
       - name: Prepare
-        run: |
-          echo preparing
-          DATABASE_URL=postgres://localhost/zz npm run zz:prepare
+        env:
+          DATABASE_URL: postgres://localhost/zz
+        run: npm run zz:prepare
       - run: npm run zz-check # the check
         continue-on-error: false
-      - shell: bash
-        run: npm run zz-piped | tee piped.log
+      - run: npm run zz-args -- --require unit,integration
       - run: |
-          echo listing
-          npm run zz-listed && echo listed
+          # A comment and a continued line still make one command.
+          npm run zz-continued \
+            -- --flag
   terraform:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest

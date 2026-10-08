@@ -6,19 +6,26 @@ jobs:
     steps:
       # - run: npm run zz-commented
       - run: echo hi # npm run zz-commented
-      - run: |
-          # npm run zz-commented
-          npm run zz-step-only
-          npm run zz-or-true || true
+      - run: npm run zz-step-only
+      - run: npm run zz-or-true || true
       - name: Allowed to fail
         continue-on-error: true
         run: npm run zz-continue
       - run: npm run zz-if-false
         if: ${{ false }}
+      - shell: bash
+        run: npm run zz-piped | tee piped.log
+      - run: npm run zz-listed-early && echo listed
+      - run: DATABASE_URL=postgres://localhost/zz npm run zz-assigned
+      - run: if npm run zz-condition; then :; fi
+      - run: echo npm run zz-echoed
+      - run: npm run zz-background &
       - run: |
-          npm run zz-piped | tee piped.log
-          npm run zz-listed-early && echo listed
-          echo done
+          echo preparing
+          npm run zz-second-line
+      - run: npm run --silent zz-flagged
+      - run: npm run zz-redirected > out.log
+      - run: '! npm run zz-negated'
     env:
       NOTE: npm run zz-commented is not a step
   optional:

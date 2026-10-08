@@ -33,16 +33,15 @@ const CHECKBOX_LINE = /^\s*(?:[-*+]|\d+[.)])\s*\[[^\]]?\]/;
 
 const PACKAGE_FILE = 'package.json';
 const CI_WORKFLOW = '.github/workflows/ci.yml';
-// "npm run <script>"; a trailing full stop of the surrounding sentence is not part of the name.
-const NPM_RUN = /\bnpm run ([\w:-]+(?:\.[\w:-]+)*)/g;
+// "npm run <script>"; a trailing full stop of the surrounding sentence is not part of the name,
+// and a name starts with a word character, so a flag such as "--silent" is never read as one.
+const SCRIPT_NAME = String.raw`\w[\w:-]*(?:\.[\w:-]+)*`;
+const NPM_RUN = new RegExp(String.raw`\bnpm run (${SCRIPT_NAME})`, 'g');
+// A whole command that is exactly "npm run <script>", optionally followed by plain arguments:
+// no assignment, operator, redirection, substitution, quote or glob before, inside or after it.
+const EXACT_NPM_RUN = new RegExp(String.raw`^npm run (${SCRIPT_NAME})(?: +[\w.,:=/@%+-]+)*$`);
 // A "key: value" line of a workflow, as "key: ..." or "- key: ...".
 const WORKFLOW_KEY = /^( *)(- +)?([\w-]+):(?:\s(.*)|$)/;
-// "||" runs its right side when the left side fails, so a script before it can never fail the build.
-const OR_ELSE = '||';
-// A pipe ("|" or "|&", not "||"): without pipefail, a pipeline fails only when its last command does.
-const PIPE = /(?<!\|)\|(?!\|)/;
-// "set" turning pipefail on, such as "set -o pipefail" or "set -euo pipefail".
-const SET_PIPEFAIL = /^set\s+(?:-[A-Za-z]+\s+)*-[A-Za-z]*o\s+pipefail\b/;
 // A block scalar header such as "|", ">" or "|-": the command is on the more indented lines below.
 const BLOCK_SCALAR = /^[|>][+-]?\d*$/;
 // A comment: "#" at the start or after whitespace, to the end of the line.
@@ -426,29 +425,22 @@ function isFalse(value: string | undefined): boolean {
   return bare.trim().toLowerCase() === 'false';
 }
 
-function unquoted(value: string | undefined): string {
-  return (value ?? '').trim().replace(/^(['"])(.*)\1$/, '$2');
-}
-
-/** A "run:" step: its commands in order, and whether its shell starts with pipefail on. */
+/** A "run:" step: its commands in order. */
 export interface WorkflowStep {
   commands: string[];
-  pipefail: boolean;
 }
 
 /**
  * Every "run:" step of a GitHub Actions workflow that can fail the build, with one command per
  * line, without comments; a line ending in a backslash continues on the next one. A step is left
  * out when it, or the job holding it, has "continue-on-error" set to anything but false or
- * "if: false". GitHub runs "shell: bash" as "bash -eo pipefail", but its default shell as
- * "bash -e", without pipefail.
+ * "if: false".
  */
 export function workflowSteps(content: string): WorkflowStep[] {
   const entries = parseWorkflow(content);
   const steps: WorkflowStep[] = [];
   entries.forEach((entry, index) => {
     if (entry.key !== 'run') return;
-    const shell = mappingOf(entries, index).keys.get('shell');
     for (let at: number | undefined = index; at !== undefined;) {
       const { keys, parent } = mappingOf(entries, at);
       const continueOnError = keys.get('continue-on-error');
@@ -470,7 +462,7 @@ export function workflowSteps(content: string): WorkflowStep[] {
       if (command !== '') commands.push(command);
     }
     if (pending.trim() !== '') commands.push(pending.trim());
-    steps.push({ commands, pipefail: unquoted(shell) === 'bash' });
+    steps.push({ commands });
   });
   return steps;
 }
@@ -481,42 +473,19 @@ export function workflowCommands(content: string): string[] {
 }
 
 /**
- * The scripts that a CI command runs in a way that can fail the build under "bash -e": every
- * "npm run <script>" with no "||" anywhere after it; not feeding a pipe, unless pipefail is on;
- * and, when it is not the last command of its "&&" list, only if that list ends the last command
- * line of its block, because "bash -e" ignores a failure anywhere else in such a list.
+ * The script a CI command proves: its name when the command is exactly "npm run <script>",
+ * optionally with plain arguments, and nothing else; otherwise none. Only then does the step's
+ * exit code equal the script's, whatever the shell, so a failing script always fails the build.
  */
-export function provenScripts(
-  command: string,
-  { last = true, pipefail = false }: { last?: boolean; pipefail?: boolean } = {},
-): string[] {
-  return [
-    ...new Set(
-      [...command.matchAll(NPM_RUN)]
-        .filter((match) => {
-          const rest = command.slice(match.index + match[0].length);
-          if (rest.includes(OR_ELSE)) return false;
-          const list = rest.split(';')[0] ?? '';
-          const pipeline = list.split('&&')[0] ?? '';
-          if (!pipefail && PIPE.test(pipeline)) return false;
-          return !list.includes('&&') || (last && !rest.includes(';'));
-        })
-        .map(([, name]) => name ?? ''),
-    ),
-  ];
+export function provenScripts(command: string): string[] {
+  const name = EXACT_NPM_RUN.exec(command)?.[1];
+  return name === undefined ? [] : [name];
 }
 
-/** The scripts that a step runs in a way that can fail the build, tracking "set -o pipefail". */
+/** The script a step proves: only a step whose run holds a single command can prove one. */
 export function provenStepScripts(step: WorkflowStep): string[] {
-  let pipefail = step.pipefail;
-  return [
-    ...new Set(
-      step.commands.flatMap((command, index) => {
-        if (SET_PIPEFAIL.test(command)) pipefail = true;
-        return provenScripts(command, { last: index === step.commands.length - 1, pipefail });
-      }),
-    ),
-  ];
+  const [command, ...rest] = step.commands;
+  return command === undefined || rest.length > 0 ? [] : provenScripts(command);
 }
 
 /** The script names of every "npm run <script>" in a text. */
@@ -552,7 +521,8 @@ export function loadCiContext(root: string): {
 
 /**
  * Why a ci AC's Verified by line does not prove it; empty when it names at least one
- * "npm run <script>" and every one it names is a script in package.json and run by a CI step.
+ * "npm run <script>" and every one it names is a script in package.json and the whole command
+ * of a CI step that can fail the build.
  */
 export function ciGapsOf(
   verifiedBy: string,
@@ -566,7 +536,9 @@ export function ciGapsOf(
       : [`npm run ${name} is not a script in ${PACKAGE_FILE}`]),
     ...(context.workflowScripts.has(name)
       ? []
-      : [`npm run ${name} is not run by a step of ${CI_WORKFLOW} that can fail the build`]),
+      : [
+          `npm run ${name} is not the whole command of a step of ${CI_WORKFLOW} that can fail the build`,
+        ]),
   ]);
 }
 

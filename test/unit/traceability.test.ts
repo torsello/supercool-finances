@@ -64,7 +64,7 @@ describe('traceability: spec parsing', () => {
             id: 'ZZA-AC06',
             spec: '001-alpha',
             level: 'ci',
-            verifiedBy: 'CI job `ci`, steps `npm run zz-piped` and `npm run zz-listed`',
+            verifiedBy: 'CI job `ci`, steps `npm run zz-args` and `npm run zz-continued`',
           },
         ],
       },
@@ -224,16 +224,24 @@ describe('traceability: report', () => {
       'FAIL ZZC-AC03 (specs/001-gamma, Implemented, level ci) has no "- **Verified by:**" line',
       'FAIL ZZC-AC04 (specs/001-gamma, Implemented) has no passing unit test whose name contains its ID',
       'FAIL ZZC-AC06 (specs/001-gamma, Implemented) has no passing integration test whose name contains its ID',
-      'FAIL ZZC-AC09 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-absent is not a script in package.json; npm run zz-absent is not run by a step of .github/workflows/ci.yml that can fail the build',
-      'FAIL ZZC-AC10 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-commented is not run by a step of .github/workflows/ci.yml that can fail the build',
+      'FAIL ZZC-AC09 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-absent is not a script in package.json; npm run zz-absent is not the whole command of a step of .github/workflows/ci.yml that can fail the build',
+      'FAIL ZZC-AC10 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-commented is not the whole command of a step of .github/workflows/ci.yml that can fail the build',
       'FAIL ZZC-AC11 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-step-only is not a script in package.json',
       'FAIL ZZC-AC12 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: it names no npm run script that a step of .github/workflows/ci.yml runs',
-      'FAIL ZZC-AC13 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-or-true is not run by a step of .github/workflows/ci.yml that can fail the build',
-      'FAIL ZZC-AC14 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-continue is not run by a step of .github/workflows/ci.yml that can fail the build',
-      'FAIL ZZC-AC15 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-if-false is not run by a step of .github/workflows/ci.yml that can fail the build',
-      'FAIL ZZC-AC16 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-job-off is not run by a step of .github/workflows/ci.yml that can fail the build',
-      'FAIL ZZC-AC17 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-piped is not run by a step of .github/workflows/ci.yml that can fail the build',
-      'FAIL ZZC-AC18 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-listed-early is not run by a step of .github/workflows/ci.yml that can fail the build',
+      'FAIL ZZC-AC13 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-or-true is not the whole command of a step of .github/workflows/ci.yml that can fail the build',
+      'FAIL ZZC-AC14 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-continue is not the whole command of a step of .github/workflows/ci.yml that can fail the build',
+      'FAIL ZZC-AC15 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-if-false is not the whole command of a step of .github/workflows/ci.yml that can fail the build',
+      'FAIL ZZC-AC16 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-job-off is not the whole command of a step of .github/workflows/ci.yml that can fail the build',
+      'FAIL ZZC-AC17 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-piped is not the whole command of a step of .github/workflows/ci.yml that can fail the build',
+      'FAIL ZZC-AC18 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-listed-early is not the whole command of a step of .github/workflows/ci.yml that can fail the build',
+      'FAIL ZZC-AC19 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-assigned is not the whole command of a step of .github/workflows/ci.yml that can fail the build',
+      'FAIL ZZC-AC20 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-condition is not the whole command of a step of .github/workflows/ci.yml that can fail the build',
+      'FAIL ZZC-AC21 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-echoed is not the whole command of a step of .github/workflows/ci.yml that can fail the build',
+      'FAIL ZZC-AC22 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-background is not the whole command of a step of .github/workflows/ci.yml that can fail the build',
+      'FAIL ZZC-AC23 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-second-line is not the whole command of a step of .github/workflows/ci.yml that can fail the build',
+      'FAIL ZZC-AC24 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-flagged is not the whole command of a step of .github/workflows/ci.yml that can fail the build',
+      'FAIL ZZC-AC25 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-redirected is not the whole command of a step of .github/workflows/ci.yml that can fail the build',
+      'FAIL ZZC-AC26 (specs/001-gamma, Implemented, level ci) is not proven by its Verified by line: npm run zz-negated is not the whole command of a step of .github/workflows/ci.yml that can fail the build',
       'FAIL ZZD-AC01 (specs/002-delta, ticked in specs/002-delta/tasks.md) has no passing unit test whose name contains its ID',
       'FAIL ZZC-AC04 (specs/001-gamma, Implemented) is named by a test that did not pass: "ZZC-AC04 is skipped" (skipped, test/unit/gamma.test.ts)',
       'FAIL ZZC-AC04 (specs/001-gamma, Implemented) is named by a test that did not pass: "ZZC-AC04 is todo" (todo, test/unit/gamma.test.ts)',
@@ -365,91 +373,81 @@ describe('traceability: ci-level proof', () => {
     ]);
   });
 
-  it('never counts a script with || anywhere after it as proof', () => {
+  it('counts a command only when it is exactly npm run <script>, with plain arguments at most', () => {
     expect(provenScripts('npm run reconcile')).toEqual(['reconcile']);
-    expect(provenScripts('DATABASE_URL=x npm run reconcile -- --json && npm run b')).toEqual([
+    expect(provenScripts('npm run test:integration')).toEqual(['test:integration']);
+    expect(provenScripts('npm run x.y')).toEqual(['x.y']);
+    expect(provenScripts('npm run trace -- --require unit,integration')).toEqual(['trace']);
+    expect(provenScripts('npm run reconcile -- --out=reports/r.json --level 2')).toEqual([
       'reconcile',
-      'b',
     ]);
     for (const command of [
       'npm run reconcile || true',
-      'npm run reconcile ||:',
-      'npm run reconcile || echo skipped',
-      'npm run reconcile || exit 0',
-      'npm run reconcile && npm run b || true',
-      'npm run reconcile; npm run b || true',
+      'npm run reconcile && echo ok',
+      'npm run a && npm run reconcile',
+      'npm run reconcile; echo done',
+      'npm run reconcile | tee out.log',
+      'npm run reconcile |& tee out.log',
+      'cat input | npm run reconcile',
+      'npm run reconcile &',
+      'npm run reconcile > out.log',
+      'npm run reconcile 2>&1',
+      'npm run reconcile < input',
+      '! npm run reconcile',
+      'DATABASE_URL=x npm run reconcile',
+      'env DATABASE_URL=x npm run reconcile',
+      'if npm run reconcile; then :; fi',
+      'while npm run reconcile; do :; done',
+      'until npm run reconcile; do :; done',
+      'echo npm run reconcile',
+      'echo $(npm run reconcile)',
+      'echo `npm run reconcile`',
+      'time npm run reconcile',
+      ' npm run reconcile',
+      'npm run reconcile -- "$ARG"',
+      "npm run reconcile -- 'a b'",
+      'npm run reconcile -- *.json',
+      'npm  run reconcile',
+      'npx npm run reconcile',
+      'npm run --silent reconcile',
+      'npm run',
     ]) {
-      expect(provenScripts(command)).not.toContain('reconcile');
+      expect(provenScripts(command), command).toEqual([]);
     }
-    expect(provenScripts('npm run a || npm run b')).toEqual(['b']);
+  });
 
+  it('counts a step only when its run holds a single command, whatever its shell', () => {
     const workflow = [
       'steps:',
+      '  - run: npm run inline # a trailing comment',
       '  - run: |',
-      '      npm run reconcile \\',
-      '        || echo skipped',
-      '  - run: npm run kept',
-    ].join('\n');
-    expect(workflowCommands(workflow).flatMap((command) => provenScripts(command))).toEqual([
-      'kept',
-    ]);
-  });
-
-  it('counts a script that feeds a pipe only when pipefail is on', () => {
-    for (const command of [
-      'npm run a | tee out.log',
-      'npm run a |& tee out.log',
-      'npm run a | tee out.log && echo done',
-    ]) {
-      expect(provenScripts(command)).not.toContain('a');
-      expect(provenScripts(command, { pipefail: true })).toContain('a');
-    }
-    expect(provenScripts('cat input | npm run a')).toEqual(['a']);
-    expect(provenScripts('npm run a | npm run b')).toEqual(['b']);
-  });
-
-  it('counts a script before the last && of a list only on the last command line of its block', () => {
-    expect(provenScripts('npm run a && echo ok', { last: false })).toEqual([]);
-    expect(provenScripts('npm run a && echo ok', { last: true })).toEqual(['a']);
-    expect(provenScripts('npm run a && npm run b', { last: false })).toEqual(['b']);
-    expect(provenScripts('npm run a && echo ok; echo done', { last: true })).toEqual([]);
-    expect(provenScripts('npm run a && npm run b; echo done', { last: false })).toEqual(['b']);
-    expect(provenScripts('npm run a; echo done', { last: false })).toEqual(['a']);
-  });
-
-  it('reads pipefail from shell: bash or a set line, and the position of each command in its step', () => {
-    const workflow = [
-      'steps:',
+      '      # a comment line',
+      '      npm run continued \\',
+      '        -- --flag',
       '  - run: |',
-      '      npm run piped-default | tee out.log',
-      '      npm run listed-early && echo listed',
-      '      set -euo pipefail',
-      '      npm run piped-after-set | tee out.log',
-      '      npm run listed-last && echo listed',
+      '      echo preparing',
+      '      npm run second-line',
+      '  - run: |',
+      '      npm run first-of-two',
+      '      echo done',
       '  - shell: bash',
       '    run: npm run piped-bash | tee out.log',
-      '  - shell: bash {0}',
-      '    run: npm run piped-custom-shell | tee out.log',
+      '  - shell: bash',
+      '    run: npm run plain-bash',
     ].join('\n');
 
     expect(workflowSteps(workflow)).toEqual([
-      {
-        commands: [
-          'npm run piped-default | tee out.log',
-          'npm run listed-early && echo listed',
-          'set -euo pipefail',
-          'npm run piped-after-set | tee out.log',
-          'npm run listed-last && echo listed',
-        ],
-        pipefail: false,
-      },
-      { commands: ['npm run piped-bash | tee out.log'], pipefail: true },
-      { commands: ['npm run piped-custom-shell | tee out.log'], pipefail: false },
+      { commands: ['npm run inline'] },
+      { commands: ['npm run continued -- --flag'] },
+      { commands: ['echo preparing', 'npm run second-line'] },
+      { commands: ['npm run first-of-two', 'echo done'] },
+      { commands: ['npm run piped-bash | tee out.log'] },
+      { commands: ['npm run plain-bash'] },
     ]);
     expect(workflowSteps(workflow).flatMap(provenStepScripts)).toEqual([
-      'piped-after-set',
-      'listed-last',
-      'piped-bash',
+      'inline',
+      'continued',
+      'plain-bash',
     ]);
   });
 
@@ -473,10 +471,11 @@ describe('traceability: ci-level proof', () => {
     expect(workflowCommands(workflow)).toEqual(['npm run in-required-job']);
   });
 
-  it('finds every npm run script in a line, without a trailing full stop', () => {
+  it('finds every npm run script in a line, without a trailing full stop or a flag', () => {
     expect(
       npmRunScripts('step `npm run reconcile` after `npm run test:integration`, then npm run x.y.'),
     ).toEqual(['reconcile', 'test:integration', 'x.y']);
+    expect(npmRunScripts('`npm run --silent token`')).toEqual([]);
     expect(npmRunScripts('pnpm run other and CI job `terraform`')).toEqual([]);
   });
 
@@ -491,10 +490,10 @@ describe('traceability: ci-level proof', () => {
       'it names no npm run script that a step of .github/workflows/ci.yml runs',
     ]);
     expect(ciGapsOf('npm run package-only, npm run step-only, npm run neither', context)).toEqual([
-      'npm run package-only is not run by a step of .github/workflows/ci.yml that can fail the build',
+      'npm run package-only is not the whole command of a step of .github/workflows/ci.yml that can fail the build',
       'npm run step-only is not a script in package.json',
       'npm run neither is not a script in package.json',
-      'npm run neither is not run by a step of .github/workflows/ci.yml that can fail the build',
+      'npm run neither is not the whole command of a step of .github/workflows/ci.yml that can fail the build',
     ]);
   });
 

@@ -7,6 +7,14 @@
     "zz-if-false": "true",
     "zz-job-off": "true",
     "zz-piped": "true",
-    "zz-listed-early": "true"
+    "zz-listed-early": "true",
+    "zz-assigned": "true",
+    "zz-condition": "true",
+    "zz-echoed": "true",
+    "zz-background": "true",
+    "zz-second-line": "true",
+    "zz-flagged": "true",
+    "zz-redirected": "true",
+    "zz-negated": "true"
   }
 }

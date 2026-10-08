@@ -4,7 +4,7 @@
     "zz-check": "true",
     "zz:prepare": "true",
     "zz-terraform-validate": "true",
-    "zz-piped": "true",
-    "zz-listed": "true"
+    "zz-args": "true",
+    "zz-continued": "true"
   }
 }

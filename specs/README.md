@@ -54,7 +54,7 @@ Use the `spec` skill (`/spec NNN-name PFX`). It follows [the template](../.claud
 ```
 
 - `Level` is exactly `unit`, `integration`, `e2e` or `ci`.
-- Only when no test can prove an AC (for example Terraform validated in CI), the level is `ci` and the AC adds `- **Verified by:** <CI job and the npm run script its step runs>`. Any other AC with a `Verified by` line fails the check. The line must name at least one `npm run <script>`, and every script it names must be in `package.json` and run by a step of `.github/workflows/ci.yml` that can fail the build: a `run:` command, comments excluded, with no `||` anywhere after the `npm run <script>`; not feeding a pipe (`|` or `|&`) unless the step sets `shell: bash` or an earlier line of its block runs `set -o pipefail`, because GitHub's default shell is `bash -e` without pipefail; and, when it is followed by `&&` in its list, only on the last command line of its block, because `bash -e` ignores a failure anywhere else in a `&&` list (a line ending in a backslash continues on the next). The step and its job must be without `continue-on-error` (other than `false`) or `if: false`. Until all of that holds, the AC is not covered.
+- Only when no test can prove an AC (for example Terraform validated in CI), the level is `ci` and the AC adds `- **Verified by:** <CI job and the npm run script its step runs>`. Any other AC with a `Verified by` line fails the check. The line must name at least one `npm run <script>`, and every script it names must be in `package.json` and be the whole command of a step of `.github/workflows/ci.yml`: the step's `run` is exactly `npm run <script>`, optionally followed by plain arguments (letters, digits and `_ . , : = / @ % + -`), as a single command, with nothing before or after it. Comments, blank lines and a line continued with a backslash do not count as commands. Anything else is not proof: an assignment or `env` before the script, `!`, `if`, `echo`, a pipe, `&&`, `||`, `;`, `&`, a redirection, a quote, a substitution, an npm flag before the script name, or a second command in the step. The step and its job must also be without `continue-on-error` (other than `false`) and `if: false`. Until all of that holds, the AC is not covered.
 - An AC heading may be indented by up to three spaces, as any Markdown heading. A heading that starts like an AC ID, in any case and at any indent, but is not exactly `### PFX-ACnn` followed by a space or the end of the line (for example `### MOV-AC3`, `#### MOV-AC03`, `### MOV-AC03:`, `### mov-ac03` or a heading indented by four spaces) fails the check, and so does an AC ID whose prefix is not the spec's `ID prefix`.
 - Headings inside fenced code blocks are examples, not ACs. A fence closes only with the same character (backtick or tilde) repeated at least as many times.
 
@@ -84,12 +84,12 @@ npm run trace -- --write               # also write docs/traceability.md
 
 The check prints every AC with its spec, status, level, coverage and proof (test files, or the `Verified by` command). An AC is **required** when its spec is `Implemented` or a ticked task in any `specs/*/tasks.md` names it. A task is a `- [ ]` or `- [x]` line, and it names its AC IDs on that line. Coverage is one of:
 
-| Coverage     | Meaning                                                                                                                                                                                                                                |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `covered`    | A passing test of its level names it, or, for level `ci`, it has a `Verified by` line naming at least one `npm run <script>`, each a script in `package.json` and run by a step of `.github/workflows/ci.yml` that can fail the build. |
-| `pending`    | Not proven, and not required yet.                                                                                                                                                                                                      |
-| `missing`    | Required and not proven. Fails the check.                                                                                                                                                                                              |
-| `unverified` | The report of its level is absent, so that project was not run. Fails only with `--require`.                                                                                                                                           |
+| Coverage     | Meaning                                                                                                                                                                                                                                              |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `covered`    | A passing test of its level names it, or, for level `ci`, it has a `Verified by` line naming at least one `npm run <script>`, each a script in `package.json` and the whole command of a step of `.github/workflows/ci.yml` that can fail the build. |
+| `pending`    | Not proven, and not required yet.                                                                                                                                                                                                                    |
+| `missing`    | Required and not proven. Fails the check.                                                                                                                                                                                                            |
+| `unverified` | The report of its level is absent, so that project was not run. Fails only with `--require`.                                                                                                                                                         |
 
 The check exits with code 1 when:
 
@@ -109,14 +109,16 @@ Tick a task in `tasks.md` as soon as it is done, so its ACs are enforced from th
 
 Keep this table up to date whenever a spec is added or its status changes.
 
-| #   | Spec                                                 | Prefix | Status |
-| --- | ---------------------------------------------------- | ------ | ------ |
-| 000 | [overview](000-overview/spec.md)                     | SYS    | Draft  |
-| 001 | [accounts](001-accounts/spec.md)                     | ACC    | Draft  |
-| 002 | [ledger](002-ledger/spec.md)                         | LED    | Draft  |
-| 003 | [money movements](003-money-movements/spec.md)       | MOV    | Draft  |
-| 004 | [reversals](004-reversals/spec.md)                   | REV    | Draft  |
-| 005 | [idempotency](005-idempotency/spec.md)               | IDM    | Draft  |
-| 006 | [auth](006-auth/spec.md)                             | AUT    | Draft  |
-| 007 | [security and operability](007-security-ops/spec.md) | SEC    | Draft  |
-| 008 | [deployment](008-deployment/spec.md)                 | DEP    | Draft  |
+| #   | Spec                                                 | Prefix | Status   | Scope                                                                                                       | Depends on                        |
+| --- | ---------------------------------------------------- | ------ | -------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| 000 | [overview](000-overview/spec.md)                     | SYS    | Approved | Roles, glossary, currencies, status-code rule, order of checks, shared errors and global invariants         | none                              |
+| 001 | [accounts](001-accounts/spec.md)                     | ACC    | Approved | Create, read and list accounts, history, freeze, unfreeze and close                                         | 000, 002, 003, 004, 005, 006, 007 |
+| 002 | [ledger](002-ledger/spec.md)                         | LED    | Approved | Double-entry records, settlement accounts, database checks, amount limits, reconciliation                   | 000, 001, 003, 004, 005           |
+| 003 | [money movements](003-money-movements/spec.md)       | MOV    | Approved | Deposits, withdrawals, transfers, locking, reading a transaction                                            | 000, 001, 002, 004, 005, 007      |
+| 004 | [reversals](004-reversals/spec.md)                   | REV    | Approved | Compensating transactions by operators                                                                      | 000, 001, 002, 003, 005           |
+| 005 | [idempotency](005-idempotency/spec.md)               | IDM    | Approved | `Idempotency-Key`, fingerprint, replay, what is stored, expiry and cleanup                                  | 000, 001, 002, 003, 004, 007, 008 |
+| 006 | [auth](006-auth/spec.md)                             | AUT    | Approved | JWT verification, token CLI, authorization matrix                                                           | 000, 001, 003, 004, 005, 007      |
+| 007 | [security and operability](007-security-ops/spec.md) | SEC    | Approved | Rate limits, body limits, headers, logs, health, shutdown, timeouts, pool, configuration, metrics, API docs | 000 to 006, 008                   |
+| 008 | [deployment](008-deployment/spec.md)                 | DEP    | Approved | Docker Compose stack, seed, image, failover, AWS Terraform                                                  | 000, 002, 005, 006, 007           |
+
+Shared vocabulary lives in spec 000 only: a term, role, problem type or status code is defined once there or in the capability spec that owns it, and every other spec refers to it. Every spec is `Approved` with no open question: each decision is stated in the spec as a rule and cited across specs by requirement ID or section. Spec 000 lists the AC IDs retired on 2026-10-07, which are never reused.
