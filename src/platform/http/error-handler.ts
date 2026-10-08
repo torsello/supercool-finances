@@ -57,6 +57,7 @@ const UNAUTHENTICATED_HEADERS = { 'www-authenticate': 'Bearer realm="supercool-f
 const RETRY_AFTER = { 'retry-after': '1' };
 
 const MALFORMED_DETAILS: Readonly<Record<MalformedPart, string>> = {
+  request: 'The request could not be parsed.',
   body: 'The request body is not valid JSON.',
   'idempotency-key': 'The Idempotency-Key header is missing or malformed.',
   cursor: 'The pagination cursor is not valid.',

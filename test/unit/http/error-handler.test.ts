@@ -54,6 +54,13 @@ const ROWS: readonly [string, unknown, number, string, Record<string, string>][]
     { 'www-authenticate': 'Bearer realm="supercool-finances"' },
   ],
   ['Forbidden', new Forbidden(), 403, '/problems/forbidden', {}],
+  [
+    'MalformedRequest request',
+    new MalformedRequest('request'),
+    400,
+    '/problems/malformed-request',
+    {},
+  ],
   ['MalformedRequest body', new MalformedRequest('body'), 400, '/problems/malformed-request', {}],
   [
     'MalformedRequest header',
@@ -228,6 +235,7 @@ describe('toProblem', () => {
   });
 
   it('SYS-R26 names what is broken in the detail of a malformed request: the body, the header or the cursor', () => {
+    expect(toProblem(new MalformedRequest('request')).detail).toMatch(/request/);
     expect(toProblem(new MalformedRequest('body')).detail).toMatch(/body/);
     expect(toProblem(new MalformedRequest('idempotency-key')).detail).toMatch(
       /Idempotency-Key header/,

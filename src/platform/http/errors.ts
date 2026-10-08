@@ -4,11 +4,11 @@
  */
 
 /** What a malformed request got wrong, named in the problem's `detail` (SYS-R26). */
-export type MalformedPart = 'body' | 'idempotency-key' | 'cursor';
+export type MalformedPart = 'request' | 'body' | 'idempotency-key' | 'cursor';
 
 /**
- * A body that does not parse as JSON, a missing or malformed `Idempotency-Key`, or an invalid
- * cursor (SYS-R26): 400 `/problems/malformed-request`.
+ * A request the HTTP parser refuses, a body that does not parse as JSON, a missing or malformed
+ * `Idempotency-Key`, or an invalid cursor (SYS-R26): 400 `/problems/malformed-request`.
  */
 export class MalformedRequest extends Error {
   override readonly name = 'MalformedRequest';

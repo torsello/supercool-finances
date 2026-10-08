@@ -2,8 +2,7 @@ import { IncomingMessage, maxHeaderSize, STATUS_CODES } from 'node:http';
 import type { Socket } from 'node:net';
 import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 import { handleError, problemResponse, sendProblem, toProblem } from './error-handler.js';
-import { RouteNotFound } from './errors.js';
-import { PROBLEM_CONTENT_TYPE, PROBLEM_TYPES } from './problem.js';
+import { MalformedRequest, RouteNotFound } from './errors.js';
 
 /**
  * The router's longest path parameter: Node's maximum header size, which also bounds the request
@@ -40,25 +39,13 @@ interface ClientError extends Error {
   code?: string;
 }
 
-/** The status Fastify's default client error handler answers for each error. */
-function clientErrorStatus(error: ClientError): 400 | 408 | 431 {
-  if (error.code === 'ERR_HTTP_REQUEST_TIMEOUT') return 408;
-  if (error.code === 'HPE_HEADER_OVERFLOW') return 431;
-  return 400;
-}
-
-const CLIENT_ERROR_DETAILS = {
-  400: 'The request could not be parsed.',
-  408: 'The request was not received in time.',
-  431: 'The request headers are too large.',
-} as const;
-
 /**
- * Fastify's `clientErrorHandler`, for a request the HTTP parser refuses before Fastify sees it: an
- * `application/problem+json` body with the status Fastify would answer (400, 408 or 431) and an id
- * from the app's request id generator (SYS-R24). The three share `/problems/malformed-request`,
- * the owner's choice on 2026-10-08, so 408 and 431 are that type's only statuses other than 400.
- * Like Fastify's default, it answers nothing on a reset or destroyed socket and then destroys it.
+ * Fastify's `clientErrorHandler`, for a request the HTTP parser refuses before Fastify sees it. It
+ * answers 400 `/problems/malformed-request` whatever Node reports (an invalid request line or
+ * header, headers above the maximum size, or a request not received in time), the one status spec
+ * 000 and plan 000 section 7 give that type. The body comes from `toProblem` and the registry, with
+ * an id from the app's request id generator (SYS-R24, SYS-R26). Like Fastify's default, it answers
+ * nothing on a reset or destroyed socket and then destroys it.
  */
 export function clientErrorHandler(): (
   this: RequestIdSource,
@@ -68,22 +55,21 @@ export function clientErrorHandler(): (
   // Fastify calls the handler with the app as `this`, whose `genReqId` is the app's generator.
   return function (this: RequestIdSource, error: ClientError, socket: Socket): void {
     if (error.code === 'ECONNRESET' || socket.destroyed) return;
-    const status = clientErrorStatus(error);
-    const body = JSON.stringify({
-      type: '/problems/malformed-request',
-      title: PROBLEM_TYPES['/problems/malformed-request'].title,
-      status,
-      detail: CLIENT_ERROR_DETAILS[status],
-      requestId: this.genReqId(new IncomingMessage(socket)),
-    });
+    const response = problemResponse(
+      toProblem(new MalformedRequest('request')),
+      this.genReqId(new IncomingMessage(socket)),
+    );
     if (socket.writable) {
+      const headers = Object.entries(response.headers)
+        .map(([name, value]) => `${name}: ${value}\r\n`)
+        .join('');
       socket.write(
-        `HTTP/1.1 ${String(status)} ${STATUS_CODES[status] ?? ''}\r\n` +
-          `Content-Type: ${PROBLEM_CONTENT_TYPE}\r\n` +
-          `Content-Length: ${String(Buffer.byteLength(body))}\r\n` +
-          'Connection: close\r\n\r\n' +
-          body,
+        `HTTP/1.1 ${String(response.status)} ${STATUS_CODES[response.status] ?? ''}\r\n` +
+          headers +
+          `content-length: ${String(response.body.byteLength)}\r\n` +
+          'connection: close\r\n\r\n',
       );
+      socket.write(response.body);
     }
     socket.destroy(error);
   };

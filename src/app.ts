@@ -5,16 +5,26 @@ import {
   type ZodTypeProvider,
 } from 'fastify-type-provider-zod';
 import { z } from 'zod';
+import { accountRoutes } from './modules/accounts/adapters/http/routes.js';
+import { CursorCodec } from './modules/accounts/adapters/http/cursor.js';
+import {
+  KyselyAccountQueries,
+  KyselyAccountRepository,
+  KyselyAccountTransactions,
+} from './modules/accounts/adapters/persistence/kysely-accounts.js';
 import { registerAuthentication } from './modules/auth/adapters/http/authenticate.js';
 import { registerAuthorization } from './modules/auth/adapters/http/authorize.js';
 import { loadConfig, type Config, type Environment } from './platform/config/config.js';
 import { createDatabase, createPool } from './platform/db/database.js';
+import { TransactionRunner } from './platform/db/transaction-runner.js';
+import { UnitOfWorkRunner, type UnitOfWorkFaults } from './platform/db/unit-of-work.js';
 import {
   clientErrorHandler,
   handleFrameworkError,
   MAX_PARAM_LENGTH,
 } from './platform/http/framework-errors.js';
 import { registerRoutes, type RouteModule } from './platform/http/routes.js';
+import { UuidV7Generator } from './platform/ids/uuid-v7.js';
 import { loggerOptions, type LogDestination } from './platform/logging/logger.js';
 
 export type { RouteModule } from './platform/http/routes.js';
@@ -25,6 +35,8 @@ export type { RouteModule } from './platform/http/routes.js';
  * that builds a component with a hook point adds it here.
  */
 export interface TestSeams {
+  /** `unit-of-work-faults`: the unit of work's fault hook (plan 000 section 8). */
+  unitOfWorkFaults?: UnitOfWorkFaults;
   /** `throwing-route`: a route registered under `/v1` with the module routes. */
   throwingRoute?: RouteModule;
 }
@@ -56,9 +68,16 @@ export function buildApp(config: Config, options: AppOptions = {}) {
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
 
-  const db = createDatabase(createPool({ connectionString: config.databaseUrl, logger: app.log }));
+  const pool = createPool({ connectionString: config.databaseUrl, logger: app.log });
+  const db = createDatabase(pool);
   app.addHook('onClose', async () => {
     await db.destroy();
+  });
+  const ids = new UuidV7Generator();
+  const unitOfWork = new UnitOfWorkRunner(new TransactionRunner({ pool }), {
+    ...(options.seams?.unitOfWorkFaults === undefined
+      ? {}
+      : { faults: options.seams.unitOfWorkFaults }),
   });
 
   app.get(
@@ -67,7 +86,16 @@ export function buildApp(config: Config, options: AppOptions = {}) {
     () => ({ status: 'ok' }) as const,
   );
 
-  const modules: RouteModule[] = [];
+  const modules: RouteModule[] = [
+    accountRoutes({
+      repository: new KyselyAccountRepository(db),
+      ids,
+      queries: new KyselyAccountQueries(db),
+      transactions: new KyselyAccountTransactions(unitOfWork, ids),
+      cursors: new CursorCodec(config.cursorSecret),
+      accountLockTimeoutMs: config.accountLockTimeoutMs,
+    }),
+  ];
   if (options.seams?.throwingRoute !== undefined) modules.push(options.seams.throwingRoute);
 
   registerRoutes(app, {

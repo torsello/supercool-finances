@@ -1,5 +1,6 @@
 import { buildApp, type RouteModule, type TestSeams } from '../../src/app.js';
 import type { Environment } from '../../src/platform/config/config.js';
+import type { FaultStep, UnitOfWorkFaults } from '../../src/platform/db/unit-of-work.js';
 import { testConfig, type BuiltApp } from './app.js';
 import { LogCapture } from './logs.js';
 
@@ -31,18 +32,43 @@ const throwingRoute: RouteModule = (scope) => {
 };
 
 /**
- * The seams `buildApp` has hook points for so far. The unit of work's faults and the reversal's
- * skipped check are attached once the composition root builds those components (the account,
- * movement and reversal routes), and the response and connection hooks once the presenter and the
- * keyed handler exist (the idempotency wiring), each in the 08-api step that builds it.
+ * `unit-of-work-faults`: throws `error` when the work reaches `step`, until cleared. A test sets it
+ * just before the request it faults and clears it afterwards.
  */
-function seams(): TestSeams {
-  return { throwingRoute };
+export class UnitOfWorkFaultSeam implements UnitOfWorkFaults {
+  #fault: { step: FaultStep; error: Error } | undefined;
+
+  failAt(step: FaultStep, error: Error): void {
+    this.#fault = { step, error };
+  }
+
+  clear(): void {
+    this.#fault = undefined;
+  }
+
+  atStep(step: FaultStep): void {
+    if (this.#fault?.step === step) throw this.#fault.error;
+  }
+}
+
+export interface BuiltTestApp extends BuiltApp {
+  faults: UnitOfWorkFaultSeam;
+}
+
+/**
+ * The seams `buildApp` has hook points for so far. The reversal's skipped check is attached once
+ * the composition root builds the reversal use case (the reversal routes), and the response and
+ * connection hooks once the presenter and the keyed handler exist (the idempotency wiring), each
+ * in the 08-api step that builds it.
+ */
+function seams(faults: UnitOfWorkFaultSeam): TestSeams {
+  return { unitOfWorkFaults: faults, throwingRoute };
 }
 
 /** The test app: the composition root with the test seams attached and its logs captured. */
-export function buildTestApp(options: { env?: Environment } = {}): BuiltApp {
+export function buildTestApp(options: { env?: Environment } = {}): BuiltTestApp {
   const logs = new LogCapture();
-  const app = buildApp(testConfig(options.env), { logStream: logs.stream, seams: seams() });
-  return { app, logs };
+  const faults = new UnitOfWorkFaultSeam();
+  const app = buildApp(testConfig(options.env), { logStream: logs.stream, seams: seams(faults) });
+  return { app, logs, faults };
 }

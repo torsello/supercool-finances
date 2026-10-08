@@ -1,4 +1,5 @@
 import type { LightMyRequestResponse } from 'fastify';
+import type { BuiltApp } from './app.js';
 
 /** The `Authorization` header of a bearer token. */
 export function bearer(token: string): { authorization: string } {
@@ -25,4 +26,50 @@ export function problemOf(response: LightMyRequestResponse): ProblemBody {
 /** A problem body without its `requestId`, to compare bodies that may differ only there. */
 export function withoutRequestId(body: ProblemBody): Record<string, unknown> {
   return Object.fromEntries(Object.entries(body).filter(([name]) => name !== 'requestId'));
+}
+
+/** An app as the test support builds it. */
+type App = BuiltApp['app'];
+
+/** The account representation as the API answers it (section 1.3 of spec 001). */
+export interface AccountJson {
+  id: string;
+  currency: string;
+  status: string;
+  balance: string;
+  createdAt: string;
+  updatedAt: string;
+  ownerId?: string;
+}
+
+/** Creates an account through the API as the holder of `token`, without Idempotency-Key. */
+export async function createAccount(
+  app: App,
+  token: string,
+  currency = 'EUR',
+): Promise<AccountJson> {
+  const response = await app.inject({
+    method: 'POST',
+    url: '/v1/accounts',
+    headers: bearer(token),
+    payload: { currency },
+  });
+  if (response.statusCode !== 201) {
+    throw new Error(`account creation answered ${String(response.statusCode)}: ${response.body}`);
+  }
+  return response.json<AccountJson>();
+}
+
+/** Freezes, unfreezes or closes an account through the API. */
+export async function changeStatus(
+  app: App,
+  token: string,
+  accountId: string,
+  action: 'freeze' | 'unfreeze' | 'close',
+): Promise<LightMyRequestResponse> {
+  return await app.inject({
+    method: 'POST',
+    url: `/v1/accounts/${accountId}/${action}`,
+    headers: bearer(token),
+  });
 }

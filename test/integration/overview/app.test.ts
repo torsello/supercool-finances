@@ -1,5 +1,6 @@
 import { connect } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { PROBLEM_TYPES } from '../../../src/platform/http/problem.js';
 import { buildProductionApp, type BuiltApp } from '../../support/app.js';
 import { bearer, problemOf, withoutRequestId } from '../../support/http.js';
 import { LOG_LEVEL } from '../../support/logs.js';
@@ -113,7 +114,7 @@ describe('the app built by the composition root', () => {
     });
   }
 
-  it('SYS-R24 answers a request the HTTP parser refuses with problem details, the status Fastify uses and a generated id', async () => {
+  it('SYS-R24 SYS-R26 answers every request the HTTP parser refuses with 400 malformed-request from the registry and a generated id', async () => {
     const tcp = buildProductionApp();
     await tcp.app.listen({ host: '127.0.0.1', port: 0 });
     try {
@@ -124,7 +125,7 @@ describe('the app built by the composition root', () => {
         [
           'headers above the maximum size',
           `GET /health/live HTTP/1.1\r\nHost: x\r\nX-Big: ${'a'.repeat(20000)}\r\n\r\n`,
-          431,
+          400,
         ],
       ];
       const ids = new Set<string>();
@@ -144,9 +145,9 @@ describe('the app built by the composition root', () => {
         const problem = JSON.parse(body) as Record<string, unknown>;
         expect(problem, name).toEqual({
           type: '/problems/malformed-request',
-          title: 'Malformed Request',
-          status,
-          detail: expect.any(String) as unknown,
+          title: PROBLEM_TYPES['/problems/malformed-request'].title,
+          status: 400,
+          detail: 'The request could not be parsed.',
           requestId: expect.stringMatching(/^req-/) as unknown,
         });
         ids.add(String(problem['requestId']));
