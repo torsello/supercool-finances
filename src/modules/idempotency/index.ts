@@ -2,7 +2,7 @@
 // table of what is stored, the runner of the key step and its ports. The composition root imports
 // the adapters directly.
 export { IdempotencyKeyReused } from './domain/errors.js';
-export { canonicalJson, fingerprint } from './domain/fingerprint.js';
+export { canonicalJson, fingerprint, NOT_CANONICAL_MARKER } from './domain/fingerprint.js';
 export { parseIdempotencyKey, type ParsedIdempotencyKey } from './domain/idempotency-key.js';
 export {
   decide,
@@ -29,3 +29,5 @@ export type {
   Presenter,
   ProblemResponse,
 } from './application/ports.js';
+// The keyed handler is built by the composition root; other modules' routes only use it.
+export type { Created, KeyedHandler, KeyedOperation } from './adapters/http/keyed-handler.js';

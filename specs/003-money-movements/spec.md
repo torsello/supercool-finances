@@ -117,9 +117,9 @@ Unless stated otherwise: customer user C1 owns account A1 (EUR) and A2 (EUR), cu
 
 - **Level:** integration
 - **Covers:** MOV-R03, MOV-R25
-- **Given** A1 with "5000" EUR, A2 with "0" EUR and B1 with "100" EUR
+- **Given** A1 with "5000" EUR, A2 with "50" EUR and B1 with "100" EUR
 - **When** C1 transfers `{"destinationAccountId": B1, "amount": "300", "currency": "EUR"}` from A1, and then `{"destinationAccountId": A2, "amount": "700", "currency": "EUR"}` from A1
-- **Then** the first answers 201 with a body with exactly `id`, `kind` "transfer", `amount` "300", `currency` "EUR", `createdAt`, `accountId` A1 and `balance` "4700", with no member holding B1's id or balance; its transaction has exactly the entries "-300" on A1 and "300" on B1 and none on a system account; the second answers 201 with `accountId` A1 and `balance` "4000" and no member holding A2's balance; and the balances are A1 "4000", A2 "700" and B1 "400" EUR
+- **Then** the first answers 201 with a body with exactly `id`, `kind` "transfer", `amount` "300", `currency` "EUR", `createdAt`, `accountId` A1 and `balance` "4700", with no member holding B1's id or balance; its transaction has exactly the entries "-300" on A1 and "300" on B1 and none on a system account; the second answers 201 with `accountId` A1 and `balance` "4000" and no member holding A2's balance; and the balances are A1 "4000", A2 "750" and B1 "400" EUR
 
 ### MOV-AC04 · Each role moves money only as permitted
 

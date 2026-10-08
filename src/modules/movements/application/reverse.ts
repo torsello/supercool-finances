@@ -22,12 +22,19 @@ export interface ReverseCommand {
 
 /**
  * The hook point of the `skip-existing-reversal-check` test seam (plan 000 section 8). Only the
- * test app passes it; the production composition root never does.
+ * test app passes it; the production composition root never does. The test app attaches every seam
+ * at once (SYS-R37), so the hook decides per reversal whether the check is skipped.
  */
 export interface SkipExistingReversalCheck {
-  /** Called in place of step 5 of section 1.4 of spec 004, which is then skipped. */
-  skipped(originalId: string): void;
-  /** Called with the `cause` of the `AlreadyReversed` the ledger writer threw for the insert. */
+  /**
+   * Asked in place of step 5 of section 1.4 of spec 004: when it answers true the step is skipped,
+   * and the hook records it; when it answers false the step runs as in production.
+   */
+  skips(originalId: string): boolean;
+  /**
+   * Called, for a reversal whose check was skipped, with the `cause` of the `AlreadyReversed` the
+   * ledger writer threw for the insert.
+   */
   insertRefused(cause: AlreadyReversedCause | undefined): void;
 }
 
@@ -91,15 +98,13 @@ export class Reversals {
       original.entries.map((entry) => ({ id: entry.accountId, kind: entry.accountKind })),
     );
     const hook = this.#skipExistingReversalCheck;
-    let alreadyReversed = false;
-    if (hook === undefined) {
-      alreadyReversed = (await tx.transactions.findReversalOf(id)) !== undefined;
-    } else {
-      hook.skipped(id);
-    }
+    const skipped = hook?.skips(id) === true;
+    const alreadyReversed = skipped
+      ? false
+      : (await tx.transactions.findReversalOf(id)) !== undefined;
     checkReversal(reversal, { alreadyReversed, accounts: locked });
 
-    const appended = await append(tx, reversal, hook);
+    const appended = await append(tx, reversal, skipped ? hook : undefined);
     await tx.audit.record({
       actorId: command.actor.id,
       actorRole: command.actor.role,

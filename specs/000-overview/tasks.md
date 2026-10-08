@@ -35,24 +35,24 @@ No task for this spec: the key step that fills steps 2 to 4 and 9 of the movemen
 
 These tasks run in the cross-spec order of plan 000 section 1 for 08-api: authentication, error handler and pipeline, account routes, idempotency wiring, movement and reversal routes, then the ACs that need them.
 
-- [ ] Test first in `test/unit/platform/config.test.ts`: the shared integer rule of plan section 4 refuses a sign, a leading zero, an exponent, a separator, spaces and an empty string, and the error lists every invalid variable by name without its value; then `src/platform/config/config.ts`.
-- [ ] Test first in `test/unit/http/error-handler.test.ts` (SYS-R24, SYS-R25, SYS-R28, SYS-R29, SYS-R34): every row of plan section 7, with fixed `title` and `detail` and no internals in a 500; then `src/platform/http/problem.ts` and `error-handler.ts`.
-- [ ] Extend `test/unit/platform/transaction-runner.test.ts` so the exhausted retry is mapped by `toProblem` to 503, `/problems/service-unavailable` and `Retry-After: 1`: SYS-AC16.
-- [ ] Test first: SYS-AC06 in `test/unit/http/amount-schema.test.ts`; then `src/platform/http/schemas/amount.ts`, `currency.ts` and `ids.ts`.
-- [ ] Test first in `test/unit/http/validation.test.ts` (SYS-R27): Zod issues become one `errors` entry per field with `pointer` or `parameter`, in schema order then body order; then `src/platform/http/validation.ts`.
-- [ ] Build `src/platform/http/routes.ts` (the `/v1` prefix, the not-found handler, the hook order of plan section 5), `src/platform/logging/logger.ts`, `src/app.ts` and `src/main.ts`, with `test/integration/overview/app.test.ts` (SYS-R32, SYS-R43) proving that an unknown path answers the problem body with and without credentials.
-- [ ] Add `test/support/app.ts`, `test/support/test-app.ts` with the one list of the five seams of plan section 8, `test/support/tokens.ts`, `test/support/http.ts` and log capture.
-- [ ] Test first, once the account routes are served: SYS-AC18 in `test/integration/overview/correlation-id.test.ts`; then `src/platform/http/request-id.ts`.
-- [ ] Test first, once the account, withdrawal and deposit routes are served: SYS-AC20 and SYS-AC21 in `test/integration/overview/problem-details.test.ts`; then the mapping of parser errors to 400.
-- [ ] Test first, once the deposit route is served: SYS-AC23 in `test/integration/overview/order-of-checks.test.ts`.
-- [ ] Test first, once every route of table 1.1 is served (plans 001, 003 and 004): SYS-AC01 in `test/integration/overview/roles.test.ts`.
-- [ ] Test first, once the account read, withdrawal and transfer routes are served: SYS-AC03 in `test/integration/overview/foreign-accounts.test.ts`.
-- [ ] Test first, once the account and deposit routes are served: SYS-AC05 and SYS-AC07 in `test/integration/overview/currencies.test.ts`.
-- [ ] Test first, once the movement and reversal routes are served: SYS-AC08, SYS-AC11 and SYS-AC12 in `test/integration/overview/ledger-invariants.test.ts`.
-- [ ] Test first, once the deposit and reversal routes are served: SYS-AC24 in `test/integration/overview/test-seams.test.ts`; then `app.testSeams` and `attachedTestHooks()`.
-- [ ] Test first, once the account, history, deposit, status and transaction routes are served: SYS-AC25 in `test/integration/overview/system-accounts.test.ts`.
-- [ ] Test first, once the account read and status routes and the idempotency wiring are served: SYS-AC26 in `test/integration/overview/ignored-idempotency-key.test.ts`.
-- [ ] Describe the problem details schema, every problem type of plan section 7 and the `/v1` prefix in the OpenAPI document (ADR-0016 follow-up, SYS-R43).
+- [x] Test first in `test/unit/platform/config.test.ts`: the shared integer rule of plan section 4 refuses a sign, a leading zero, an exponent, a separator, spaces and an empty string, and the error lists every invalid variable by name without its value; then `src/platform/config/config.ts`.
+- [x] Test first in `test/unit/http/error-handler.test.ts` (SYS-R24, SYS-R25, SYS-R28, SYS-R29, SYS-R34): every row of plan section 7, with fixed `title` and `detail` and no internals in a 500; then `src/platform/http/problem.ts` and `error-handler.ts`.
+- [x] Extend `test/unit/platform/transaction-runner.test.ts` so the exhausted retry is mapped by `toProblem` to 503, `/problems/service-unavailable` and `Retry-After: 1`: SYS-AC16.
+- [x] Test first: SYS-AC06 in `test/unit/http/amount-schema.test.ts`; then `src/platform/http/schemas/amount.ts`, `currency.ts` and `ids.ts`.
+- [x] Test first in `test/unit/http/validation.test.ts` (SYS-R27): Zod issues become one `errors` entry per field with `pointer` or `parameter`, in schema order then body order; then `src/platform/http/validation.ts`.
+- [x] Build `src/platform/http/routes.ts` (the `/v1` prefix, the not-found handler, the hook order of plan section 5), `src/platform/logging/logger.ts`, `src/app.ts` and `src/main.ts`, with `test/integration/overview/app.test.ts` (SYS-R32, SYS-R43) proving that an unknown path answers the problem body with and without credentials.
+- [x] Add `test/support/app.ts`, `test/support/test-app.ts` with the one list of the five seams of plan section 8, `test/support/tokens.ts`, `test/support/http.ts` and log capture.
+- [x] Test first, once the account routes are served: SYS-AC18 in `test/integration/overview/correlation-id.test.ts`; then `src/platform/http/request-id.ts`. Then the request id tests of `test/integration/overview/app.test.ts` (an undecodable path, a request the HTTP parser refuses), which assert only a non-empty id that differs between requests, must check the generated UUIDv7 of SYS-R21.
+- [x] Test first, once the account, withdrawal and deposit routes are served: SYS-AC20 and SYS-AC21 in `test/integration/overview/problem-details.test.ts`; then the mapping of parser errors to 400.
+- [x] Test first, once the deposit route is served: SYS-AC23 in `test/integration/overview/order-of-checks.test.ts`.
+- [x] Test first, once every route of table 1.1 is served (plans 001, 003 and 004): SYS-AC01 in `test/integration/overview/roles.test.ts`.
+- [x] Test first, once the account read, withdrawal and transfer routes are served: SYS-AC03 in `test/integration/overview/foreign-accounts.test.ts`.
+- [x] Test first, once the account and deposit routes are served: SYS-AC05 and SYS-AC07 in `test/integration/overview/currencies.test.ts`.
+- [x] Test first, once the movement and reversal routes are served: SYS-AC08, SYS-AC11 and SYS-AC12 in `test/integration/overview/ledger-invariants.test.ts`.
+- [x] Test first, once the deposit and reversal routes are served: SYS-AC24 in `test/integration/overview/test-seams.test.ts`; then `app.testSeams` and `attachedTestHooks()`.
+- [x] Test first, once the account, history, deposit, status and transaction routes are served: SYS-AC25 in `test/integration/overview/system-accounts.test.ts`.
+- [x] Test first, once the account read and status routes and the idempotency wiring are served: SYS-AC26 in `test/integration/overview/ignored-idempotency-key.test.ts`.
+- [x] Describe the problem details schema, every problem type of plan section 7 and the `/v1` prefix in the OpenAPI document (ADR-0016 follow-up, SYS-R43).
 
 ## 09-hardening
 

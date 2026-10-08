@@ -34,6 +34,15 @@ const LEDGER_TABLES = new Set(['transactions', 'ledger_entries']);
 /** The context PostgreSQL gives the append-only trigger's exception (LED-R16). */
 const APPEND_ONLY_TRIGGER = 'function ledger_refuse_change()';
 
+/**
+ * The SQLSTATE of a database error, also when a typed error holds it as its `cause`, so the line
+ * that logs a failed request names it (SYS-R22); undefined for any other error.
+ */
+export function sqlstateOf(error: unknown): string | undefined {
+  if (error instanceof pg.DatabaseError) return error.code;
+  return error instanceof Error ? sqlstateOf(error.cause) : undefined;
+}
+
 /** A deadlock or serialization failure, which the runner retries for movements (SYS-R18). */
 export function isRetryable(error: unknown): boolean {
   return error instanceof pg.DatabaseError && RETRYABLE.has(error.code ?? '');

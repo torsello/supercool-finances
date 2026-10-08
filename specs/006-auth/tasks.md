@@ -18,23 +18,23 @@ No task for this spec.
 
 These tasks run in the cross-spec order of plan 000 section 1 for 08-api: authentication, error handler and pipeline, account routes, idempotency wiring, movement and reversal routes, then the ACs that need them.
 
-- [ ] Test first: AUT-AC15 in `test/unit/platform/config.test.ts`; then `JWT_SECRET`, `JWT_ISSUER` and `JWT_AUDIENCE` in `src/platform/config/config.ts`, and the two values in `.env.example` with `npm run env:sync`.
-- [ ] Add `test/support/tokens.ts`, signing V and its variants, and `src/modules/auth/domain/caller.ts` and `errors.ts`, with `test/unit/auth/tokens-helper.test.ts` (AUT-R02, AUT-R03) proving V decodes to the claims of the spec.
-- [ ] Test first in `test/unit/auth/token-verifier.test.ts` (AUT-R02, AUT-R03): the cases of the spec's valid-token and claims ACs, asserting the identity or the internal reason; then the header, signature and claims checks of `token-verifier.ts`.
-- [ ] Test first in `test/unit/auth/token-verifier.test.ts` (AUT-R04, AUT-R05): the expiry, not-before and lifetime cases of the spec, each with its internal reason; then the time and lifetime checks.
-- [ ] Test first in `test/unit/auth/token-verifier.test.ts` (AUT-R02): the signature and algorithm cases of the spec, each with its internal reason.
-- [ ] Test first in `test/unit/auth/permissions.test.ts` (SYS-R03, AUT-R10, AUT-R11, AUT-R14): every route of table 1.3 has exactly the roles table 1.1 of spec 000 gives it; then `permissions.ts`.
-- [ ] Build `authenticate.ts` and `authorize.ts` as `onRequest` hooks on every `/v1` route, with `test/integration/auth/hooks.test.ts` (AUT-R06, AUT-R20) proving a 401 carries the body and header of section 1.5 and the health check answers without reading the header.
-- [ ] Step 6, once `toProblem` exists (plan 000): extend the verifier tests of `test/unit/auth/token-verifier.test.ts` so every rejection is mapped by `toProblem` to 401 `/problems/unauthenticated`, and name them AUT-AC01, AUT-AC03, AUT-AC04 and AUT-AC05, as SYS-AC16 does.
-- [ ] Test first: AUT-AC02 in `test/integration/auth/unauthenticated.test.ts`, once `/docs` is served.
-- [ ] Test first: AUT-AC06 in `test/integration/auth/auth-logs.test.ts`.
-- [ ] Test first: AUT-AC07 and AUT-AC08 in `test/integration/auth/forbidden.test.ts`.
-- [ ] Test first: AUT-AC09 and AUT-AC10 in `test/integration/auth/foreign-accounts.test.ts`.
-- [ ] Test first: AUT-AC11 in `test/integration/auth/identity-source.test.ts`.
-- [ ] Test first: AUT-AC13 in `test/unit/auth/token-script.test.ts`; then `token-issuer.ts`, `src/modules/auth/adapters/cli/token.ts`, `scripts/token.ts` and `npm run token`.
-- [ ] Test first: AUT-AC12 in `test/integration/auth/token-script.test.ts`.
-- [ ] Test first: AUT-AC14 in `test/integration/auth/no-token-endpoint.test.ts`.
-- [ ] Update the docs: in AGENTS.md, add `npm run token` to the commands table, from 08-api.
+- [x] Test first: AUT-AC15 in `test/unit/platform/config.test.ts`; then `JWT_SECRET`, `JWT_ISSUER` and `JWT_AUDIENCE` in `src/platform/config/config.ts`, and the two values in `.env.example` with `npm run env:sync`.
+- [x] Add `test/support/tokens.ts`, signing V and its variants, and `src/modules/auth/domain/caller.ts` and `errors.ts`, with `test/unit/auth/tokens-helper.test.ts` (AUT-R02, AUT-R03) proving V decodes to the claims of the spec.
+- [x] Test first in `test/unit/auth/token-verifier.test.ts` (AUT-R02, AUT-R03): the cases of the spec's valid-token and claims ACs, asserting the identity or the internal reason; then the header, signature and claims checks of `token-verifier.ts`.
+- [x] Test first in `test/unit/auth/token-verifier.test.ts` (AUT-R04, AUT-R05): the expiry, not-before and lifetime cases of the spec, each with its internal reason; then the time and lifetime checks.
+- [x] Test first in `test/unit/auth/token-verifier.test.ts` (AUT-R02): the signature and algorithm cases of the spec, each with its internal reason.
+- [x] Test first in `test/unit/auth/permissions.test.ts` (SYS-R03, AUT-R10, AUT-R11, AUT-R14): every route of table 1.3 has exactly the roles table 1.1 of spec 000 gives it; then `permissions.ts`.
+- [x] Build `authenticate.ts` and `authorize.ts` as `onRequest` hooks on every `/v1` route, with `test/integration/auth/hooks.test.ts` (AUT-R06, AUT-R20) proving a 401 carries the body and header of section 1.5 and the health check answers without reading the header.
+- [x] Step 6, once `toProblem` exists (plan 000): extend the verifier tests of `test/unit/auth/token-verifier.test.ts` so every rejection is mapped by `toProblem` to 401 `/problems/unauthenticated`, and name them AUT-AC01, AUT-AC03, AUT-AC04 and AUT-AC05, as SYS-AC16 does.
+- [x] Test first: AUT-AC02 in `test/integration/auth/unauthenticated.test.ts`, once `/docs` is served.
+- [x] Test first: AUT-AC06 in `test/integration/auth/auth-logs.test.ts`.
+- [x] Test first: AUT-AC07 and AUT-AC08 in `test/integration/auth/forbidden.test.ts`.
+- [x] Test first: AUT-AC09 and AUT-AC10 in `test/integration/auth/foreign-accounts.test.ts`.
+- [x] Test first: AUT-AC11 in `test/integration/auth/identity-source.test.ts`.
+- [x] Test first: AUT-AC13 in `test/unit/auth/token-script.test.ts`; then `token-issuer.ts`, `src/modules/auth/adapters/cli/token.ts`, `scripts/token.ts` and `npm run token`.
+- [x] Test first: AUT-AC12 in `test/integration/auth/token-script.test.ts`.
+- [x] Test first: AUT-AC14 in `test/integration/auth/no-token-endpoint.test.ts`.
+- [x] Update the docs: in AGENTS.md, add `npm run token` to the commands table, from 08-api.
 
 ## 09-hardening
 

@@ -14,7 +14,15 @@ export type FaultStep = 'after-entries' | 'after-balances';
 export interface UnitOfWorkFaults {
   /** Called when the work reaches a named step; a hook that throws injects a fault there. */
   atStep?(step: FaultStep): void;
+  /**
+   * Called with each ledger entry before it is written; the amount it returns is written in place
+   * of the entry's own, so a test can write one entry with another amount (LED-AC23).
+   */
+  entryAmount?(entry: { accountId: string; amount: bigint }): bigint;
 }
+
+/** The name of the seam a unit of work runner has attached, if any (SYS-AC24). */
+export type UnitOfWorkTestHook = 'unit-of-work-faults';
 
 /** The savepoints of the movement skeleton (plan 000 section 6.2). */
 export type SavepointName = 'work';
@@ -95,9 +103,17 @@ export class UnitOfWork {
   reached(step: FaultStep): void {
     this.#faults?.atStep?.(step);
   }
+
+  /** The amount to write for a ledger entry: its own, unless the fault seam rewrites it. */
+  entryAmount(entry: { accountId: string; amount: bigint }): bigint {
+    return this.#faults?.entryAmount?.(entry) ?? entry.amount;
+  }
 }
 
-/** Runs work on a unit of work inside one transaction of the runner (plan 000 section 6.1). */
+/**
+ * Runs work on a unit of work inside one transaction of the runner (plan 000 section 6.1).
+ * `attachedTestHooks()` names the seam attached, so SYS-AC24 can assert there is none.
+ */
 export class UnitOfWorkRunner {
   readonly #runner: TransactionRunner<pg.PoolClient>;
   readonly #faults: UnitOfWorkFaults | undefined;
@@ -108,6 +124,10 @@ export class UnitOfWorkRunner {
   ) {
     this.#runner = runner;
     this.#faults = options.faults;
+  }
+
+  attachedTestHooks(): UnitOfWorkTestHook[] {
+    return this.#faults === undefined ? [] : ['unit-of-work-faults'];
   }
 
   async run<T>(work: (uow: UnitOfWork) => Promise<T>, options: { retry: RetryPolicy }): Promise<T> {

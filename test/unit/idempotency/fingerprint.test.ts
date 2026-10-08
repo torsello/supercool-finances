@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { canonicalJson, fingerprint } from '../../../src/modules/idempotency/index.js';
+import {
+  canonicalJson,
+  fingerprint,
+  NOT_CANONICAL_MARKER,
+} from '../../../src/modules/idempotency/index.js';
 
 const a = '018f2a00-0000-7000-8000-00000000000a';
 const withdrawals = `/accounts/${a}/withdrawals`;
@@ -118,5 +122,57 @@ describe('request fingerprint', () => {
     ]) {
       expect(() => canonicalJson(value)).toThrow(TypeError);
     }
+  });
+  /** `levels` arrays nested in one another, as `JSON.parse` returns them. */
+  function nested(levels: number): unknown {
+    return JSON.parse(`${'['.repeat(levels)}${']'.repeat(levels)}`) as unknown;
+  }
+
+  it('IDM-R05 accepts 64 levels of nesting and refuses a body RFC 8785 cannot encode: 1e400, 65 levels and 3000 levels of nested arrays', () => {
+    expect(canonicalJson(nested(64))).toBe(`${'['.repeat(64)}${']'.repeat(64)}`);
+    expect(canonicalJson({ a: nested(63) })).toBe(`{"a":${'['.repeat(63)}${']'.repeat(63)}}`);
+    for (const body of [
+      JSON.parse('{"amount":1e400,"currency":"EUR"}') as unknown,
+      nested(65),
+      { a: nested(64) },
+      nested(3000),
+    ]) {
+      expect(() => canonicalJson(body)).toThrow(TypeError);
+    }
+  });
+
+  it('IDM-AC06 fingerprints a body with 1e400 and a body nested deeper than 64 levels without an error, as the method, the path and the fixed marker, which differ from the fingerprints of the other bodies of the AC', () => {
+    expect(() => JSON.parse(NOT_CANONICAL_MARKER) as unknown).toThrow(SyntaxError);
+    const marked = sha256(`POST\n${withdrawals}\n${NOT_CANONICAL_MARKER}`);
+    for (const body of [
+      JSON.parse('{"amount":1e400,"currency":"EUR"}') as unknown,
+      nested(65),
+      nested(3000),
+    ]) {
+      expect(fingerprint('POST', withdrawals, body)).toBe(marked);
+    }
+    // The marker as a JSON string is canonical JSON, with its quotes, so it gets another fingerprint.
+    expect(fingerprint('POST', withdrawals, NOT_CANONICAL_MARKER)).not.toBe(marked);
+    expect(fingerprint('POST', withdrawals, nested(64))).not.toBe(marked);
+    expect(fingerprint('POST', `/accounts/${a}/deposits`, nested(3000))).not.toBe(marked);
+
+    const body = { amount: '100', currency: 'EUR' };
+    const others = [
+      fingerprint('POST', withdrawals, body),
+      fingerprint('POST', withdrawals, { amount: '101', currency: 'EUR' }),
+      fingerprint('POST', `/accounts/${a}/transfers`, body),
+      fingerprint('POST', `/accounts/${a.toUpperCase()}/withdrawals`, body),
+      fingerprint(
+        'POST',
+        '/x',
+        JSON.parse('{"a":"1","b":{"x":[2,{"c":4,"d":3}],"y":1}}') as unknown,
+      ),
+      fingerprint(
+        'POST',
+        '/x',
+        JSON.parse('{"a":"1","b":{"x":[{"c":4,"d":3},2],"y":1}}') as unknown,
+      ),
+    ];
+    expect(others).not.toContain(marked);
   });
 });

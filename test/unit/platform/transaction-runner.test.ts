@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events';
 import pg from 'pg';
 import { describe, expect, it } from 'vitest';
 import { RetriesExhausted } from '../../../src/platform/db/errors.js';
+import { toProblem } from '../../../src/platform/http/error-handler.js';
 import {
   backoffBound,
   TransactionRunner,
@@ -176,6 +177,90 @@ describe('transaction runner', () => {
     ).rejects.toBe(failure);
     expect(attempts).toBe(1);
     expect(delays).toEqual([]);
+  });
+
+  it('SYS-AC16 retries 40P01 and 40001 within the bound, and maps the exhausted retry to 503 service-unavailable with Retry-After: 1', async () => {
+    expect([1, 2, 3, 4, 5, 6, 7].map(backoffBound)).toEqual([10, 20, 40, 80, 160, 200, 200]);
+
+    for (const [random, check] of [
+      [
+        0,
+        (delay: number) => {
+          expect(delay).toBe(0);
+        },
+      ],
+      [
+        0.999,
+        (delay: number) => {
+          expect(delay).toBeLessThan(backoffBound(1));
+        },
+      ],
+    ] as const) {
+      const { runner, delays } = setup(random);
+      let attempts = 0;
+      await runner.run(
+        () => {
+          attempts += 1;
+          return attempts === 1 ? Promise.reject(databaseError('40P01')) : Promise.resolve();
+        },
+        { retry: 'movement' },
+      );
+      expect(delays).toHaveLength(1);
+      check(delays[0] ?? Number.NaN);
+    }
+
+    const deadlock = setup(0.5);
+    let deadlockAttempts = 0;
+    const second = await deadlock.runner.run(
+      () => {
+        deadlockAttempts += 1;
+        return deadlockAttempts === 1
+          ? Promise.reject(databaseError('40P01'))
+          : Promise.resolve('second attempt');
+      },
+      { retry: 'movement' },
+    );
+    expect(second).toBe('second attempt');
+    expect(deadlockAttempts).toBe(2);
+    expect(deadlock.delays).toEqual([5]);
+
+    const serialization = setup(0.5);
+    let serializationAttempts = 0;
+    const exhausted = await serialization.runner
+      .run(
+        () => {
+          serializationAttempts += 1;
+          return Promise.reject(databaseError('40001'));
+        },
+        { retry: 'movement' },
+      )
+      .then(
+        () => undefined,
+        (error: unknown) => error,
+      );
+    expect(serializationAttempts).toBe(3);
+    expect(serialization.delays).toEqual([5, 10]);
+    expect(exhausted).toBeInstanceOf(RetriesExhausted);
+    expect(toProblem(exhausted)).toMatchObject({
+      status: 503,
+      type: '/problems/service-unavailable',
+      headers: { 'retry-after': '1' },
+    });
+
+    const other = setup(0.5);
+    let otherAttempts = 0;
+    const unique = databaseError('23505');
+    await expect(
+      other.runner.run(
+        () => {
+          otherAttempts += 1;
+          return Promise.reject(unique);
+        },
+        { retry: 'movement' },
+      ),
+    ).rejects.toBe(unique);
+    expect(otherAttempts).toBe(1);
+    expect(other.delays).toEqual([]);
   });
 
   it('SYS-R11 releases the client with an error, so the pool destroys it, when ROLLBACK fails', async () => {

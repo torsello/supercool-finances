@@ -69,4 +69,5 @@ The rule and the catalogue are in section 1 and section 4 of spec 000 (SYS-R24 t
 ### Follow-ups
 
 - Phase 08-api: the error handler, the problem type registry and the OpenAPI error schemas.
+  - Done in phase 08-api on 2026-10-08.
 - The phase that adds nginx: problem details for its 413, 429 and gateway errors (section 1.6 of spec 007, DEP-R16).

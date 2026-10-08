@@ -6,7 +6,11 @@ import {
   LedgerWriteRejected,
   StatementTimeout,
 } from '../../../src/platform/db/errors.js';
-import { classifyDatabaseError, isRetryable } from '../../../src/platform/db/sqlstate.js';
+import {
+  classifyDatabaseError,
+  isRetryable,
+  sqlstateOf,
+} from '../../../src/platform/db/sqlstate.js';
 
 function databaseError(
   code: string,
@@ -120,5 +124,14 @@ describe('SQLSTATE classification (plan 000 section 6.3)', () => {
   it('SYS-R19 leaves an error that is already typed as it is', () => {
     const typed = new AccountLockTimeout({ cause: databaseError('55P03') });
     expect(classifyDatabaseError(typed, 'key-wait')).toBe(typed);
+  });
+});
+
+describe('sqlstateOf', () => {
+  it('SYS-R22 names the SQLSTATE of a database error, also through a cause, and nothing for other errors', () => {
+    expect(sqlstateOf(databaseError('57P01'))).toBe('57P01');
+    expect(sqlstateOf(new Error('wrapped', { cause: databaseError('57014') }))).toBe('57014');
+    expect(sqlstateOf(new Error('plain'))).toBeUndefined();
+    expect(sqlstateOf('not an error')).toBeUndefined();
   });
 });

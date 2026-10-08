@@ -27,20 +27,20 @@ No task for this spec: movements add no table. The cross-spec order of the 05-sc
 
 These tasks run in the cross-spec order of plan 000 section 1 for 08-api: authentication, error handler and pipeline, account routes, idempotency wiring, movement and reversal routes, then the ACs that need them.
 
-- [ ] Test first: MOV-AC20 in `test/unit/platform/config.test.ts`; then `ACCOUNT_LOCK_TIMEOUT_MS` in `src/platform/config/config.ts`.
-- [ ] Test first in `test/unit/movements/movement-schemas.test.ts` (MOV-R08, MOV-R09, MOV-R10, MOV-R30): one `errors` entry per failing field; `destinationAccountId` missing, not a string, not a UUID, or equal to the path id in any letter case is refused; then the body schemas of `src/modules/movements/adapters/http/schemas.ts`.
-- [ ] Build `presenters.ts` and `routes.ts` for the four routes, registered by the composition root, with `test/integration/movements/routes.test.ts` (MOV-R25) proving a deposit answers the body of section 1.2 without `balance`.
-- [ ] Test first: MOV-AC01, MOV-AC02 and MOV-AC03 in `test/integration/movements/movements.test.ts`.
-- [ ] Test first: MOV-AC04 in `test/integration/movements/authorization.test.ts`.
-- [ ] Test first: MOV-AC05 and MOV-AC06 in `test/integration/movements/request-validation.test.ts`.
-- [ ] Test first: MOV-AC07 and MOV-AC08 in `test/integration/movements/request-validation.test.ts`.
-- [ ] Test first: MOV-AC09 and MOV-AC11 in `test/integration/movements/business-rules.test.ts`.
-- [ ] Test first: MOV-AC10 in `test/integration/movements/business-rules.test.ts`.
-- [ ] Test first: MOV-AC12 in `test/integration/movements/lock-timeout.test.ts`.
-- [ ] Test first: MOV-AC13 in `test/integration/movements/concurrency.test.ts`.
-- [ ] Test first: MOV-AC16 in `test/integration/movements/audit.test.ts`.
-- [ ] Test first: MOV-AC17 in `test/integration/movements/atomicity.test.ts`, with the `after-balances` fault of the `unit-of-work-faults` seam.
-- [ ] Test first: MOV-AC18 in `test/integration/movements/read-transaction.test.ts`.
+- [x] Test first: MOV-AC20 in `test/unit/platform/config.test.ts`; then `ACCOUNT_LOCK_TIMEOUT_MS` in `src/platform/config/config.ts`.
+- [x] Test first in `test/unit/movements/movement-schemas.test.ts` (MOV-R08, MOV-R09, MOV-R10, MOV-R30): one `errors` entry per failing field; `destinationAccountId` missing, not a string, not a UUID, or equal to the path id in any letter case is refused; then the body schemas of `src/modules/movements/adapters/http/schemas.ts`.
+- [x] Build `presenters.ts` and `routes.ts` for the four routes, registered by the composition root, with `test/integration/movements/routes.test.ts` (MOV-R25) proving a deposit answers the body of section 1.2 without `balance`.
+- [x] Test first: MOV-AC01, MOV-AC02 and MOV-AC03 in `test/integration/movements/movements.test.ts`.
+- [x] Test first: MOV-AC04 in `test/integration/movements/authorization.test.ts`.
+- [x] Test first: MOV-AC05 and MOV-AC06 in `test/integration/movements/request-validation.test.ts`.
+- [x] Test first: MOV-AC07 and MOV-AC08 in `test/integration/movements/request-validation.test.ts`.
+- [x] Test first: MOV-AC09 and MOV-AC11 in `test/integration/movements/business-rules.test.ts`.
+- [x] Test first: MOV-AC10 in `test/integration/movements/business-rules.test.ts`.
+- [x] Test first: MOV-AC12 in `test/integration/movements/lock-timeout.test.ts`.
+- [x] Test first: MOV-AC13 in `test/integration/movements/concurrency.test.ts`.
+- [x] Test first: MOV-AC16 in `test/integration/movements/audit.test.ts`.
+- [x] Test first: MOV-AC17 in `test/integration/movements/atomicity.test.ts`, with the `after-balances` fault of the `unit-of-work-faults` seam.
+- [x] Test first: MOV-AC18 in `test/integration/movements/read-transaction.test.ts`.
 
 ## 09-hardening
 

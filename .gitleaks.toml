@@ -1,0 +1,11 @@
+# gitleaks configuration, read from the repository root by the CI job `secret-scan` and by /ship.
+# Every default rule still applies.
+[extend]
+useDefault = true
+
+# A made-up example Idempotency-Key in the OpenAPI document (src/platform/http/docs.ts and
+# docs/api/openapi.yaml), not a secret. Only this exact value is allowed.
+[[allowlists]]
+description = "Example Idempotency-Key of the OpenAPI document, not a secret"
+regexTarget = "secret"
+regexes = ['''^5b0d7f1e-6c2a-4e8b-9f3d-2a1c4e6b8d0f$''']
