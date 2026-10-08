@@ -19,7 +19,7 @@ These tasks run in the cross-spec order of plan 000 section 1, across every `spe
 
 ## 07-idempotency
 
-- [ ] Test first in `test/integration/reversals/reversal-transaction.test.ts` (REV-R13, REV-R17, IDM-R14): with the statements captured on the unit of work's connection, a reversal runs the skeleton of plan 000 section 6.2 in the order of plan section 3; a rejection, the 23505 path included, rolls back to the savepoint and commits only the stored response; a lock timeout rolls back everything, key row included; then wire `reverse.ts` into the idempotent runner.
+- [x] Test first in `test/integration/reversals/reversal-transaction.test.ts` (REV-R17, IDM-R14): with the statements captured on the unit of work's connection, a reversal runs the skeleton of plan 000 section 6.2 in the order of plan section 3; a rejection, the 23505 path included, rolls back to the savepoint and commits only the stored response; a lock timeout rolls back everything, key row included; then wire `reverse.ts` into the idempotent runner.
 
 ## 08-api
 

@@ -1,0 +1,3011 @@
+ ▐▛███▛█   Claude Code v2.1.292
+▝▜██████▀  Opus 5.5 · Claude Max
+ ▝▝   ▝▝   ~/supercool-finances
+
+▎ [✻] [✻] [✻] · Share Claude Code and earn $10 in usage credits · /passes
+
+❯ /clear                                                                        
+
+!  git switch main && git pull --ff-only && git switch -c phase/07-idempotency  
+  ⎿  Switched to branch 'main'
+     Your branch is up to date with 'origin/main'.
+     From https://github.com/torsello/supercool-finances
+        f19692d..a6e159d  main       -> origin/main
+     Updating f19692d..a6e159d
+     Fast-forward
+      .github/workflows/ci.yml                           |    6 +
+      AGENTS.md                                          |    1 +
+      docs/adr/0002-modular-monolith.md                  |    3 +-
+      ...003-hexagonal-architecture-with-tactical-ddd.md |    1 +
+      ...entry-ledger-with-signed-integer-minor-units.md |    4 +-
+      ...committed-with-ordered-pessimistic-row-locks.md |    1 +
+      docs/adr/0010-kysely-and-pg-instead-of-an-orm.md   |    3 +-
+      ...-strings-in-the-api-and-bigint-in-the-domain.md |    1 +
+      ...ent-timeout-function-for-maintenance-scripts.md |    1 +
+      docs/ai/README.md                                  |    2 +
+      docs/ai/transcripts/06-domain-part1.txt            | 5703
+     ++++++++++++++++++++
+      docs/ai/transcripts/06-domain-part2.txt            | 1596 ++++++
+      eslint.config.js                                   |  145 +-
+      package.json                                       |    1 +
+      scripts/reconcile.ts                               |    8 +
+      specs/000-overview/tasks.md                        |   16 +-
+      specs/001-accounts/tasks.md                        |   14 +-
+      specs/002-ledger/tasks.md                          |   18 +-
+      specs/003-money-movements/tasks.md                 |   18 +-
+      specs/004-reversals/tasks.md                       |   12 +-
+      .../adapters/persistence/kysely-accounts.ts        |  188 +
+      src/modules/accounts/application/account-id.ts     |    9 +
+      .../accounts/application/account-queries.ts        |   91 +
+      .../accounts/application/change-account-status.ts  |   47 +
+      src/modules/accounts/application/create-account.ts |   26 +
+      src/modules/accounts/application/keyset.ts         |   29 +
+      src/modules/accounts/application/ports.ts          |   84 +
+      src/modules/accounts/domain/account.ts             |   78 +
+      src/modules/accounts/domain/errors.ts              |   46 +
+      src/modules/accounts/index.ts                      |   43 +
+      src/modules/ledger/adapters/cli/reconcile.ts       |   92 +
+      .../ledger/adapters/persistence/kysely-ledger.ts   |  103 +
+      .../adapters/persistence/kysely-reconciliation.ts  |   53 +
+      src/modules/ledger/application/ports.ts            |   46 +
+      src/modules/ledger/application/reconciliation.ts   |   19 +
+      src/modules/ledger/domain/currency.ts              |   23 +
+      src/modules/ledger/domain/errors.ts                |  117 +
+      src/modules/ledger/domain/ledger-transaction.ts    |  188 +
+      src/modules/ledger/domain/money.ts                 |   37 +
+      src/modules/ledger/index.ts                        |   38 +
+      .../adapters/persistence/kysely-movements.ts       |  188 +
+      src/modules/movements/application/deposit.ts       |   56 +
+      .../movements/application/get-transaction.ts       |   55 +
+      src/modules/movements/application/ports.ts         |  103 +
+      src/modules/movements/application/results.ts       |   27 +
+      src/modules/movements/application/reverse.ts       |  125 +
+      src/modules/movements/application/steps.ts         |   52 +
+      src/modules/movements/application/transfer.ts      |   90 +
+      src/modules/movements/application/withdraw.ts      |   61 +
+      src/modules/movements/domain/errors.ts             |   49 +
+      src/modules/movements/domain/lock-plan.ts          |   16 +
+      src/modules/movements/domain/movement-rules.ts     |   88 +
+      src/modules/movements/domain/reversal-rules.ts     |   52 +
+      src/modules/movements/index.ts                     |   52 +
+      src/platform/audit/kysely-audit-log.ts             |   57 +
+      src/platform/db/database.ts                        |   37 +-
+      src/platform/db/errors.ts                          |   60 +
+      src/platform/db/sqlstate.ts                        |   73 +
+      src/platform/db/transaction-runner.ts              |  119 +
+      src/platform/db/unit-of-work.ts                    |  119 +
+      src/platform/ids/uuid-v7.ts                        |   12 +
+      test/integration/accounts/account-queries.test.ts  |  340 ++
+      .../accounts/change-status-use-case.test.ts        |  266 +
+      .../accounts/create-account-use-case.test.ts       |   72 +
+      test/integration/ledger/ledger-writer.test.ts      |  211 +
+      test/integration/ledger/reconcile-script.test.ts   |  143 +
+      test/integration/ledger/reconciliation.test.ts     |   77 +
+      test/integration/ledger/system-balance.test.ts     |   73 +
+      .../integration/movements/deposit-use-case.test.ts |   99 +
+      .../movements/lock-wait-use-case.test.ts           |  103 +
+      .../movements/movement-accounts.test.ts            |  105 +
+      test/integration/movements/support.ts              |   90 +
+      .../movements/transaction-queries.test.ts          |  111 +
+      .../movements/transfer-use-case.test.ts            |  156 +
+      .../movements/withdrawal-use-case.test.ts          |   97 +
+      test/integration/platform/audit-log.test.ts        |  163 +
+      test/integration/platform/database.test.ts         |   42 +
+      .../platform/transaction-runner.test.ts            |   94 +
+      test/integration/platform/unit-of-work.test.ts     |  167 +
+      .../reversals/reverse-lock-wait.test.ts            |  231 +
+      .../integration/reversals/reverse-use-case.test.ts |  290 +
+      test/support/db.ts                                 |   14 +-
+      test/unit/accounts/account.test.ts                 |   95 +
+      test/unit/accounts/keyset-order.test.ts            |   53 +
+      test/unit/ledger/currency.test.ts                  |   25 +
+      test/unit/ledger/ledger-transaction.test.ts        |  138 +
+      test/unit/ledger/money.test.ts                     |   58 +
+      test/unit/ledger/reconcile-pool.test.ts            |   21 +
+      test/unit/movements/lock-plan.test.ts              |   80 +
+      test/unit/movements/movement-rules.test.ts         |  137 +
+      test/unit/movements/reversal-rules.test.ts         |  141 +
+      test/unit/movements/reversal.test.ts               |  129 +
+      test/unit/platform/sqlstate.test.ts                |  124 +
+      test/unit/platform/transaction-runner.test.ts      |  279 +
+      test/unit/platform/unit-of-work.test.ts            |   35 +
+      test/unit/platform/uuid-v7.test.ts                 |   29 +
+      test/unit/toolchain.test.ts                        |  163 +-
+      97 files changed, 14776 insertions(+), 77 deletions(-)
+      create mode 100644 docs/ai/transcripts/06-domain-part1.txt
+      create mode 100644 docs/ai/transcripts/06-domain-part2.txt
+      create mode 100644 scripts/reconcile.ts
+      create mode 100644
+     src/modules/accounts/adapters/persistence/kysely-accounts.ts
+      create mode 100644 src/modules/accounts/application/account-id.ts
+      create mode 100644 src/modules/accounts/application/account-queries.ts
+      create mode 100644
+     src/modules/accounts/application/change-account-status.ts
+      create mode 100644 src/modules/accounts/application/create-account.ts
+      create mode 100644 src/modules/accounts/application/keyset.ts
+      create mode 100644 src/modules/accounts/application/ports.ts
+      create mode 100644 src/modules/accounts/domain/account.ts
+      create mode 100644 src/modules/accounts/domain/errors.ts
+      create mode 100644 src/modules/accounts/index.ts
+      create mode 100644 src/modules/ledger/adapters/cli/reconcile.ts
+      create mode 100644
+     src/modules/ledger/adapters/persistence/kysely-ledger.ts
+      create mode 100644
+     src/modules/ledger/adapters/persistence/kysely-reconciliation.ts
+      create mode 100644 src/modules/ledger/application/ports.ts
+      create mode 100644 src/modules/ledger/application/reconciliation.ts
+      create mode 100644 src/modules/ledger/domain/currency.ts
+      create mode 100644 src/modules/ledger/domain/errors.ts
+      create mode 100644 src/modules/ledger/domain/ledger-transaction.ts
+      create mode 100644 src/modules/ledger/domain/money.ts
+      create mode 100644 src/modules/ledger/index.ts
+      create mode 100644
+     src/modules/movements/adapters/persistence/kysely-movements.ts
+      create mode 100644 src/modules/movements/application/deposit.ts
+      create mode 100644 src/modules/movements/application/get-transaction.ts
+      create mode 100644 src/modules/movements/application/ports.ts
+      create mode 100644 src/modules/movements/application/results.ts
+      create mode 100644 src/modules/movements/application/reverse.ts
+      create mode 100644 src/modules/movements/application/steps.ts
+      create mode 100644 src/modules/movements/application/transfer.ts
+      create mode 100644 src/modules/movements/application/withdraw.ts
+      create mode 100644 src/modules/movements/domain/errors.ts
+      create mode 100644 src/modules/movements/domain/lock-plan.ts
+      create mode 100644 src/modules/movements/domain/movement-rules.ts
+      create mode 100644 src/modules/movements/domain/reversal-rules.ts
+      create mode 100644 src/modules/movements/index.ts
+      create mode 100644 src/platform/audit/kysely-audit-log.ts
+      create mode 100644 src/platform/db/errors.ts
+      create mode 100644 src/platform/db/sqlstate.ts
+      create mode 100644 src/platform/db/transaction-runner.ts
+      create mode 100644 src/platform/db/unit-of-work.ts
+      create mode 100644 src/platform/ids/uuid-v7.ts
+      create mode 100644 test/integration/accounts/account-queries.test.ts
+      create mode 100644
+     test/integration/accounts/change-status-use-case.test.ts
+      create mode 100644
+     test/integration/accounts/create-account-use-case.test.ts
+      create mode 100644 test/integration/ledger/ledger-writer.test.ts
+      create mode 100644 test/integration/ledger/reconcile-script.test.ts
+      create mode 100644 test/integration/ledger/reconciliation.test.ts
+      create mode 100644 test/integration/ledger/system-balance.test.ts
+      create mode 100644 test/integration/movements/deposit-use-case.test.ts
+      create mode 100644 test/integration/movements/lock-wait-use-case.test.ts
+      create mode 100644 test/integration/movements/movement-accounts.test.ts
+      create mode 100644 test/integration/movements/support.ts
+      create mode 100644 test/integration/movements/transaction-queries.test.ts
+      create mode 100644 test/integration/movements/transfer-use-case.test.ts
+      create mode 100644 test/integration/movements/withdrawal-use-case.test.ts
+      create mode 100644 test/integration/platform/audit-log.test.ts
+      create mode 100644 test/integration/platform/transaction-runner.test.ts
+      create mode 100644 test/integration/platform/unit-of-work.test.ts
+      create mode 100644 test/integration/reversals/reverse-lock-wait.test.ts
+      create mode 100644 test/integration/reversals/reverse-use-case.test.ts
+      create mode 100644 test/unit/accounts/account.test.ts
+      create mode 100644 test/unit/accounts/keyset-order.test.ts
+      create mode 100644 test/unit/ledger/currency.test.ts
+      create mode 100644 test/unit/ledger/ledger-transaction.test.ts
+      create mode 100644 test/unit/ledger/money.test.ts
+      create mode 100644 test/unit/ledger/reconcile-pool.test.ts
+      create mode 100644 test/unit/movements/lock-plan.test.ts
+      create mode 100644 test/unit/movements/movement-rules.test.ts
+      create mode 100644 test/unit/movements/reversal-rules.test.ts
+      create mode 100644 test/unit/movements/reversal.test.ts
+      create mode 100644 test/unit/platform/sqlstate.test.ts
+      create mode 100644 test/unit/platform/transaction-runner.test.ts
+      create mode 100644 test/unit/platform/unit-of-work.test.ts
+      create mode 100644 test/unit/platform/uuid-v7.test.ts
+     Switched to a new branch 'phase/07-idempotency'
+
+⏺ You're on phase/07-idempotency, branched from an up-to-date main (at a6e159d,
+  the phase 06 merge), and the working tree is clean.
+
+  What would you like to do first? I can read the idempotency spec and tasks.md
+  and list the open tasks with their AC IDs. Or tell me which part of phase 07
+  to start on.
+
+✻ Worked for 5s · done 1:35 PM
+
+❯ /effort high                                                                  
+  ⎿  Set effort level to high (saved as your default for new sessions):
+     Comprehensive implementation with extensive testing and documentation
+
+❯ Implement phase 07-idempotency: every 07-idempotency task of                  
+  specs/*/tasks.md, tests first, as specs/005-idempotency/plan.md describes     
+  them (the key step 3, 3b and 3c with the time left, the savepoint, what is    
+  stored, the cleanup and its entry point) and ADR-0009. The specs, ADRs, plans 
+  and tasks are the source; where this prompt and a plan differ, the plan       
+  wins, and tell me. Tick only the 07-idempotency tasks. Run npm run check, npm 
+  run test:integration and npm run trace.                                       
+
+  Listed 1 directory (ctrl+o to expand)
+
+⏺ Bash(for f in specs/*/tasks.md; do echo "=== $f"; awk '/^##
+      07-idempotency/{p=1;print;next} /^## /{p=0} p' $f; done)
+  ⎿  === specs/000-overview/tasks.md
+     ## 07-idempotency
+     … +81 lines (ctrl+o to expand)
+
+  Read 2 files (ctrl+o to expand)
+
+⏺ Reading the spec, plan and ADR is done; next I'm reading plan 000 (skeleton
+  6.2, runner 6.1, presenter) and the existing movement code before writing
+  tests.
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Bash(sed -n 1,66p specs/000-overview/plan.md && sed -n 121,230p
+      specs/000-overview/plan.md)
+  ⎿  # 000 · Overview · Plan
+
+     How the shared platform is built: the request pipeline of SYS-R31, the
+     … +420 lines (ctrl+o to expand)
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Bash(cd src/modules/movements && cat application/ports.ts
+      application/results.ts application/steps.ts application/deposit.ts
+      application/withdraw.ts application/tran…)
+  ⎿  import type { AccountStatus } from '../../accounts/index.js';
+     import type {
+       CurrencyCode,
+     … +386 lines (ctrl+o to expand)
+
+⏺ Bash(cd /Users/matiastorsello/supercool-finances && cat
+      src/modules/movements/application/reverse.ts
+      src/modules/movements/index.ts src/modules/accounts/application/…)
+  ⎿  import { NotFound } from '../../accounts/index.js';
+     import {
+       AlreadyReversed,
+     … +327 lines (ctrl+o to expand)
+
+⏺ Bash(cat src/modules/movements/adapters/persistence/kysely-movements.ts && sed
+      -n 1,80p src/modules/accounts/adapters/persistence/kysely-accounts.ts)
+  ⎿  import type { Kysely } from 'kysely';
+     import { KyselyAuditLog } from '../../../../platform/audit/kysely-audi
+     t-log.js';
+     … +265 lines (ctrl+o to expand)
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Still reading: plan sections of 001/003/004 that describe the keyed flows,
+  then the existing tests and test helpers.
+
+⏺ Bash(sed -n 55,80p specs/001-accounts/plan.md && echo ---- && sed -n 26,60p
+      specs/003-money-movements/plan.md && echo ---- && sed -n 29,60p
+      specs/004-reversals/plan.…)
+  ⎿  ## 3. Operations and their database statements
+
+     Each block lists the statements in the order they run. "Skeleton" refe
+     … +204 lines (ctrl+o to expand)
+
+  Searched for 1 pattern, read 3 files, listed 2 directories (ctrl+o to expand)
+
+⏺ Bash(grep -rn "db/errors\|application layer\|platform/" docs/adr/0003*
+      docs/adr/0010* | cut -c1-500; sed -n 130,175p test/unit/toolchain.test.ts)
+  ⎿  docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md:35:  - A lin
+     t rule keeps the domain free of infrastructure: `eslint.config.js` for
+     bids imports of `fastify`, `kysely`, `pg`, `ioredis` and other infrast
+     … +46 lines (ctrl+o to expand)
+
+⏺ Still in the reading phase: checking the lint boundary tests, since the runner
+  (application layer) needs IdempotencyWaitTimeout, which lives in
+  platform/db/errors.ts.
+
+⏺ Bash(sed -n 1,129p test/unit/toolchain.test.ts | grep -n "platform\|it(" )
+  ⎿  10:  it('validates amounts as decimal-digit strings in minor units', (
+     ) => {
+     26:  it('shows why amounts are bigint, not number', () => {
+     … +7 lines (ctrl+o to expand)
+
+⏺ Bash(sed -n 95,122p test/unit/toolchain.test.ts)
+  ⎿      'fastify',
+         '@fastify/helmet',
+         'ioredis',
+     … +24 lines (ctrl+o to expand)
+
+⏺ I've mapped out the plan: build the idempotency domain, application runner,
+  Kysely key store/adapter, cleanup CLI, then wire up movements, reversals, and
+  account creation—each test-first. Checking a few remaining types before
+  starting to write code.
+
+  Searched for 1 pattern, listed 1 directory (ctrl+o to expand)
+⏺ Bash(sed -n 1,30p migrations/1791468168000_app-functions.sql; cat
+      src/platform/db/database.ts; sed -n 1,60p
+      src/modules/ledger/adapters/persistence/kysely-ledger.ts)
+  ⎿  -- Up Migration
+
+     -- SEC-R31, SEC-R48, ADR-0019, ADR-0021: timeouts set per database tra
+     … +171 lines (ctrl+o to expand)
+
+⏺ Bash(sed -n 1,80p test/integration/reversals/reverse-use-case.test.ts; cat
+      test/integration/accounts/create-account-use-case.test.ts | head -40; sed
+      -n 60,110p src/m…)
+  ⎿  import { randomUUID } from 'node:crypto';
+     import { afterAll, describe, expect, it } from 'vitest';
+     import { NotFound } from '../../../src/modules/accounts/index.js';
+     … +161 lines (ctrl+o to expand)
+
+⏺ Starting the work: checking the local database is up, then writing the domain
+  tests (key parser, fingerprint, outcome table).
+
+⏺ Bash(docker compose ps 2>&1 | tail -5)
+  ⎿  NAME                            IMAGE                   COMMAND
+                SERVICE    CREATED       STATUS                 PORTS
+     supercool-finances-postgres-1   postgres:16.15-alpine   "docker-entryp
+     … +5 lines (ctrl+o to expand)
+
+⏺ Task 1, test first: the key parser (IDM-AC02).
+
+⏺ Write(test/unit/idempotency/idempotency-key.test.ts)
+  ⎿  Wrote 33 lines to test/unit/idempotency/idempotency-key.test.ts
+       1 import { describe, expect, it } from 'vitest';
+         tency/index.js';
+       3 
+       5   it('IDM-AC02 accepts visible ASCII keys of 1 to 255 characters
+         other value as malformed', () => {
+       6     for (const key of ['k', 'k1', '018f2a00-0000-7000-8000-00000
+       7       expect(parseIdempotencyKey(key)).toEqual({ kind: 'key', ke
+         y });
+       9 
+         ing' });
+     … +33 lines (ctrl+o to expand)
+
+⏺ Write(test/unit/idempotency/fingerprint.test.ts)
+  ⎿  Wrote 105 lines to test/unit/idempotency/fingerprint.test.ts
+       1 import { createHash } from 'node:crypto';
+       2 import { describe, expect, it } from 'vitest';
+       3 import { canonicalJson, fingerprint } from '../../../src/modules
+       4 
+       5 const a = '018f2a00-0000-7000-8000-00000000000a';
+       6 const withdrawals = `/accounts/${a}/withdrawals`;
+       7 
+       9   return createHash('sha256').update(text, 'utf8').digest('hex')
+         ;
+      10 }
+     … +118 lines (ctrl+o to expand)
+
+⏺ Update(test/unit/idempotency/fingerprint.test.ts)
+  ⎿  Added 6 lines, removed 7 lines
+      76          "\u0080": "Control",
+      77          "ö": "Latin Small Letter O With Diaeresis"
+      78        }`,
+      79 -    ) as Record<string, unknown>;                              
+      80 -    const keys = (JSON.parse(canonicalJson(input)) as Record<st
+         -ring, unknown>)                                                
+      81 -      ? [...canonicalJson(input).matchAll(/"((?:[^"\\]|\\.)*)":
+         -/g)].map(                                                      
+      82 -          (match) => JSON.parse(`"${match[1] ?? ''}"`) as strin
+         -g,                                                             
+      83 -        )                                                      
+      84 -      : [];                                                    
+      85 -    expect(keys).toEqual(['\r', '1', '\u0080', 'ö', '€', '😀', 
+         -'דּ']);                                                         
+      79 +    ) as unknown;                                              
+      80 +    expect(canonicalJson(input)).toBe(                         
+      81 +      '{"\\r":"Carriage Return","1":"One","\u0080":"Control",' 
+         ++                                                              
+      82 +        '"ö":"Latin Small Letter O With Diaeresis","€":"Euro Si
+         +gn",' +                                                        
+      83 +        '"😀":"Emoji: Grinning Face","דּ":"Hebrew Letter Dalet W
+         +ith Dagesh"}',                                                 
+      84 +    );                                                         
+      85    });
+      86  
+      87    it('IDM-R05 writes no whitespace, keeps array order and escap
+          es control characters in lowercase hex', () => {
+
+⏺ Now the outcome table test (IDM-R14 to IDM-R17).
+
+⏺ Write(test/unit/idempotency/outcome.test.ts)
+  ⎿  Wrote 94 lines to test/unit/idempotency/outcome.test.ts
+       1 import { describe, expect, it } from 'vitest';
+       2 import { decide, isStored, type Outcome } from '../../../src/mod
+         ules/idempotency/index.js';
+       3 
+       4 const BUSINESS_REJECTIONS: [number, string][] = [
+       6   [422, '/problems/currency-mismatch'],
+       7   [422, '/problems/account-not-active'],
+       8   [422, '/problems/insufficient-funds'],
+       9   [422, '/problems/destination-unavailable'],
+      10   [422, '/problems/balance-limit-exceeded'],
+     … +108 lines (ctrl+o to expand)
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Bash(sed -i '' 's#/problems/too-many-requests#/problems/rate-limited#'
+      test/unit/idempotency/outcome.test.ts && grep -n "rate-limited"
+      test/unit/idempotency/outcome.…)
+  ⎿  73:      [429, '/problems/rate-limited'],
+  ⎿  Updated test/unit/idempotency/outcome.test.ts (+1 -1)
+      70        [404, '/problems/not-found'],
+      71        [413, '/problems/payload-too-large'],
+      72        [415, '/problems/unsupported-media-type'],
+      73 -      [429, '/problems/too-many-requests'],                    
+      73 +      [429, '/problems/rate-limited'],                         
+      74      ] as const) {
+      75        const outcome: Outcome = { step: 'before-key-step', statu
+          s, type };
+      76        expect(decide(outcome), type).toEqual({ stored: false, en
+          ding: 'no-transaction' });
+
+⏺ Now the three domain files.
+
+⏺ Write(src/modules/idempotency/domain/idempotency-key.ts)
+  ⎿  Wrote 26 lines to src/modules/idempotency/domain/idempotency-key.ts
+       1 /** The `Idempotency-Key` header as parsed at the malformed-requ
+         est step (IDM-R03). */
+       2 export type ParsedIdempotencyKey =
+       4   | { kind: 'malformed' }
+       5   | { kind: 'key'; key: string };
+       6 
+       7 /** 1 to 255 characters of visible ASCII, U+0021 to U+007E, spac
+       8 const KEY = /^[\x21-\x7e]{1,255}$/;
+       9 
+      10 /**
+     … +23 lines (ctrl+o to expand)
+
+⏺ Write(src/modules/idempotency/domain/fingerprint.ts)
+  ⎿  Wrote 40 lines to src/modules/idempotency/domain/fingerprint.ts
+       1 import { createHash } from 'node:crypto';
+       3 /**
+       4  * A value in the JSON Canonicalization Scheme of RFC 8785: obje
+       5  * code units of their names at every level, arrays in order, no
+       6  * number serialization of ECMAScript's `JSON.stringify`, which 
+         is the one RFC 8785 specifies
+         trol characters, the shortest
+       8  * round-trip number, `-0` as `0`). A value JSON cannot hold (`u
+       9  * non-finite number) is refused with a `TypeError` rather than 
+      10  */
+     … +46 lines (ctrl+o to expand)
+
+⏺ Write(src/modules/idempotency/domain/outcome.ts)
+  ⎿  Wrote 84 lines to src/modules/idempotency/domain/outcome.ts
+      1 /**
+      2  * The headers stored with a response, those that describe its bo
+        dy: `content-type`, and
+        t-Id`, `Idempotent-Replayed`)
+      4  * are never stored; they are set on each answer (section 1.2 of 
+        spec 005).
+      5  */
+      7   'content-type': string;
+      8   location?: string;
+      9 }
+     … +91 lines (ctrl+o to expand)
+
+⏺ Write(src/modules/idempotency/domain/errors.ts)
+  ⎿  Wrote 11 lines to src/modules/idempotency/domain/errors.ts
+       1 /**
+       2  * The key matches an unexpired key row of the same user with an
+         other fingerprint (IDM-R09):
+       3  * 422 `/problems/idempotency-key-reused`, never stored.
+       4  */
+       6   override readonly name = 'IdempotencyKeyReused';
+       7 
+       8   constructor() {
+       9     super('idempotency key already used with another request');
+      10   }
+     … +2 lines (ctrl+o to expand)
+
+⏺ Update(src/modules/idempotency/domain/fingerprint.ts)
+  ⎿  Added 1 line, removed 1 line
+      21    }
+      22    if (typeof value === 'object') {
+      23      const members = Object.entries(value as Record<string, unkn
+          own>);
+      24 -    // The default sort compares strings by UTF-16 code units, 
+         -as RFC 8785 section 3.2.3 requires.                            
+      24 +    // `<` compares strings by UTF-16 code units, as RFC 8785 s
+         +ection 3.2.3 requires.                                         
+      25      members.sort(([left], [right]) => (left < right ? -1 : left
+           > right ? 1 : 0));
+      26      return `{${members.map(([name, item]) => `${JSON.stringify(
+          name)}:${canonicalJson(item)}`).join(',')}}`;
+      27    }
+
+⏺ Write(src/modules/idempotency/index.ts)
+  ⎿  Wrote 16 lines to src/modules/idempotency/index.ts
+       1 // The idempotency module's public API (plan 000 section 2): the
+       2 // table of what is stored, the runner of the key step and its p
+         orts. The composition root imports
+       3 // the adapters directly.
+       5 export { canonicalJson, fingerprint } from './domain/fingerprint
+         .js';
+         ./domain/idempotency-key.js';
+       7 export {
+       8   decide,
+      10   type Decision,
+     … +10 lines (ctrl+o to expand)
+
+⏺ Bash(npx vitest run --project unit test/unit/idempotency 2>&1 | tail -30)
+  ⎿   RUN  v5.0.3 /Users/matiastorsello/supercool-finances
+
+      ❯ |unit| test/unit/idempotency/fingerprint.test.ts (6 tests | 1 faile
+     … +22 lines (ctrl+o to expand)
+
+⏺ esbuild seems to mangle that String.raw JSON text; I'll build the RFC input as
+  an object literal instead.
+
+⏺ Update(test/unit/idempotency/fingerprint.test.ts)
+  ⎿  Added 8 lines, removed 8 lines
+      53    });
+      54  
+      55    it('IDM-R05 serializes the RFC 8785 example of section 3.2.2 
+          exactly: literals, numbers and minimal string escapes', () => {
+      56 -    const input = JSON.parse(                                  
+      57 -      String.raw`{                                             
+      58 -        "numbers": [333333333.33333329, 1E30, 4.50, 2e-3, 0.000
+         -000000000000000000000001],                                     
+      59 -        "string": "€$\u000F\u000aA'B"\\\\"\/",                 
+      60 -        "literals": [null, true, false]                        
+      61 -      }`,                                                      
+      62 -    ) as unknown;                                              
+      56 +    // The parsed input: "€$\u000F\u000aA'B"\\\\"\/" is € $ U+0
+         +00F LF A ' B " \ \ " /.                                        
+      57 +    const input = {                                            
+      58 +      numbers: [333333333.33333329, 1e30, 4.5, 2e-3, 0.00000000
+         +0000000000000000001],                                          
+      59 +      string: '€$\u000f\nA\'B"\\\\"/',                         
+      60 +      literals: [null, true, false],                           
+      61 +    };                                                         
+      62      expect(canonicalJson(input)).toBe(
+      64 -      String.raw`{"literals":[null,true,false],"numbers":[33333
+         -3333.3333333,1e+30,4.5,0.002,1e-27],"string":"€$\u000f\nA'B\"\\
+         -\\\"/"}`,                                                      
+      63 +      '{"literals":[null,true,false],"numbers":[333333333.33333
+         +33,1e+30,4.5,0.002,1e-27],' +                                  
+      64 +        '"string":"€$\\u000f\\nA\'B\\"\\\\\\\\\\"/"}',         
+      65      );
+      66    });
+      67  
+
+⏺ Bash(npx vitest run --project unit test/unit/idempotency 2>&1 | tail -8)
+  ⎿   RUN  v5.0.3 /Users/matiastorsello/supercool-finances
+     … +5 lines (ctrl+o to expand)
+⏺ Update(test/unit/idempotency/fingerprint.test.ts)
+  ⎿  Added 4 lines, removed 1 line
+      55    it('IDM-R05 serializes the RFC 8785 example of section 3.2.2 
+          exactly: literals, numbers and minimal string escapes', () => {
+      56      // The parsed input: "€$\u000F\u000aA'B"\\\\"\/" is € $ U+0
+          00F LF A ' B " \ \ " /.
+      57      const input = {
+      58 -      numbers: [333333333.33333329, 1e30, 4.5, 2e-3, 0.00000000
+         -0000000000000000001],                                          
+      58 +      // Parsed from the RFC's text, which has more digits than
+         + a double holds.                                               
+      59 +      numbers: JSON.parse(                                     
+      60 +        '[333333333.33333329, 1E30, 4.50, 2e-3, 0.0000000000000
+         +00000000000001]',                                              
+      61 +      ) as unknown,                                            
+      62        string: '€$\u000f\nA\'B"\\\\"/',
+      63        literals: [null, true, false],
+      64      };
+
+⏺ Domain layer is green (16 tests). Next I'll build the application layer (ports
+  and runner), adding a targeted eslint allowlist entry for importing the typed
+  IdempotencyWaitTimeout error from platform/db/errors.ts, which I'll flag in
+  the report.
+
+⏺ Write(src/modules/idempotency/application/ports.ts)
+  ⎿  Wrote 82 lines to src/modules/idempotency/application/ports.ts
+       1 import type { StoredResponse } from '../domain/outcome.js';
+       2 
+       3 /** What the key step writes for a first request: who, which key
+       4 export interface KeyClaim {
+       5   userId: string;
+       6   key: string;
+       7   fingerprint: string;
+         tion (IDM-R20). */
+       9   ttlSeconds: number;
+      10 }
+     … +91 lines (ctrl+o to expand)
+
+⏺ Write(src/modules/idempotency/application/idempotent-runner.ts)
+  ⎿  Wrote 136 lines to
+     src/modules/idempotency/application/idempotent-runner.ts
+       1 import { IdempotencyWaitTimeout } from '../../../platform/db/err
+         ors.js';
+       2 import { IdempotencyKeyReused } from '../domain/errors.js';
+         s';
+       4 import type {
+       5   IdempotencySettings,
+       6   KeyClaim,
+       8   KeyedTransactions,
+       9   Presenter,
+      10 } from './ports.js';
+     … +157 lines (ctrl+o to expand)
+
+⏺ I'll write the test runner's unit test first, before building the adapter. I
+  also need to give IdempotencyWaitTimeout an optional cause, since the deadline
+  path raises it without a driver error.
+
+⏺ Update(src/platform/db/errors.ts)
+  ⎿  Added 5 lines, removed 2 lines
+      25    }
+      26  }
+      27  
+      28 -/** An idempotency key held by another request beyond the idemp
+         -otency wait timeout (IDM-R12). */                              
+      28 +/**                                                            
+      29 + * An idempotency key held by another request beyond the idempo
+         +tency wait timeout (IDM-R12): a                                
+      30 + * 55P03 at a key-wait step, or no time left before the key-wai
+         +t deadline, with no cause.                                     
+      31 + */                                                            
+      32  export class IdempotencyWaitTimeout extends Error {
+      33    override readonly name = 'IdempotencyWaitTimeout';
+      34  
+      32 -  constructor(options: { cause: unknown }) {                   
+      35 +  constructor(options?: { cause: unknown }) {                  
+      36      super('idempotency key still held by another request', opti
+          ons);
+      37    }
+      38  }
+
+⏺ Update(eslint.config.js)
+  ⎿  Added 5 lines, removed 3 lines
+      55  }
+      56  
+      57  /**
+      58 - * What use cases may import from `platform/`, as paths under i
+         -t such as `db/errors.js`. None yet:                            
+      59 - * the application layer declares ports, and adapters implement
+         - them with the platform.                                       
+      58 + * What use cases may import from `platform/`, as paths under i
+         +t. The application layer declares                              
+      59 + * ports, and adapters implement them with the platform; the on
+         +ly exception is the typed errors of                            
+      60 + * `db/errors.js`, which import nothing, so the idempotent runn
+         +er can end a request with                                      
+      61 + * `IdempotencyWaitTimeout` when its key-wait deadline has pass
+         +ed (plan 005 section 3).                                       
+      62   */
+      61 -const PLATFORM_FOR_APPLICATION = [];                           
+      63 +const PLATFORM_FOR_APPLICATION = ['db/errors.js'];             
+      64  const platformInApplication = {
+      65    regex: `(^|/)platform/${PLATFORM_FOR_APPLICATION.map((path) =
+          > `(?!${path.replaceAll('.', '\\.')}$)`).join('')}`,
+      66    message: applicationBoundary,
+
+⏺ Bash(sed -n 75,94p test/unit/toolchain.test.ts && sed -n 122,140p
+      test/unit/toolchain.test.ts)
+  ⎿            ['no-restricted-syntax', 'no-restricted-globals', 'no-restri
+     cted-properties'].includes(
+                 id ?? '',
+     … +36 lines (ctrl+o to expand)
+
+⏺ Update(test/unit/toolchain.test.ts)
+  ⎿  Added 2 lines
+      129        "import '../../../modules/accounts/domain/account.js';",
+      130        "import '../../../modules/ledger/index.js';",
+      131        "import 'node:crypto';",
+      132 +      // The typed errors of the platform, which import nothin
+          +g (plan 005 section 3).                                       
+      133 +      "import '../../../platform/db/errors.js';",             
+      134      ].join('\n');
+      135      expect(await ruleIds('src/modules/accounts/application/pro
+           be.ts', code)).toEqual([]);
+      136      expect(
+
+⏺ Update(test/unit/toolchain.test.ts)
+  ⎿  Added 2 lines
+       99      '../../adapters/http/routes.js',
+      100      '../../../platform/db/unit-of-work.js',
+      101      '../../../platform/db/schema.js',
+      102 +    '../../../platform/db/sqlstate.js',                       
+      103 +    '../../../platform/db/errors.js.map',                     
+      104      '../../../platform/audit/kysely-audit-log.js',
+      105    ])('fails on an import of %s from application code', async (
+           specifier) => {
+      106      const ids = await ruleIds(
+
+⏺ Writing the runner's unit test (IDM-R12, IDM-R13): real transaction runner and
+  unit of work over a scripted fake connection, a fake key store, a fake
+  operation.
+
+⏺ Write(test/unit/idempotency/idempotent-runner.test.ts)
+  ⎿  Wrote 403 lines to test/unit/idempotency/idempotent-runner.test.ts
+       1 import { EventEmitter } from 'node:events';
+       2 import { sql, type Kysely } from 'kysely';
+       3 import pg from 'pg';
+       4 import { describe, expect, it } from 'vitest';
+       5 import { IdempotentRunner } from '../../../src/modules/idempoten
+       6 import type {
+       7   KeyClaim,
+       8   KeyedTransactions,
+       9   KeyRow,
+      10   KeyStore,
+     … +447 lines (ctrl+o to expand)
+
+⏺ Simplifying the fake connection so it records parameter values itself.
+
+⏺ Bash(python3 - <<'EOF'
+      import re…)
+  ⎿   RUN  v5.0.3 /Users/matiastorsello/supercool-finances
+     … +5 lines (ctrl+o to expand)
+  ⎿  Updated test/unit/idempotency/idempotent-runner.test.ts (+9 -16)
+      34   */
+      35  class FakeClient extends EventEmitter implements RunnerClient {
+      36    readonly statements: string[] = [];
+      37 +  /** The parameters of each `app.set_lock_timeout` call, in or
+         +der. */                                                        
+      38 +  readonly lockTimeouts: unknown[] = [];                       
+      39    fails: (text: string) => string | undefined = () => undefined
+          ;
+      40  
+      39 -  query(text: string): Promise<{ command: string; rowCount: num
+         -ber; rows: unknown[] }> {                                      
+      41 +  query(                                                       
+      42 +    text: string,                                              
+      43 +    values: readonly unknown[] = [],                           
+      44 +  ): Promise<{ command: string; rowCount: number; rows: unknown
+         +[] }> {                                                        
+      45      this.statements.push(text);
+      46 +    if (text === SET_LOCK_TIMEOUT) this.lockTimeouts.push(value
+         +s[0]);                                                         
+      47      const code = this.fails(text);
+      48      if (code !== undefined) return Promise.reject(databaseError
+          (code));
+      49      return Promise.resolve({ command: text.split(' ')[0] ?? '',
+           rowCount: 0, rows: [] });
+     ...
+      204    return { client, delays, keys, run };
+      205  }
+      206  
+      201 -/** Each set_lock_timeout of the fake connection, with its val
+          -ue. */                                                        
+      202 -function lockTimeouts(client: FakeClient, values: unknown[][])
+          -: number[] {                                                  
+      203 -  expect(client.statements.filter((text) => text === SET_LOCK_
+          -TIMEOUT)).toHaveLength(values.length);                        
+      204 -  return values.map((value) => Number(value[0]));             
+      205 -}                                                             
+      206 -                                                              
+      207  describe('idempotent runner', () => {
+      208    it('IDM-R12 a 55P03 at the key insert ends in IdempotencyWai
+           tTimeout, rolls back everything and is not retried', async () 
+           => {
+      209      const { client, delays, run } = setup();
+     ...
+      372    it('IDM-R11 IDM-R12 sets lock_timeout before step 3b and eac
+           h re-pass to the whole ms left before the deadline, and ends i
+           n IdempotencyWaitTimeout with less than 1 ms left', async () =
+           > {
+      373      // Readings of the monotonic clock: at step 2, then before
+            each lock_timeout of a key-wait step.
+      374      const { client, keys, run } = setup([1000, 1500, 2200.4, 2
+           300.9, 2999.5]);
+      375 -    const values: unknown[][] = [];                           
+      376 -    const statements = client.statements;                     
+      377 -    const query = client.query.bind(client);                  
+      378 -    client.query = (text: string, ...rest: unknown[]) => {    
+      379 -      if (text === SET_LOCK_TIMEOUT) values.push(rest[0] as un
+          -known[]);                                                     
+      380 -      return query(text);                                     
+      381 -    };                                                        
+      375      keys.claims = [false, false];
+     … 10 more lines (ctrl+o to expand)
+
+⏺ Runner unit tests pass (10). Quick mutation check that they really depend on
+  the step tracking: drop the keyWait wrapping and expect failures.
+
+⏺ Bash(f=src/modules/idempotency/application/idempotent-runner.ts && cp $f
+      /tmp/claude-501/runner.bak 2>/dev/null || cp $f "$TMPDIR/runner.bak"; sed
+      -i '' 's/await tx.…)
+  ⎿       × IDM-R12 a 55P03 at the key insert ends in IdempotencyWaitTimeou
+     t, rolls back everything and is not retried 6ms
+          × IDM-R12 a 55P03 at step 3b, at step 3c or at a re-pass also end
+     … +3 lines (ctrl+o to expand)
+  ⎿  Updated src/modules/idempotency/application/idempotent-runner.ts (+1 
+     -1)
+      84      const deadline = this.#now() + waitTimeoutMs;
+      85      const claim: KeyClaim = { ...request, ttlSeconds: keyTtlSec
+          onds };
+      86  
+      87 -    await tx.keyWait(async () => {                             
+      87 +    await (async (s: () => Promise<void>) => s())(async () => {
+      88        for (let pass = 1; ; pass += 1) {
+      89          if (pass > 1) await this.#setTimeLeft(tx, deadline);
+      90          if (await tx.keys.claim(claim)) return;
+
+⏺ Bash(f=src/modules/idempotency/application/idempotent-runner.ts && sed -i ''
+      's/await (async (s: () => Promise<void>) => s())(async () => {/await
+      tx.keyWait(async ()…)
+  ⎿  87:    await tx.keyWait(async () => {
+           Tests  26 passed (26)
+  ⎿  Updated src/modules/idempotency/application/idempotent-runner.ts (+1 
+     -1)
+      84      const deadline = this.#now() + waitTimeoutMs;
+      85      const claim: KeyClaim = { ...request, ttlSeconds: keyTtlSec
+          onds };
+      86  
+      87 -    await (async (s: () => Promise<void>) => s())(async () => {
+      87 +    await tx.keyWait(async () => {                             
+      88        for (let pass = 1; ; pass += 1) {
+      89          if (pass > 1) await this.#setTimeLeft(tx, deadline);
+      90          if (await tx.keys.claim(claim)) return;
+
+⏺ Reverted; the step tracking is what those two tests check. Now the persistence
+  adapter, kysely-key-store.ts, plus the missing idempotency_keys entry in the
+  hand-written Kysely schema.
+
+⏺ Update(src/platform/db/schema.ts)
+  ⎿  Added 1 line
+      18    transactions: TransactionsTable;
+      19    ledger_entries: LedgerEntriesTable;
+      20    audit_records: AuditRecordsTable;
+      21 +  idempotency_keys: IdempotencyKeysTable;                      
+      22  }
+      23  
+      24  declare const timestampText: unique symbol;
+
+⏺ Bash(cat >> src/platform/db/schema.ts <<'EOF'…)
+  ⎿  Updated src/platform/db/schema.ts (+19 -0)
+       92    request_id: Immutable<string>;
+       93    created_at: DefaultTimestamp;
+       94  }
+       95 +                                                              
+       96 +/** The stored headers of a key row, as `jsonb` (plan 005 sect
+          +ion 2). */                                                    
+       97 +export type StoredHeadersColumn = Record<string, string>;     
+       98 +                                                              
+       99 +/**                                                           
+      100 + * Idempotency keys (plan 005 section 2). The key step's state
+          +ments write them as SQL text, with                            
+      101 + * `now()` for the timestamps, which are never selected direct
+          +ly; the stored response is null until                         
+      102 + * step 9 completes the row, and a deferred trigger refuses to
+          + commit it incomplete (IDM-R18).                              
+      103 + */                                                           
+      104 +export interface IdempotencyKeysTable {                       
+      105 +  user_id: Immutable<string>;                                 
+      106 +  key: Immutable<string>;                                     
+      107 +  fingerprint: string;                                        
+      108 +  status: number | null;                                      
+      109 +  headers: ColumnType<StoredHeadersColumn | null, string | nul
+          +l, string | null>;                                            
+      110 +  body: Buffer | null;                                        
+      111 +  created_at: ColumnType<never, never, never>;                
+      112 +  expires_at: ColumnType<never, never, never>;                
+      113 +}                                                             
+
+⏺ Next I'll add integration support for the keyed tests—statement recorder with
+  hooks and backend pid, keyed transactions builder, test presenter, key-row
+  reader, and blocked-by wait—followed by key-step.test.ts.
+
+⏺ Write(test/integration/idempotency/support.ts)
+  ⎿  Wrote 240 lines to test/integration/idempotency/support.ts
+       1 import type pg from 'pg';
+       2 import { KyselyKeyedTransactions } from '../../../src/modules/id
+       3 import type { Presenter, ProblemResponse } from '../../../src/mo
+         dules/idempotency/application/ports.js';
+       4 import type { StoredResponse } from '../../../src/modules/idempo
+       5 import {
+       6   AccountLockTimeout,
+       7   RetriesExhausted,
+       9 } from '../../../src/platform/db/errors.js';
+      10 import {
+     … +275 lines (ctrl+o to expand)
+
+⏺ Write(test/integration/idempotency/key-step.test.ts)
+  ⎿  Wrote 419 lines to test/integration/idempotency/key-step.test.ts
+       1 import { randomUUID } from 'node:crypto';
+       3 import { IdempotentRunner } from '../../../src/modules/idempoten
+         cy/application/idempotent-runner.js';
+       4 import { IdempotencyKeyReused } from '../../../src/modules/idemp
+       5 import { AccountLockTimeout, IdempotencyWaitTimeout } from '../.
+         ./../src/platform/db/errors.js';
+         f-work.js';
+       7 import { closePools, runtimePool } from '../../support/db.js';
+       8 import { openLockSession } from '../../support/sessions.js';
+      10   expireKeyRow,
+     … +468 lines (ctrl+o to expand)
+
+⏺ Fixing a race in the two IDM-R10 tests: the second request must start only
+  once the first has claimed the key.
+⏺ Bash(python3 - <<'EOF'
+      p='test/integration/idempotency/key-step.test.ts'…)
+  ⎿  Updated test/integration/idempotency/key-step.test.ts (+13 -0)
+      319      const gate = new Promise<void>((resolve) => {
+      320        open = resolve;
+      321      });
+      322 +    let claimed: () => void = () => undefined;                
+      323 +    const running = new Promise<void>((resolve) => {          
+      324 +      claimed = resolve;                                      
+      325 +    });                                                       
+      326      const first = await runKeyed(request(c1, 'k1'), {
+      327        operation: async (uow) => {
+      328          const created = await insertAccount(uow);
+      329 +        claimed();                                            
+      330          await gate;
+      331          return created;
+      332        },
+      333      });
+      334 +    // The first request holds the key row before the second o
+          +ne starts.                                                    
+      335 +    await running;                                            
+      336      const second = await runKeyed(request(c1, 'k1'));
+      337      await waitUntilBlockedBy(await second.pool.pid(), await fi
+           rst.pool.pid());
+      338      open();
+     ...
+      350        open = resolve;
+      351      });
+      352      const failed = randomUUID();
+      353 +    let claimed: () => void = () => undefined;                
+      354 +    const running = new Promise<void>((resolve) => {          
+      355 +      claimed = resolve;                                      
+      356 +    });                                                       
+      357      const first = await runKeyed(request(c1, 'k1'), {
+      358        operation: async (uow) => {
+      359          await insertAccount(uow, failed);
+      360 +        claimed();                                            
+      361          await gate;
+      362          throw new Error('fault after the first write');
+      363        },
+      364      });
+      365 +    await running;                                            
+      366      const ran = randomUUID();
+      367      const second = await runKeyed(request(c1, 'k1'), {
+      368        operation: (uow) => insertAccount(uow, ran),
+
+⏺ Now the adapter itself.
+
+⏺ Write(src/modules/idempotency/adapters/persistence/kysely-key-store.ts)
+  ⎿  Wrote 129 lines to
+     src/modules/idempotency/adapters/persistence/kysely-key-store.ts
+       1 import { sql, type Kysely } from 'kysely';
+         ';
+       3 import type { RetryPolicy } from '../../../../platform/db/transa
+         ction-runner.js';
+         latform/db/unit-of-work.js';
+       5 import type { StoredHeaders, StoredResponse } from '../../domain
+       6 import type {
+       7   KeyClaim,
+       8   KeyedTransaction,
+      10   KeyRow,
+     … +153 lines (ctrl+o to expand)
+
+⏺ Bash(npx vitest run --project integration
+      test/integration/idempotency/key-step.test.ts 2>&1 | tail -40)
+  ⎿      109|     expect(row).toMatchObject({
+            |                 ^
+         110|       fingerprint: FP1,
+     … +36 lines (ctrl+o to expand)
+  ⎿  (timeout 3m)
+
+⏺ Only the TTL text format differed (86400.000000); using trim_scale keeps it
+  exact.
+
+⏺ Bash(sed -i '' 's/extract(epoch FROM expires_at - created_at)::text AS
+      ttl_seconds/trim_scale(extract(epoch FROM expires_at - created_at))::text
+      AS ttl_seconds/' tes…)
+  ⎿        Tests  10 passed (10)
+        Duration  2.33s (tests 95%, import 3%, transform 2%)
+  ⎿  Updated test/integration/idempotency/support.ts (+1 -1)
+      180  export async function keyRowOf(userId: string, key: string): P
+           romise<KeyRowRecord | undefined> {
+      181    const result = await runtimePool().query<KeyRowRecord>(
+      182      `SELECT fingerprint, status, headers, body, created_at::te
+           xt, expires_at::text,
+      183 -            extract(epoch FROM expires_at - created_at)::text 
+          -AS ttl_seconds, xmin::text                                    
+      183 +            trim_scale(extract(epoch FROM expires_at - created
+          +_at))::text AS ttl_seconds, xmin::text                        
+      184       FROM idempotency_keys WHERE user_id = $1 AND key = $2`,
+      185      [userId, key],
+      186    );
+
+⏺ All 10 key-step tests pass, including the shared 2000 ms budget. Next, task 9,
+  test first: the cleanup script (IDM-AC24, SEC-R48).
+
+⏺ Write(test/integration/idempotency/cleanup-script.test.ts)
+  ⎿  Wrote 189 lines to test/integration/idempotency/cleanup-script.test.ts
+       1 import { spawn } from 'node:child_process';
+       2 import { randomUUID } from 'node:crypto';
+       3 import pg from 'pg';
+       5 import {
+       6   CLEANUP_BATCH_SIZE,
+       7   runCleanup,
+       8 } from '../../../src/modules/idempotency/adapters/cli/cleanup.js
+       9 import { createPool } from '../../../src/platform/db/database.js
+         ';
+      10 import { withScratchDatabase } from '../../support/db.js';
+     … +209 lines (ctrl+o to expand)
+
+⏺ Write(src/modules/idempotency/adapters/cli/cleanup.ts)
+  ⎿  Wrote 114 lines to src/modules/idempotency/adapters/cli/cleanup.ts
+       1 import pg from 'pg';
+       2 import { createPool } from '../../../../platform/db/database.js'
+         ;
+       3 
+       4 interface Output {
+       6 }
+       7 
+       8 /** The part of a `pg` pool the command uses. */
+       9 export interface CleanupPool {
+      10   connect(): Promise<pg.PoolClient>;
+     … +126 lines (ctrl+o to expand)
+
+⏺ Bash(mkdir -p src/cli && cat > src/cli/idempotency-cleanup.ts <<'EOF'
+      // npm run idempotency:cleanup: deletes expired idempotency keys against
+      DATABASE_URL (IDM-R22)…)
+  ⎿  28:    "reconcile": "tsx --env-file-if-exists=.env scripts/reconcile.t
+     s",
+     29:    "idempotency:cleanup": "tsx --env-file-if-exists=.env src/cli/i
+     dempotency-cleanup.ts",
+  ⎿  Updated package.json (+1 -0)
+      26      "env:sync": "tsx scripts/env-sync.ts",
+      27      "trace": "tsx scripts/trace.ts",
+      28      "reconcile": "tsx --env-file-if-exists=.env scripts/reconci
+          le.ts",
+      29 +    "idempotency:cleanup": "tsx --env-file-if-exists=.env src/c
+         +li/idempotency-cleanup.ts",                                    
+      30      "migrate:up": "node --env-file-if-exists=.env node_modules/
+          node-pg-migrate/bin/node-pg-migrate.js up --migrations-dir migr
+          ations --migration-file-language sql --database-url-var MIGRATI
+          ON_DATABASE_URL --check-order",
+      31      "migrate:down": "node --env-file-if-exists=.env node_module
+          s/node-pg-migrate/bin/node-pg-migrate.js down --migrations-dir 
+          migrations --migration-file-language sql --database-url-var MIG
+          RATION_DATABASE_URL --check-order"
+      32    },
+  ⎿  Created src/cli/idempotency-cleanup.ts (+9 -0)
+      1 +// npm run idempotency:cleanup: deletes expired idempotency keys
+        + against DATABASE_URL (IDM-R22).                                
+      2 +// Compiled to dist/cli/idempotency-cleanup.js, which the schedu
+        +led cleanup task runs (DEP-R37).                                
+      3 +import { runCleanup } from '../modules/idempotency/adapters/cli/
+        +cleanup.js';                                                    
+      4 +                                                                
+      5 +process.exitCode = await runCleanup({                           
+      6 +  databaseUrl: process.env['DATABASE_URL'],                     
+      7 +  stdout: process.stdout,                                       
+      8 +  stderr: process.stderr,                                       
+      9 +});                                                             
+
+⏺ Bash(npx vitest run --project integration
+      test/integration/idempotency/cleanup-script.test.ts 2>&1 | grep -E
+      "✓|×|Tests|Duration|Error|expected" | head -20)
+  ⎿       × SEC-R48 IDM-R22 deletes in batches of 1000, each in its own tra
+     nsaction that first calls app.set_statement_timeout(600000) 124ms
+     ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+     … +4 lines (ctrl+o to expand)
+
+⏺ Bash(npx vitest run --project integration
+      test/integration/idempotency/cleanup-script.test.ts 2>&1 | grep -B2 -A20
+      "Expected" | head -40)
+  ⎿  AssertionError: expected [ 'BEGIN', …(7) ] to deeply equal [ 'BEGIN',
+     …(7) ]
+     … +20 lines (ctrl+o to expand)
+
+⏺ Just whitespace in my regex; the batches are right.
+
+⏺ Bash(sed -i '' 's#/^WITH doomed AS \\(SELECT .\* FOR UPDATE SKIP LOCKED\\)
+      DELETE /#/^WITH doomed AS \\( ?SELECT .* FOR UPDATE SKIP LOCKED ?\\)
+      DELETE /#' test/integ…)
+  ⎿  171:        expect.stringMatching(/^WITH doomed AS \( ?SELECT .* FOR U
+     PDATE SKIP LOCKED ?\) DELETE /) as string,
+           Tests  3 passed (3)
+        Duration  1.30s (tests 92%, import 5%, transform 2%)
+  ⎿  Updated test/integration/idempotency/cleanup-script.test.ts (+1 -1)
+      168        const batch = [
+      169          'BEGIN',
+      170          'SELECT app.set_statement_timeout(600000)',
+      171 -        expect.stringMatching(/^WITH doomed AS \(SELECT .* FOR
+          - UPDATE SKIP LOCKED\) DELETE /) as string,                    
+      171 +        expect.stringMatching(/^WITH doomed AS \( ?SELECT .* F
+          +OR UPDATE SKIP LOCKED ?\) DELETE /) as string,                
+      172          'COMMIT',
+      173        ];
+      174        expect(statements).toEqual([...batch, ...batch]);
+
+⏺ Cleanup green (3 tests). Now the wiring tasks; checking the movement and
+  reversal requirement IDs those tests carry.
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Refactoring kysely-movements.ts so the movement ports can be built on any unit
+  of work (needed for the keyed transactions), then writing the movement test.
+
+⏺ Update(src/modules/movements/adapters/persistence/kysely-movements.ts)
+  ⎿  Added 29 lines, removed 14 lines
+      160  }
+      161  
+      162  /**
+      163 - * Movements in one transaction of the unit-of-work runner, re
+          -tried on 40P01 and 40001 (SYS-R18).                           
+      164 - * The ledger writer comes from the composition root, since on
+          -e module's adapters never import                              
+      165 - * another's.                                                 
+      163 + * What a movement or reversal uses on one unit of work: steps
+          + 6 to 8 of the skeleton. The ledger                           
+      164 + * writer comes from the composition root, since one module's 
+          +adapters never import another's.                              
+      165   */
+      166 +export interface MovementDependencies {                       
+      167 +  ids: IdGenerator;                                           
+      168 +  ledger: (uow: UnitOfWork) => LedgerWriter;                  
+      169 +}                                                             
+      170 +                                                              
+      171 +/**                                                           
+      172 + * The ports of a movement on the given unit of work's connect
+          +ion: alone, or as the operation of                            
+      173 + * the idempotency module's keyed transactions, after the key 
+          +step (plan 000 section 6.2).                                  
+      174 + */                                                           
+      175 +export function movementTransactionOn(                        
+      176 +  uow: UnitOfWork,                                            
+      177 +  deps: MovementDependencies,                                 
+      178 +): MovementTransaction {                                      
+      179 +  return {                                                    
+      180 +    setLockTimeout: async (ms) => {                           
+      181 +      await uow.setLockTimeout(ms);                           
+      182 +    },                                                        
+      183 +    accounts: new KyselyMovementAccounts(uow.db),             
+      184 +    transactions: new KyselyTransactionLookup(uow.db),        
+      185 +    ledger: deps.ledger(uow),                                 
+      186 +    audit: new KyselyAuditLog(uow.db, deps.ids),              
+      187 +  };                                                          
+      188 +}                                                             
+      189 +                                                              
+      190 +/** Movements in one transaction of the unit-of-work runner, r
+          +etried on 40P01 and 40001 (SYS-R18). */                       
+      191  export class KyselyMovementTransactions implements MovementTra
+           nsactions {
+      192    constructor(
+      193      private readonly unitOfWork: UnitOfWorkRunner,
+      170 -    private readonly deps: { ids: IdGenerator; ledger: (uow: U
+          -nitOfWork) => LedgerWriter },                                 
+      194 +    private readonly deps: MovementDependencies,              
+      195    ) {}
+      196  
+      197    async run<T>(work: (tx: MovementTransaction) => Promise<T>):
+            Promise<T> {
+      198      return await this.unitOfWork.run(
+      175 -      async (uow) =>                                          
+      176 -        await work({                                          
+      177 -          setLockTimeout: async (ms) => {                     
+      178 -            await uow.setLockTimeout(ms);                     
+      179 -          },                                                  
+      180 -          accounts: new KyselyMovementAccounts(uow.db),       
+      181 -          transactions: new KyselyTransactionLookup(uow.db),  
+      182 -          ledger: this.deps.ledger(uow),                      
+      183 -          audit: new KyselyAuditLog(uow.db, this.deps.ids),   
+      184 -        }),                                                   
+      199 +      async (uow) => await work(movementTransactionOn(uow, thi
+          +s.deps)),                                                     
+      200        { retry: 'movement' },
+      201      );
+      202    }
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Adding a keyed-movements helper next to the existing movement test support.
+
+⏺ Bash(python3 - <<'EOF'
+      p='test/integration/movements/support.ts'…)
+  ⎿  import type pg from 'pg';
+     import { KyselyLedgerWriter } from '../../../src/modules/ledger/adapte
+     rs/persistence/kysely-ledger.js';
+     … +27 lines (ctrl+o to expand)
+  ⎿  Updated test/integration/movements/support.ts (+29 -6)
+       1  import type pg from 'pg';
+       2  import { KyselyLedgerWriter } from '../../../src/modules/ledger
+          /adapters/persistence/kysely-ledger.js';
+       3 -import { KyselyMovementTransactions } from '../../../src/module
+         -s/movements/adapters/persistence/kysely-movements.js';         
+       3 +import {                                                       
+       4 +  KyselyMovementTransactions,                                  
+       5 +  movementTransactionOn,                                       
+       6 +  type MovementDependencies,                                   
+       7 +} from '../../../src/modules/movements/adapters/persistence/kys
+         +ely-movements.js';                                             
+       8 +import type { MovementTransaction } from '../../../src/modules/
+         +movements/index.js';                                           
+       9 +import type { KyselyKeyedTransactions } from '../../../src/modu
+         +les/idempotency/adapters/persistence/kysely-key-store.js';     
+      10  import { TransactionRunner, type RunnerPool } from '../../../sr
+          c/platform/db/transaction-runner.js';
+      11  import { UnitOfWorkRunner } from '../../../src/platform/db/unit
+          -of-work.js';
+      12  import { UuidV7Generator } from '../../../src/platform/ids/uuid
+          -v7.js';
+      13  import { runtimePool } from '../../support/db.js';
+      14 +import { keyedTransactions } from '../idempotency/support.js'; 
+      15  
+      16  export const C1 = '0192f0c4-0000-7000-8000-0000000000c1';
+      17  export const C2 = '0192f0c4-0000-7000-8000-0000000000c2';
+     ...
+      21  
+      22  export const settings = { accountLockTimeoutMs: 2000 };
+      23  
+      24 +function movementDependencies(): MovementDependencies {        
+      25 +  const ids = new UuidV7Generator();                           
+      26 +  return { ids, ledger: (uow) => new KyselyLedgerWriter(uow, id
+         +s) };                                                          
+      27 +}                                                              
+      28 +                                                               
+      29  /** Movements in one transaction of the unit-of-work runner, as
+           the composition root wires them. */
+      30  export function movementTransactions(
+      31    pool: RunnerPool<pg.PoolClient> = runtimePool(),
+      32  ): KyselyMovementTransactions {
+      21 -  const ids = new UuidV7Generator();                           
+      22 -  return new KyselyMovementTransactions(new UnitOfWorkRunner(ne
+         -w TransactionRunner({ pool })), {                              
+      23 -    ids,                                                       
+      24 -    ledger: (uow) => new KyselyLedgerWriter(uow, ids),         
+      25 -  });                                                          
+      33 +  return new KyselyMovementTransactions(                       
+      34 +    new UnitOfWorkRunner(new TransactionRunner({ pool })),     
+      35 +    movementDependencies(),                                    
+      36 +  );                                                           
+      37 +}                                                              
+     … 14 more lines (ctrl+o to expand)
+
+⏺ Now movement-transaction.test.ts (both movement tasks).
+
+⏺ Write(test/integration/movements/movement-transaction.test.ts)
+  ⎿  Wrote 291 lines to
+     test/integration/movements/movement-transaction.test.ts
+       1 import { randomUUID } from 'node:crypto';
+       2 import { afterAll, describe, expect, it } from 'vitest';
+       3 import { IdempotentRunner } from '../../../src/modules/idempoten
+         cy/application/idempotent-runner.js';
+       4 import {
+       6   transfer,
+       7   withdraw,
+       8   type MovementResult,
+       9   type MovementTransaction,
+      10 } from '../../../src/modules/movements/index.js';
+     … +313 lines (ctrl+o to expand)
+
+⏺ Bash(npx vitest run --project integration
+      test/integration/movements/movement-transaction.test.ts 2>&1 | grep -E
+      "✓|×|Tests|Duration|Error|Expected|Received|^[-+] "…)
+  ⎿        Tests  4 passed (4)
+        Duration  846ms (tests 74%, import 14%, transform 11%, setup 1%)
+
+⏺ Movement wiring green (4 tests). Now reversal-transaction.test.ts (REV-R13,
+  REV-R17, IDM-R14), including the 23505 path through the skip-check seam.
+
+⏺ Write(test/integration/reversals/reversal-transaction.test.ts)  ⎿  Wrote 179 lines to
+     test/integration/reversals/reversal-transaction.test.ts
+       1 import { randomUUID } from 'node:crypto';
+       2 import { afterAll, describe, expect, it } from 'vitest';
+       3 import { IdempotentRunner } from '../../../src/modules/idempoten
+       4 import type { AlreadyReversedCause } from '../../../src/modules/
+         ledger/index.js';
+       5 import {
+       6   Reversals,
+       8   type ReversalResult,
+       9   type ReversalsOptions,
+      10 } from '../../../src/modules/movements/index.js';
+     … +195 lines (ctrl+o to expand)
+
+⏺ Bash(npx vitest run --project integration
+      test/integration/reversals/reversal-transaction.test.ts 2>&1 | grep -E
+      "✓|×|Tests|Duration|Error|Expected|Received|^[-+] "…)
+  ⎿        Tests  3 passed (3)
+        Duration  614ms (tests 61%, import 21%, transform 16%, setup 1%)
+
+⏺ Renaming two reversal tests so their requirement IDs match what they prove
+  (REV-R13 is the keyed semantics, REV-R19 the lock timeout).
+
+⏺ Bash(f=test/integration/reversals/reversal-transaction.test.ts && sed -i ''
+      "s/it('REV-R17 a reversal runs the skeleton/it('REV-R13 REV-R17 a keyed
+      reversal runs the…)
+  ⎿  72:  it('REV-R13 REV-R17 a keyed reversal runs the skeleton in the ord
+     er of plan 004 section 3: key row first, lookup, account lock timeout,
+      locks, the existing-reversal check, the writes and the stored respons
+     … +6 lines (ctrl+o to expand)
+  ⎿  Updated test/integration/reversals/reversal-transaction.test.ts (+2 
+     -2)
+      69      await closePools();
+      70    });
+      71  
+      72 -  it('REV-R17 a reversal runs the skeleton in the order of plan
+         - 004 section 3: key row first, lookup, account lock timeout, lo
+         -cks, the existing-reversal check, the writes and the stored res
+         -ponse', async () => {                                          
+      72 +  it('REV-R13 REV-R17 a keyed reversal runs the skeleton in the
+         + order of plan 004 section 3: key row first, lookup, account lo
+         +ck timeout, locks, the existing-reversal check, the writes and 
+         +the stored response', async () => {                            
+      73      const a1 = await createCustomerAccount({ currency: 'EUR', o
+          wnerId: C1 });
+      74      const d = await writeDirectDeposit(a1, '1000');
+      75  
+     ...
+      154      expect(await balanceOf(a1.id)).toBe('1000');
+      155    });
+      156  
+      157 -  it('REV-R13 REV-R19 a lock timeout rolls back everything, ke
+          -y row included', async () => {                                
+      157 +  it('REV-R19 a lock timeout rolls back everything, key row in
+          +cluded', async () => {                                        
+      158      const a1 = await createCustomerAccount({ currency: 'EUR', 
+           ownerId: C1 });
+      159      const d = await writeDirectDeposit(a1, '1000');
+      160      const key = `rev-${randomUUID()}`;
+
+⏺ Bash(sed -i '' "s/it('IDM-R14 a rejection rolls back to the savepoint and
+      commits only the stored response, the 23505/it('IDM-R14 REV-R06 a
+      rejection rolls back to t…)
+  ⎿  1
+  ⎿  Updated test/integration/reversals/reversal-transaction.test.ts (+1 
+     -1)
+      91      expect(await balanceOf(a1.id)).toBe('0');
+      92    });
+      93  
+      94 -  it('IDM-R14 a rejection rolls back to the savepoint and commi
+         -ts only the stored response, the 23505 of a second reversal inc
+         -luded', async () => {                                          
+      94 +  it('IDM-R14 REV-R06 a rejection rolls back to the savepoint a
+         +nd commits only the stored response, the 23505 of a second reve
+         +rsal included', async () => {                                  
+      95      const a1 = await createCustomerAccount({ currency: 'EUR', o
+          wnerId: C1 });
+      96      const d = await writeDirectDeposit(a1, '1000');
+      97      await writeDirectDeposit(a1, '1000');
+
+⏺ Now account creation with a key (ACC-R03, IDM-R02).
+
+⏺ Write(test/integration/accounts/create-account-keyed.test.ts)
+  ⎿  Wrote 108 lines to
+     test/integration/accounts/create-account-keyed.test.ts
+       1 import { randomUUID } from 'node:crypto';
+       2 import { afterAll, describe, expect, it } from 'vitest';
+         counts/adapters/persistence/kysely-accounts.js';
+       4 import {
+       5   createAccount,
+       7   type AccountRepository,
+       8 } from '../../../src/modules/accounts/index.js';
+       9 import { IdempotentRunner } from '../../../src/modules/idempoten
+      10 import { UuidV7Generator } from '../../../src/platform/ids/uuid-
+         v7.js';
+     … +113 lines (ctrl+o to expand)
+
+⏺ Bash(npx vitest run --project integration
+      test/integration/accounts/create-account-keyed.test.ts 2>&1 | grep -E
+      "✓|×|Tests|Duration|Error|Expected|Received|^[-+] " |…)
+  ⎿        Tests  3 passed (3)
+        Duration  277ms (import 41%, transform 30%, tests 25%, setup 2%, wo
+     rker 1%)
+
+⏺ Every wiring test passes. Now the module's public API, then the AGENTS.md
+  task.
+
+⏺ Bash(cat >> src/modules/idempotency/index.ts <<'EOF'
+      export {…)
+  ⎿  82:| `npm run reconcile`                   | Checks every cached balan
+     ce against the ledger and the per-currency global sums, against `DATAB
+     ASE_URL`: a JSON report on stdout, exit 0 when clean, 1 on drift, 2 wh
+     … +13 lines (ctrl+o to expand)
+  ⎿  Updated src/modules/idempotency/index.ts (+15 -0)
+      14    type StoredHeaders,
+      15    type StoredResponse,
+      16  } from './domain/outcome.js';
+      17 +export {                                                       
+      18 +  IdempotentRunner,                                            
+      19 +  type KeyedAnswer,                                            
+      20 +  type KeyedRequest,                                           
+      21 +} from './application/idempotent-runner.js';                   
+      22 +export type {                                                  
+      23 +  IdempotencySettings,                                         
+      24 +  KeyClaim,                                                    
+      25 +  KeyedTransaction,                                            
+      26 +  KeyedTransactions,                                           
+      27 +  KeyRow,                                                      
+      28 +  KeyStore,                                                    
+      29 +  Presenter,                                                   
+      30 +  ProblemResponse,                                             
+      31 +} from './application/ports.js';                               
+
+⏺ Bash(sed -n 86,102p AGENTS.md)
+  ⎿  Hexagonal architecture (ports and adapters) per module, with tactical
+     DDD, so money rules are unit-tested without infrastructure and the tra
+     nsaction boundary stays visible ([ADR-0003](docs/adr/0003-hexagonal-ar
+     … +17 lines (ctrl+o to expand)
+
+⏺ Bash(python3 - <<'EOF'
+      p='AGENTS.md'…)
+  ⎿   AGENTS.md | 22 ++++++++++++----------
+      1 file changed, 12 insertions(+), 10 deletions(-)
+     --- a/AGENTS.md
+     … +61 lines (ctrl+o to expand)
+  ⎿  Updated AGENTS.md (+12 -10)
+      70  
+      71  ## 5. Commands
+      72  
+      73 -| Command                               | What it does         
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                          | From phase   |                     
+      74 -| ------------------------------------- | ---------------------
+         ----------------------------------------------------------------
+         ----------------------------------------------------------------
+         ----------------------------------------------------------------
+         ----------------------------------------------------------------
+         ----------------------------------------------------------------
+         ----------------------------------------------------------------
+         ----------------------------------------------------------------
+         ----------------------------------------------------------------
+         ----------------------------------------------------------------
+         ----------------------------------------------------------------
+         ----------------------------------------------------------------
+         ----------------------------------------------------------------
+         ----------------------------------------------------------------
+         -------------------------- | ------------ |                     
+      75 -| `npm run check`                       | Typecheck, lint, form
+         -at check and unit tests. Must pass before any commit.          
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                          | 01-bootstrap |                     
+      76 -| `npm run infra:up` / `infra:down`     | Start / stop local Po
+         -stgres and Redis.                                              
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                          | 01-bootstrap |                     
+      77 -| `npm run infra:reset`                 | Delete the local volu
+         -mes and start again, so changes in `docker/postgres/init` apply
+         -.                                                              
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                          | 01-bootstrap |                     
+      78 -| `npm run test:integration`            | Integration tests aga
+         -inst real Postgres and Redis.                                  
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                          | 01-bootstrap |                     
+      79 -| `npm run env:sync`                    | Adds variables missin
+         -g from `.env`, taken from `.env.example`, without printing valu
+         -es.                                                            
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                          | 01-bootstrap |                     
+      80 -| `npm run trace`                       | Lists every AC in `sp
+         -ecs/` with its proof, read from the Vitest JSON reports in `rep
+         -orts/` written by `npm test` and `npm run test:integration`. Fa
+         -ils when an AC of an `Implemented` spec, or one named by a tick
+         -ed task in `tasks.md`, has no passing test in the report of its
+         - level (level `ci`: a `Verified by` line that names no `npm run
+         - <script>`, or names one that is not a script in `package.json`
+         - or not the whole command, `npm run <script>` with plain argume
+         -nts at most, of a step of `.github/workflows/ci.yml` that can f
+         -ail the build) or is named by any test that did not pass; when 
+         -a test or task names an undefined AC; when a project named in `
+         ---require` has no report; and when a spec or task file is malfo
+         -rmed. CI and `/ship` pass `--require unit,integration`, so e2e 
+         -ACs are enforced only from phase 12, when CI runs the e2e suite
+         - and requires its report. | 02-specs     |                     
+      81 -| `npm run migrate:up` / `migrate:down` | Apply / roll back dat
+         -abase migrations.                                              
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                          | 05-schema    |                     
+      82 -| `npm run reconcile`                   | Checks every cached b
+         -alance against the ledger and the per-currency global sums, aga
+         -inst `DATABASE_URL`: a JSON report on stdout, exit 0 when clean
+         -, 1 on drift, 2 when it cannot run. CI runs it against the test
+         - database after the integration tests.                         
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                          | 06-domain    |                     
+      73 +| Command                               | What it does         
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                          | From phase     |                   
+      74 +| ------------------------------------- | ---------------------
+         +---------------------------------------------------------------
+         +---------------------------------------------------------------
+         +---------------------------------------------------------------
+         +---------------------------------------------------------------
+         +---------------------------------------------------------------
+         +---------------------------------------------------------------
+         +---------------------------------------------------------------
+         +---------------------------------------------------------------
+         +---------------------------------------------------------------
+         +---------------------------------------------------------------
+         +---------------------------------------------------------------
+         +---------------------------------------------------------------
+         +---------------------------------------------------------------
+         +------------------------- | -------------- |                   
+      75 +| `npm run check`                       | Typecheck, lint, form
+         +at check and unit tests. Must pass before any commit.          
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                          | 01-bootstrap   |                   
+      76 +| `npm run infra:up` / `infra:down`     | Start / stop local Po
+         +stgres and Redis.                                              
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                          | 01-bootstrap   |                   
+      77 +| `npm run infra:reset`                 | Delete the local volu
+         +mes and start again, so changes in `docker/postgres/init` apply
+         +.                                                              
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                          | 01-bootstrap   |                   
+      78 +| `npm run test:integration`            | Integration tests aga
+         +inst real Postgres and Redis.                                  
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                          | 01-bootstrap   |                   
+      79 +| `npm run env:sync`                    | Adds variables missin
+         +g from `.env`, taken from `.env.example`, without printing valu
+         +es.                                                            
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                          | 01-bootstrap   |                   
+      80 +| `npm run trace`                       | Lists every AC in `sp
+         +ecs/` with its proof, read from the Vitest JSON reports in `rep
+         +orts/` written by `npm test` and `npm run test:integration`. Fa
+         +ils when an AC of an `Implemented` spec, or one named by a tick
+         +ed task in `tasks.md`, has no passing test in the report of its
+         + level (level `ci`: a `Verified by` line that names no `npm run
+         + <script>`, or names one that is not a script in `package.json`
+         + or not the whole command, `npm run <script>` with plain argume
+         +nts at most, of a step of `.github/workflows/ci.yml` that can f
+         +ail the build) or is named by any test that did not pass; when 
+         +a test or task names an undefined AC; when a project named in `
+         +--require` has no report; and when a spec or task file is malfo
+         +rmed. CI and `/ship` pass `--require unit,integration`, so e2e 
+         +ACs are enforced only from phase 12, when CI runs the e2e suite
+         + and requires its report. | 02-specs       |                   
+      81 +| `npm run migrate:up` / `migrate:down` | Apply / roll back dat
+         +abase migrations.                                              
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                          | 05-schema      |                   
+      82 +| `npm run reconcile`                   | Checks every cached b
+         +alance against the ledger and the per-currency global sums, aga
+         +inst `DATABASE_URL`: a JSON report on stdout, exit 0 when clean
+         +, 1 on drift, 2 when it cannot run. CI runs it against the test
+         + database after the integration tests.                         
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                          | 06-domain      |                   
+      83 +| `npm run idempotency:cleanup`         | Deletes expired idemp
+         +otency keys against `DATABASE_URL`, in batches of 1000, skippin
+         +g rows a request in progress holds: prints `{"deleted": n}`, ex
+         +it 0 when done, 2 when it cannot run. It never runs inside the 
+         +service; in AWS it runs every hour as a scheduled task.        
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                          | 07-idempotency |                   
+      84  
+      85  ## 6. Architecture and repository map
+      86  
+     ...
+      89  ```
+      90  src/
+      91    app.ts                      composition root
+      92 +  cli/                        executable entry points, compiled
+         + into dist/                                                    
+      93    modules/<module>/           accounts, ledger, movements, idem
+          potency, auth
+      94      domain/                   value objects, aggregates, domain
+           errors
+      95                                (never imports fastify, kysely, p
+          g or ioredis)
+
+⏺ Docs done. Running npm run check.
+
+⏺ Bash(npm run check 2>&1 | tail -40)
+  ⎿  > supercool-finances@0.1.0 check
+     > npm run typecheck && npm run lint && npm run format:check && npm run
+      test
+     … +16 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ Bash(f=test/integration/idempotency/key-step.test.ts && sed -i '' 's/^async
+      function runKeyed(/function runKeyed(/; s/(await
+      runKeyed(\([^)]*)\)*\))\.answer/runKeyed…)
+  ⎿  sed: 1: "s/^async function runKe ...": RE error: parentheses not balan
+     ced
+
+⏺ Bash(f=test/integration/idempotency/key-step.test.ts && python3 - "$f" <<'EOF'
+      import re,sys…)
+  ⎿  59:function runKeyed(
+     87:    const { pool, answer } = runKeyed(request(c1, 'k1'), {
+     121:    const first = await runKeyed(request(c1, 'k1')).answer;
+     … +16 lines (ctrl+o to expand)
+  ⎿  Updated test/integration/idempotency/key-step.test.ts (+19 -19)
+      56  }
+      57  
+      58  /** Runs one keyed request with the fake operation on a recorde
+          d connection. */
+      59 -async function runKeyed(                                       
+      59 +function runKeyed(                                             
+      60    keyed: { userId: string; key: string; fingerprint: string },
+      61    options: {
+      62      operation?: (uow: UnitOfWork) => Promise<Created>;
+     ...
+      84    it('IDM-R06 IDM-R11 IDM-R15 a first request sets the idempote
+          ncy wait, inserts the key row as its first write, takes the sav
+          epoint, runs the operation and stores its 201 before the commit
+          ', async () => {
+      85      const c1 = randomUUID();
+      86      const accountId = randomUUID();
+      87 -    const { pool, answer } = await runKeyed(request(c1, 'k1'), 
+         -{                                                              
+      87 +    const { pool, answer } = runKeyed(request(c1, 'k1'), {     
+      88        operation: (uow) => insertAccount(uow, accountId),
+      89      });
+      90      const { replayed, response } = await answer;
+     ...
+      118  
+      119    it('IDM-R07 a repeat with the same fingerprint returns the s
+           tored bytes after a rollback and writes nothing', async () => 
+           {
+      120      const c1 = randomUUID();
+      121 -    const first = await (await runKeyed(request(c1, 'k1'))).an
+          -swer;                                                         
+      121 +    const first = await runKeyed(request(c1, 'k1')).answer;   
+      122      const before = await keyRowOf(c1, 'k1');
+      123  
+      124      let calls = 0;
+      125 -    const { pool, answer } = await runKeyed(request(c1, 'k1'),
+          - {                                                            
+      125 +    const { pool, answer } = runKeyed(request(c1, 'k1'), {    
+      126        operation: (uow) => {
+      127          calls += 1;
+      128          return insertAccount(uow);
+     ...
+      147  
+      148    it('IDM-R09 IDM-R04 another fingerprint of the same user and
+            key is refused and the row is left unchanged; another user or
+            key letter case is its own key', async () => {
+      149      const c1 = randomUUID();
+      150 -    await (await runKeyed(request(c1, 'k1'))).answer;         
+      150 +    await runKeyed(request(c1, 'k1')).answer;                 
+      151      const before = await keyRowOf(c1, 'k1');
+      152  
+      153 -    const reused = await runKeyed(request(c1, 'k1', FP2));    
+      153 +    const reused = runKeyed(request(c1, 'k1', FP2));          
+      154      await expect(reused.answer).rejects.toBeInstanceOf(Idempot
+           encyKeyReused);
+      155      expect(reused.pool.statements.map(step).at(-1)).toBe('ROLL
+           BACK');
+     … 98 more lines (ctrl+o to expand)
+
+⏺ Bash(npm run lint 2>&1 | tail -15 && npx prettier --write src test AGENTS.md
+      eslint.config.js package.json >/dev/null && npm run check 2>&1 | tail -15)
+  ⎿  > supercool-finances@0.1.0 lint
+     > eslint .
+     … +18 lines (ctrl+o to expand)
+  ⎿  Updated
+     src/modules/idempotency/adapters/persistence/kysely-key-store.ts (+4 
+     -1)
+      17      const headers = value as Record<string, unknown>;
+      18      const contentType = headers['content-type'];
+      19      const location = headers['location'];
+      20 -    if (typeof contentType === 'string' && (location === undefi
+         -ned || typeof location === 'string')) {                        
+      20 +    if (                                                       
+      21 +      typeof contentType === 'string' &&                       
+      22 +      (location === undefined || typeof location === 'string') 
+      23 +    ) {                                                        
+      24        return location === undefined
+      25          ? { 'content-type': contentType }
+      26          : { 'content-type': contentType, location };
+  ⎿  Updated src/modules/idempotency/domain/idempotency-key.ts (+1 -3)
+      1  /** The `Idempotency-Key` header as parsed at the malformed-requ
+         est step (IDM-R03). */
+      2  export type ParsedIdempotencyKey =
+      3 -  | { kind: 'missing' }                                         
+      4 -  | { kind: 'malformed' }                                       
+      5 -  | { kind: 'key'; key: string };                               
+      3 +  { kind: 'missing' } | { kind: 'malformed' } | { kind: 'key'; k
+        +ey: string };                                                   
+      4  
+      5  /** 1 to 255 characters of visible ASCII, U+0021 to U+007E, spac
+         e excluded (IDM-R03). */
+      6  const KEY = /^[\x21-\x7e]{1,255}$/;
+  ⎿  Updated test/integration/idempotency/cleanup-script.test.ts (+3 -1)
+      168        const batch = [
+      169          'BEGIN',
+      170          'SELECT app.set_statement_timeout(600000)',
+      171 -        expect.stringMatching(/^WITH doomed AS \( ?SELECT .* F
+          -OR UPDATE SKIP LOCKED ?\) DELETE /) as string,                
+      171 +        expect.stringMatching(                                
+      172 +          /^WITH doomed AS \( ?SELECT .* FOR UPDATE SKIP LOCKE
+          +D ?\) DELETE /,                                               
+      173 +        ) as string,                                          
+      174          'COMMIT',
+      175        ];
+      176        expect(statements).toEqual([...batch, ...batch]);
+  ⎿  Updated test/integration/idempotency/key-step.test.ts (+10 -3)
+      66    } = {},
+      67  ) {
+      68    const pool = options.pool ?? recordingPool(runtimePool(), opt
+          ions.hooks);
+      69 -  const runner = new IdempotentRunner(SETTINGS, options.now ===
+         - undefined ? {} : { now: options.now });                       
+      69 +  const runner = new IdempotentRunner(                         
+      70 +    SETTINGS,                                                  
+      71 +    options.now === undefined ? {} : { now: options.now },     
+      72 +  );                                                           
+      73    const answer = runner.run(
+      74      keyedTransactions(pool, (uow) => uow),
+      75      keyed,
+     ...
+      261        let thirdBlocks: Promise<void> | undefined;
+      262        const pool = recordingPool(runtimePool(), {
+      263          before(statement) {
+      261 -          sentStep2 ??= step(statement) === 'set_lock_timeout(
+          -2000)' ? performance.now() : undefined;                       
+      264 +          sentStep2 ??=                                       
+      265 +            step(statement) === 'set_lock_timeout(2000)' ? per
+          +formance.now() : undefined;                                   
+      266          },
+      267          async after(statement, result) {
+      268            if (step(statement) !== 'key insert' || result.rowCo
+           unt !== 0 || thirdBlocks) return;
+     ...
+      377      await expect(first.answer).rejects.toThrow('fault after th
+           e first write');
+      378      const { replayed, response } = await second.answer;
+      379      expect(replayed).toBe(false);
+      376 -    expect(await keyRowOf(c1, 'k1')).toMatchObject({ status: 2
+          -01, body: Buffer.from(response.body) });                      
+      380 +    expect(await keyRowOf(c1, 'k1')).toMatchObject({          
+      381 +      status: 201,                                            
+      382 +      body: Buffer.from(response.body),                       
+      383 +    });                                                       
+      384      expect([await accountExists(failed), await accountExists(r
+           an)]).toEqual([false, true]);
+      385    });
+      386  
+  ⎿  Updated test/integration/idempotency/support.ts (+4 -1)
+      1  import type pg from 'pg';
+      2  import { KyselyKeyedTransactions } from '../../../src/modules/id
+         empotency/adapters/persistence/kysely-key-store.js';
+      3 -import type { Presenter, ProblemResponse } from '../../../src/mo
+        -dules/idempotency/application/ports.js';                        
+      3 +import type {                                                   
+      4 +  Presenter,                                                    
+      5 +  ProblemResponse,                                              
+      6 +} from '../../../src/modules/idempotency/application/ports.js'; 
+      7  import type { StoredResponse } from '../../../src/modules/idempo
+         tency/index.js';
+      8  import {
+      9    AccountLockTimeout,
+  ⎿  … 4 more files changed
+  ⎿  (timeout 10m)
+
+⏺ npm run check passes (177 unit tests). Making sure Prettier touched only files
+  I changed.
+
+⏺ Bash(git status --short)
+  ⎿   M AGENTS.md
+      M eslint.config.js
+      M package.json
+     … +14 lines (ctrl+o to expand)
+
+⏺ Only my files. Now the full integration suite.
+
+⏺ Bash(npm run test:integration 2>&1 | grep -E "×|FAIL|Test Files|Tests
+      |Duration" | head -30)
+  ⎿   Test Files  40 passed (40)
+           Tests  133 passed (133)
+        Duration  15.03s (tests 77%, import 20%, transform 2%, setup 1%, wo
+     rker 1%)
+  ⎿  (timeout 10m)
+
+⏺ 133 integration tests pass. Ticking only the 07-idempotency tasks, then npm 
+  run trace.
+
+⏺ Bash(python3 - <<'EOF'
+      import re…)
+  ⎿  specs/001-accounts/tasks.md 1
+     specs/003-money-movements/tasks.md 2
+     specs/004-reversals/tasks.md 1
+     … +6 lines (ctrl+o to expand)
+  ⎿  Updated specs/001-accounts/tasks.md (+1 -1)
+      20  
+      21  ## 07-idempotency
+      22  
+      23 -- [ ] Test first in `test/integration/accounts/create-account-k
+         -eyed.test.ts` (ACC-R03, IDM-R02): with a key, account creation 
+         -runs inside the key step of plan 005 as the skeleton of plan 00
+         -0 section 6.2 with no lookup or lock, a repeat returns the stor
+         -ed response and creates no account, and the same key of another
+         - user creates its own account; then wire `create-account.ts` in
+         -to the idempotent runner.                                      
+      23 +- [x] Test first in `test/integration/accounts/create-account-k
+         +eyed.test.ts` (ACC-R03, IDM-R02): with a key, account creation 
+         +runs inside the key step of plan 005 as the skeleton of plan 00
+         +0 section 6.2 with no lookup or lock, a repeat returns the stor
+         +ed response and creates no account, and the same key of another
+         + user creates its own account; then wire `create-account.ts` in
+         +to the idempotent runner.                                      
+      24  
+      25  ## 08-api
+      26  
+  ⎿  Updated specs/003-money-movements/tasks.md (+2 -2)
+      20  
+      21  ## 07-idempotency
+      22  
+      23 -- [ ] Test first in `test/integration/movements/movement-transa
+         -ction.test.ts` (MOV-R06, MOV-R19, MOV-R29, IDM-R11): with the s
+         -tatements captured on the unit of work's connection, each movem
+         -ent runs the skeleton of plan 000 section 6.2 in order, the key
+         - row is its first write, the idempotency wait is set before the
+         - key insert, and the account lock timeout immediately before th
+         -e first `FOR UPDATE`; then wire `deposit.ts`, `withdraw.ts` and
+         - `transfer.ts` into the idempotent runner.                     
+      24 -- [ ] Test first in the same file (MOV-R20, MOV-R21, IDM-R14): 
+         -a lookup or business rejection rolls back to the savepoint and 
+         -commits the stored response with no transaction, entry, balance
+         - change or audit record; an account lock timeout rolls back eve
+         -rything, key row included, and a second run with the same key i
+         -s a first request.                                             
+      23 +- [x] Test first in `test/integration/movements/movement-transa
+         +ction.test.ts` (MOV-R06, MOV-R19, MOV-R29, IDM-R11): with the s
+         +tatements captured on the unit of work's connection, each movem
+         +ent runs the skeleton of plan 000 section 6.2 in order, the key
+         + row is its first write, the idempotency wait is set before the
+         + key insert, and the account lock timeout immediately before th
+         +e first `FOR UPDATE`; then wire `deposit.ts`, `withdraw.ts` and
+         + `transfer.ts` into the idempotent runner.                     
+      24 +- [x] Test first in the same file (MOV-R20, MOV-R21, IDM-R14): 
+         +a lookup or business rejection rolls back to the savepoint and 
+         +commits the stored response with no transaction, entry, balance
+         + change or audit record; an account lock timeout rolls back eve
+         +rything, key row included, and a second run with the same key i
+         +s a first request.                                             
+      25  
+      26  ## 08-api
+      27  
+  ⎿  Updated specs/004-reversals/tasks.md (+1 -1)
+      19  
+      20  ## 07-idempotency
+      21  
+      22 -- [ ] Test first in `test/integration/reversals/reversal-transa
+         -ction.test.ts` (REV-R13, REV-R17, IDM-R14): with the statements
+         - captured on the unit of work's connection, a reversal runs the
+         - skeleton of plan 000 section 6.2 in the order of plan section 
+         -3; a rejection, the 23505 path included, rolls back to the save
+         -point and commits only the stored response; a lock timeout roll
+         -s back everything, key row included; then wire `reverse.ts` int
+         -o the idempotent runner.                                       
+      22 +- [x] Test first in `test/integration/reversals/reversal-transa
+         +ction.test.ts` (REV-R13, REV-R17, IDM-R14): with the statements
+         + captured on the unit of work's connection, a reversal runs the
+         + skeleton of plan 000 section 6.2 in the order of plan section 
+         +3; a rejection, the 23505 path included, rolls back to the save
+         +point and commits only the stored response; a lock timeout roll
+         +s back everything, key row included; then wire `reverse.ts` int
+         +o the idempotent runner.                                       
+      23  
+      24  ## 08-api
+      25  
+  ⎿  Updated specs/005-idempotency/tasks.md (+10 -10)
+      15  
+      16  ## 07-idempotency
+      17  
+      18 -- [ ] Test first: IDM-AC02 in `test/unit/idempotency/idempotenc
+         -y-key.test.ts`; then `src/modules/idempotency/domain/idempotenc
+         -y-key.ts`.                                                     
+      19 -- [ ] Test first: IDM-AC06 in `test/unit/idempotency/fingerprin
+         -t.test.ts`, with the canonical forms of RFC 8785 for key order 
+         -at every level, whitespace, string escapes and arrays; then `fi
+         -ngerprint.ts`.                                                 
+      20 -- [ ] Test first in `test/unit/idempotency/outcome.test.ts` (ID
+         -M-R14 to IDM-R17): every row of section 1.3 of the spec maps to
+         - stored or not stored, and to a rollback to the savepoint or a 
+         -full rollback; then `outcome.ts`.                              
+      21 -- [ ] Test first in `test/unit/idempotency/idempotent-runner.te
+         -st.ts` (IDM-R12, IDM-R13): with a fake key store and unit of wo
+         -rk, a 55P03 at the key insert ends in `IdempotencyWaitTimeout`,
+         - one after it in `AccountLockTimeout`, both roll back everythin
+         -g, and neither is retried; then the step tracking of `idempoten
+         -t-runner.ts`.                                                  
+      22 -- [ ] Test first in `test/integration/idempotency/key-step.test
+         -.ts` (IDM-R06, IDM-R07, IDM-R09, IDM-R11, IDM-R15, IDM-R21): wi
+         -th a fake operation, the key insert is the first write after `a
+         -pp.set_lock_timeout`; a repeat with the same fingerprint return
+         -s the stored bytes and writes nothing; another fingerprint is r
+         -efused; an expired row is replaced; then `kysely-key-store.ts` 
+         -and the claim, read and complete statements of plan section 3. 
+      23 -- [ ] Test first in `test/integration/idempotency/key-step.test
+         -.ts` (IDM-R21): the test wraps the key store's connection so th
+         -at, right after the step 3 insert returns no row for an expired
+         - key, a separate session deletes that row; the request goes bac
+         -k to step 3, claims the key and runs as a first request; then t
+         -hat branch of `idempotent-runner.ts` and `kysely-key-store.ts`.
+      24 -- [ ] Test first in `test/integration/idempotency/key-step.test
+         -.ts` (IDM-R11, IDM-R12): with `IDEMPOTENCY_WAIT_TIMEOUT_MS` 200
+         -0, an expired key whose replacement by another session makes th
+         -e request wait at step 3, and then at step 3b behind a third se
+         -ssion's replacement, ends with `IdempotencyWaitTimeout`; the ma
+         -in assertions are deterministic: each `lock_timeout` set before
+         - step 3b or a re-pass equals the time left until the key-wait d
+         -eadline, and the `lock_timeout` values used by the attempt sum 
+         -to at most 2000 ms; the only wall-clock assertion is a generous
+         - limit, the whole wait from step 2 below 4000 ms; then the key-
+         -wait deadline of `idempotent-runner.ts`.                       
+      25 -- [ ] Test first in the same file (IDM-R10, IDM-R14, IDM-R16, I
+         -DM-R17): a second claim of the same key waits for the first and
+         - then replays its result, or runs as a first request when the f
+         -irst rolled back; a stored rejection rolls back to the savepoin
+         -t and commits only the key row; a validation error, a 500 and a
+         - 503 leave no key row; then the outcome handling of `idempotent
+         --runner.ts`.                                                   
+      26 -- [ ] Test first: IDM-AC24 in `test/integration/idempotency/cle
+         -anup-script.test.ts`, on a scratch database, also asserting wit
+         -h the statements captured on the script's connection that each 
+         -batch calls `app.set_statement_timeout(600000)` inside its tran
+         -saction (SEC-R48, ADR-0021); then `src/modules/idempotency/adap
+         -ters/cli/cleanup.ts`, its executable entry point `src/cli/idemp
+         -otency-cleanup.ts`, compiled into `dist/`, and `npm run idempot
+         -ency:cleanup` running that entry point.                        
+      27 -- [ ] Update the docs: in AGENTS.md, add `npm run idempotency:c
+         -leanup` to the commands table, from 07-idempotency, and `src/cl
+         -i/` (executable entry points compiled into `dist/`) to the repo
+         -sitory map.                                                    
+      18 +- [x] Test first: IDM-AC02 in `test/unit/idempotency/idempotenc
+         +y-key.test.ts`; then `src/modules/idempotency/domain/idempotenc
+         +y-key.ts`.                                                     
+      19 +- [x] Test first: IDM-AC06 in `test/unit/idempotency/fingerprin
+         +t.test.ts`, with the canonical forms of RFC 8785 for key order 
+         +at every level, whitespace, string escapes and arrays; then `fi
+         +ngerprint.ts`.                                                 
+      20 +- [x] Test first in `test/unit/idempotency/outcome.test.ts` (ID
+         +M-R14 to IDM-R17): every row of section 1.3 of the spec maps to
+         + stored or not stored, and to a rollback to the savepoint or a 
+         +full rollback; then `outcome.ts`.                              
+      21 +- [x] Test first in `test/unit/idempotency/idempotent-runner.te
+         +st.ts` (IDM-R12, IDM-R13): with a fake key store and unit of wo
+         +rk, a 55P03 at the key insert ends in `IdempotencyWaitTimeout`,
+         + one after it in `AccountLockTimeout`, both roll back everythin
+         +g, and neither is retried; then the step tracking of `idempoten
+         +t-runner.ts`.                                                  
+      22 +- [x] Test first in `test/integration/idempotency/key-step.test
+         +.ts` (IDM-R06, IDM-R07, IDM-R09, IDM-R11, IDM-R15, IDM-R21): wi
+         +th a fake operation, the key insert is the first write after `a
+         +pp.set_lock_timeout`; a repeat with the same fingerprint return
+         +s the stored bytes and writes nothing; another fingerprint is r
+         +efused; an expired row is replaced; then `kysely-key-store.ts` 
+         +and the claim, read and complete statements of plan section 3. 
+      23 +- [x] Test first in `test/integration/idempotency/key-step.test
+         +.ts` (IDM-R21): the test wraps the key store's connection so th
+         +at, right after the step 3 insert returns no row for an expired
+         + key, a separate session deletes that row; the request goes bac
+         +k to step 3, claims the key and runs as a first request; then t
+         +hat branch of `idempotent-runner.ts` and `kysely-key-store.ts`.
+      24 +- [x] Test first in `test/integration/idempotency/key-step.test
+         +.ts` (IDM-R11, IDM-R12): with `IDEMPOTENCY_WAIT_TIMEOUT_MS` 200
+         +0, an expired key whose replacement by another session makes th
+         +e request wait at step 3, and then at step 3b behind a third se
+         +ssion's replacement, ends with `IdempotencyWaitTimeout`; the ma
+         +in assertions are deterministic: each `lock_timeout` set before
+         + step 3b or a re-pass equals the time left until the key-wait d
+         +eadline, and the `lock_timeout` values used by the attempt sum 
+         +to at most 2000 ms; the only wall-clock assertion is a generous
+         + limit, the whole wait from step 2 below 4000 ms; then the key-
+         +wait deadline of `idempotent-runner.ts`.                       
+      25 +- [x] Test first in the same file (IDM-R10, IDM-R14, IDM-R16, I
+         +DM-R17): a second claim of the same key waits for the first and
+         + then replays its result, or runs as a first request when the f
+         +irst rolled back; a stored rejection rolls back to the savepoin
+         +t and commits only the key row; a validation error, a 500 and a
+         + 503 leave no key row; then the outcome handling of `idempotent
+         +-runner.ts`.                                                   
+      26 +- [x] Test first: IDM-AC24 in `test/integration/idempotency/cle
+         +anup-script.test.ts`, on a scratch database, also asserting wit
+         +h the statements captured on the script's connection that each 
+         +batch calls `app.set_statement_timeout(600000)` inside its tran
+         +saction (SEC-R48, ADR-0021); then `src/modules/idempotency/adap
+         +ters/cli/cleanup.ts`, its executable entry point `src/cli/idemp
+         +otency-cleanup.ts`, compiled into `dist/`, and `npm run idempot
+         +ency:cleanup` running that entry point.                        
+      27 +- [x] Update the docs: in AGENTS.md, add `npm run idempotency:c
+         +leanup` to the commands table, from 07-idempotency, and `src/cl
+         +i/` (executable entry points compiled into `dist/`) to the repo
+         +sitory map.                                                    
+      28  
+      29  ## 08-api
+      30  
+
+⏺ Bash(npm run trace 2>&1 | tail -25)
+  ⎿  | DEP-AC04 | 008-deployment | Approved | e2e | unverified | not run (r
+     eports/vitest-e2e.json missing) |
+     | DEP-AC05 | 008-deployment | Approved | unit | pending | - |
+     … +58 lines (ctrl+o to expand)
+⏺ Bash(npm run trace >/dev/null 2>&1; echo "exit $?"; npm run trace -- --require
+      unit,integration >/dev/null 2>&1; echo "exit with --require: $?"; npm run
+      trace 2>&1 |…)
+  ⎿  exit 0
+     exit with --require: 0
+     | IDM-AC02 | 005-idempotency | Approved, task ticked | unit | covered
+     … +5 lines (ctrl+o to expand)
+
+⏺ Trace passes both with and without --require unit,integration, covering
+  IDM-AC02, IDM-AC06, and IDM-AC24. Next I'll verify the build produces
+  dist/cli/idempotency-cleanup.js and that the timing-sensitive key-step file
+  stays stable across repeated runs.
+
+⏺ Bash(npm run build 2>&1 | tail -3 && ls -la dist/cli/ && for i in 1 2 3 4 5;
+      do npx vitest run --project integration
+      test/integration/idempotency/key-step.test.ts te…)
+  ⎿  > supercool-finances@0.1.0 build
+     > tsc -p tsconfig.build.json
+     … +12 lines (ctrl+o to expand)
+  ⎿  (timeout 5m)
+
+⏺ Compiled entry point smoke test, with no database configured (should exit 2
+  with the fixed message):
+
+⏺ Bash(env -u DATABASE_URL node dist/cli/idempotency-cleanup.js; echo "exit $?")
+  ⎿  idempotency-cleanup: DATABASE_URL is not set
+     exit 2
+
+⏺ CI also runs the reconciliation against the test database after the
+  integration tests; checking how, so I can run the same locally.
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Bash(node --env-file-if-exists=.env -e '
+      const { spawnSync } = require("node:child_process");…)
+  ⎿  exit 0 discrepancies 0 nonzero totals 0
+
+⏺ All checks are done. I implemented every 07-idempotency task and ticked the 14
+  tasks of that phase across specs 001, 003, 004 and 005. Nothing is committed.
+
+  Verification
+  - npm run check passes (177 unit tests).
+  - npm run test:integration passes (133 tests).
+  - npm run trace exits 0, also with --require unit,integration. IDM-AC02,
+    IDM-AC06 and IDM-AC24 are covered.
+  - The shared test database still reconciles after the integration suite: no
+    discrepancies and every total is zero.
+  - npm run build writes dist/cli/idempotency-cleanup.js. Run with no
+    DATABASE_URL, it exits 2 with a fixed message.
+  - I ran the timing-sensitive key-step and movement test files 5 times and they
+    passed every time. The 2000 ms budget test checks the lock_timeout values
+    exactly; its only wall-clock check is a generous 4000 ms limit.
+
+  What changed
+  - Domain (src/modules/idempotency/domain/):
+    - the key parser;
+    - the fingerprint, in the RFC 8785 canonical JSON form and tested against
+      the RFC's own examples;
+    - the table of what gets stored (section 1.3 of the spec) as one function,
+      decide;
+    - the IdempotencyKeyReused error.
+  - Runner (idempotent-runner.ts): steps 2, 3, 3b and 3c share one key-wait
+    deadline. Before step 3b and before each pass back to step 3 it sets
+    lock_timeout to the time left, and fails with IdempotencyWaitTimeout when
+    less than 1 ms is left. If the cleanup deletes the row mid-step, it goes
+    back to step 3. After the savepoint it runs the operation. A stored
+    rejection rolls back to the savepoint and is committed; everything else
+    rolls back entirely. A replay ends with ROLLBACK.
+  - Adapter (kysely-key-store.ts): the key-step statements of plan section 3,
+    plus KyselyKeyedTransactions, which runs a request's statements inside the
+    unit of work's existing key-wait scope.
+  - Cleanup: adapters/cli/cleanup.ts, its entry point
+    src/cli/idempotency-cleanup.ts, the npm run idempotency:cleanup script, and
+    the AGENTS.md command row and src/cli/ map entry.
+  - Wiring: deposit, withdraw, transfer, Reversals.reverse and createAccount run
+    unchanged as the runner's operation. The only production change is that
+    kysely-movements.ts now exports movementTransactionOn so keyed transactions
+    can build the movement ports. Until the composition root exists in 08-api,
+    only the tests connect the runner to the use cases.
+
+  Decisions you should check
+  - Lint boundary: eslint.config.js now lets application code import
+    platform/db/errors.js, and nothing else from platform/. The runner has to
+    raise IdempotencyWaitTimeout itself when the deadline passes, and that typed
+    error lives there. The config's own comment named this path as the expected
+    exception. A toolchain test covers the new rule, and IdempotencyWaitTimeout
+    now takes an optional cause. Reverting is easy if you'd rather the error
+    come through a port.
+  - Kysely schema: schema.ts was missing the idempotency_keys table type, so I
+    added it.
+  - A 503 after COMMIT was sent: decide returns "not stored, commit" for it. The
+    response stored at step 9 is the one a retry replays.
+
+  The prompt and the plan did not conflict. One wording in task 7 was ambiguous:
+  "the lock_timeout values … sum to at most 2000 ms". Read literally, 2000 plus
+  the step 3b value always exceeds 2000. I tested the intended reading instead:
+  time used at step 3 plus the step 3b lock_timeout is at most 2000 ms.
+
+  Process note: I wrote the runner before its unit test, and the cleanup in the
+  same step as its test, so neither test was seen failing first. To check the
+  runner test isn't vacuous, I removed the key-wait step tracking: the two
+  IDM-R12 tests failed, and passed again once I restored it.
+
+  Left: commit and pull request through /ship, and the phase transcript.
+
+✻ Crunched for 20m 23s · done 1:56 PM
+
+❯ /audit                                                                        
+  ⎿  No Critical, High or Medium findings on phase/07-idempotency. Three Low findings are listed below as follow-ups. I reviewed the code and did not run the tests or npm run trace.
+
+     Findings
+
+     1. Low: a request can get 409 even though the response it waited for is already stored
+     - Where: src/modules/idempotency/application/idempotent-runner.ts:91, with #setTimeLeft at lines 103–107.
+     - What is wrong: when step 3 returns no row, the runner checks the deadline before step 3b. If less than 1 ms is left, it throws IdempotencyWaitTimeout straight away. It never runs the 3c read, which takes no lock and would find the response the first request just committed.
+     - How to trigger it: R1 holds key k1. R2 waits at step 3 and R1 commits about 1999.5 ms into R2's 2000 ms budget. R2's insert returns no row without a 55P03, but within 1 ms of R2's deadline (plus one round trip). R2 then answers 409 instead of replaying R1's stored 201.
+     - Impact: the client gets a 409 it can retry (Retry-After: 1) instead of the replay. The movement still runs only once, so no money is affected. It contradicts IDM-R10 ("then answer it as IDM-R07 or IDM-R09 if the first stored a response"). IDM-R12 only allows 409 when the insert fails with 55P03 or does not complete in time, and here it completed. Plan 005 section 3 prescribes this check, so plan and spec disagree in this window.
+     - Suggested fix: when the budget is used up, skip 3b and 3b alone. Still run the 3c read, and answer the replay or 422 for a live row. Answer IdempotencyWaitTimeout only when the row is missing or expired. Then align plan 005 section 3.
+     - Violates: IDM-R10, IDM-R12 (no AC; the nearest is IDM-AC13, planned for 09-hardening).
+
+     2. Low: a test name claims REV-R13, but the test does not prove it
+     - Where: test/integration/reversals/reversal-transaction.test.ts:61
+     - What is wrong: REV-R13 is "no or malformed Idempotency-Key → 400 /problems/malformed-request". The test only checks the order of the keyed reversal's statements, which is REV-R17. No reversal request without a key, or with a bad key, is sent.
+     - How to trigger it: search the tests for REV-R13. This test shows up as proof of it.
+     - Impact: traceability is misleading. Someone reading the trace would think REV-R13 is covered from phase 07, when it is only proven in 08-api (IDM-AC01/IDM-AC03).
+     - Suggested fix: remove REV-R13 from the test name, and from the task line in specs/004-reversals/tasks.md:22, or say it is only the key-semantics half. Leave the 400 proof to the 08-api key-required tests.
+     - Violates: REV-R13 (traceability only).
+
+     3. Low: plan 005 puts the 55P03 classification somewhere else than the code does
+     - Where: specs/005-idempotency/plan.md:15 against src/modules/idempotency/adapters/persistence/kysely-key-store.ts:117 and src/platform/db/unit-of-work.ts:69.
+     - What is wrong: plan 005 section 1 says kysely-key-store.ts turns a 55P03 at a key-wait step into IdempotencyWaitTimeout. In the code, UnitOfWork.keyWait (platform) marks the step and sqlstate.ts does the classification, which is what plan 000 section 6.3 describes. The key store only delegates.
+     - How to trigger it: read the plan, then look for the classification in kysely-key-store.ts.
+     - Impact: only the documentation is affected. The two plans disagree, and the code follows plan 000.
+     - Suggested fix: update the purpose of kysely-key-store.ts in plan 005 section 1 to "runs the key-wait statements in the unit of work's key-wait scope; sqlstate.ts classifies (plan 000 section 6.3)".
+     - Violates: missing AC (docs drift).
+
+     Deferred, already planned: the HTTP key header, the replay sender, composition-root wiring and the toProblem mapping of 409/503 with Retry-After: 1 (08-api, IDM-AC14); validating IDEMPOTENCY_WAIT_TIMEOUT_MS and IDEMPOTENCY_KEY_TTL_SECONDS (08-api, IDM-AC25); IDM-AC01, AC03–AC05, AC07–AC09, AC15–AC19 and AC21–AC23 (08-api); the replica concurrency and wait-timeout ACs IDM-AC10–AC13 (09-hardening); the request timeout after COMMIT (SEC-R33, 09-hardening); the OpenAPI key docs, the docs/runbooks/idempotency-cleanup.md runbook, the README duplicate-request flow and the ADR-0009 follow-ups (09-hardening); the hourly cleanup schedule (12-infra, DEP-R37).
+
+     Categories without findings
+
+     - Money: no findings. The module never touches amounts, and the test presenter writes bigints as strings.
+     - Transactions and concurrency: no findings.
+       - One transaction per keyed request; the savepoint comes right after the key claim.
+       - The account lock timeout is set immediately before the first FOR UPDATE, and only customer rows are locked.
+       - Retries on 40P01/40001 re-run the whole attempt, key insert included.
+       - The runner keeps no in-process state.
+     - Security: no findings.
+       - Keys are scoped by userId, and SQL is parameterized (sql templates, $1, a fixed savepoint name through sql.id).
+       - The cleanup only prints fixed messages and the SQLSTATE, never the URL or the password, and the test checks this.
+     - Failure handling: no findings.
+       - Key waits and account lock waits are separate settings, classified by step.
+       - The cleanup uses one connection with a bounded connect, calls app.set_statement_timeout(600000) in each batch's transaction, and destroys the connection on failure.
+
+     Follow-ups: 1, 2, 3
+     Verdict: ready to ship
+
+❯ The audit says ready to ship with three Low follow-ups. Fix all three, then   
+  close the phase without another audit:                                        
+  1. IdempotentRunner: when the key-wait budget is used up before step 3b, skip 
+  step 3b only and still run the step 3c read, which takes no lock: replay or   
+  answer 422 for a live row, and answer IdempotencyWaitTimeout only when the    
+  row is missing or expired (IDM-R10, IDM-R12). Add a unit test with the clock  
+  at the deadline, and align plan 005 section 3.                                
+  2. Remove REV-R13 from the name of the test in                                
+  test/integration/reversals/reversal-transaction.test.ts and from the task     
+  line in specs/004-reversals/tasks.md; the 400 for a missing or malformed key  
+  is proven in 08-api.                                                          
+  3. Plan 005 section 1: kysely-key-store.ts runs the key-wait statements in    
+  the unit of work's key-wait scope, and sqlstate.ts classifies them (plan 000  
+  section 6.3).                                                                 
+     Change nothing else. Run npm run check, npm run test:integration and npm   
+  run trace.                                                                    
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Fix 1, test first: three unit cases with the clock at the deadline before step
+  3b.
+
+⏺ Update(test/unit/idempotency/idempotent-runner.test.ts)
+  ⎿  Added 33 lines
+      369      expect(delays).toEqual([5]);
+      370    });
+      371  
+      372 +  it('IDM-R10 IDM-R12 with the key-wait budget used up before 
+          +step 3b, skips step 3b only and still reads the row: a live ro
+          +w with the same fingerprint is replayed, one with another fing
+          +erprint is refused', async () => {                            
+      373 +    for (const [fingerprint, outcome] of [                    
+      374 +      [REQUEST.fingerprint, 'replay'],                        
+      375 +      ['e'.repeat(64), 'reused'],                             
+      376 +    ] as const) {                                             
+      377 +      // At step 2, then at the deadline before step 3b: less 
+          +than 1 ms left.                                               
+      378 +      const { client, keys, run } = setup([1000, 3000]);      
+      379 +      keys.claims = [false];                                  
+      380 +      keys.rows = [{ fingerprint, response: RESPONSE, expired:
+          + false }];                                                    
+      381 +      if (outcome === 'replay') {                             
+      382 +        await expect(run()).resolves.toEqual({ replayed: true,
+          + response: RESPONSE });                                       
+      383 +      } else {                                                
+      384 +        await expect(run()).rejects.toBeInstanceOf(Idempotency
+          +KeyReused);                                                   
+      385 +      }                                                       
+      386 +      expect(client.lockTimeouts).toEqual([2000]);            
+      387 +      expect(client.statements).toEqual([BEGIN, SET_LOCK_TIMEO
+          +UT, CLAIM, READ, 'ROLLBACK']);                                
+      388 +    }                                                         
+      389 +  });                                                         
+      390 +                                                              
+      391 +  it('IDM-R12 with the key-wait budget used up before step 3b,
+          + a missing or expired row ends in IdempotencyWaitTimeout', asy
+          +nc () => {                                                    
+      392 +    for (const row of [                                       
+      393 +      undefined,                                              
+      394 +      { fingerprint: REQUEST.fingerprint, response: RESPONSE, 
+          +expired: true },                                              
+      395 +    ]) {                                                      
+      396 +      const { client, keys, run } = setup([1000, 2999.5]);    
+      397 +      keys.claims = [false];                                  
+      398 +      keys.rows = [row];                                      
+      399 +      await expect(run()).rejects.toBeInstanceOf(IdempotencyWa
+          +itTimeout);                                                   
+      400 +      expect(client.lockTimeouts).toEqual([2000]);            
+      401 +      expect(client.statements).toEqual([BEGIN, SET_LOCK_TIMEO
+          +UT, CLAIM, READ, 'ROLLBACK']);                                
+      402 +    }                                                         
+      403 +  });                                                         
+      404 +                                                              
+      405    it('IDM-R11 IDM-R12 sets lock_timeout before step 3b and eac
+           h re-pass to the whole ms left before the deadline, and ends i
+           n IdempotencyWaitTimeout with less than 1 ms left', async () =
+           > {
+      406      // Readings of the monotonic clock: at step 2, then before
+            each lock_timeout of a key-wait step.
+      407      const { client, keys, run } = setup([1000, 1500, 2200.4, 2
+           300.9, 2999.5]);
+
+⏺ Bash(npx vitest run --project unit
+      test/unit/idempotency/idempotent-runner.test.ts 2>&1 | grep -E "✓|×|Tests
+      ")
+  ⎿       × IDM-R10 IDM-R12 with the key-wait budget used up before step 3b
+     , skips step 3b only and still reads the row: a live row with the same
+      fingerprint is replayed, one with another fingerprint is refused 2ms
+     … +4 lines (ctrl+o to expand)
+
+⏺ Both new tests fail as expected. Now the runner change.
+
+⏺ Update(src/modules/idempotency/application/idempotent-runner.ts)
+  ⎿  Added 28 lines, removed 14 lines
+      73  
+      74    /**
+      75     * Steps 2 to 3c. Every key-wait step draws on one deadline t
+          aken at step 2: before step 3b and
+      76 -   * before each pass back to step 3, `lock_timeout` is set to 
+         -the whole milliseconds left, and the                           
+      77 -   * request ends with `IdempotencyWaitTimeout` at once when le
+         -ss than 1 ms is left, so one attempt                           
+      78 -   * never waits for the key longer than `IDEMPOTENCY_WAIT_TIME
+         -OUT_MS` in total (IDM-R11, IDM-R12).                           
+      79 -   * Returns once the key is claimed; throws `Replay` or `Idemp
+         -otencyKeyReused` otherwise.                                    
+      76 +   * before each pass back to step 3, `lock_timeout` is set to 
+         +the whole milliseconds left, so one                            
+      77 +   * attempt never waits for the key longer than `IDEMPOTENCY_W
+         +AIT_TIMEOUT_MS` in total (IDM-R11).                            
+      78 +   * With less than 1 ms left before step 3b, step 3b is skippe
+         +d but step 3c, which takes no lock,                            
+      79 +   * still reads the row, so a response stored by the request i
+         +t waited for is replayed or refused                            
+      80 +   * (IDM-R10); only a missing or expired row then ends in `Ide
+         +mpotencyWaitTimeout`, as does a pass                           
+      81 +   * back to step 3 with less than 1 ms left (IDM-R12). Returns
+         + once the key is claimed; throws                               
+      82 +   * `Replay` or `IdempotencyKeyReused` otherwise.             
+      83     */
+      84    async #keyStep<Operation>(tx: KeyedTransaction<Operation>, re
+          quest: KeyedRequest): Promise<void> {
+      85      const { waitTimeoutMs, keyTtlSeconds } = this.#settings;
+     ...
+       89  
+       90      await tx.keyWait(async () => {
+       91        for (let pass = 1; ; pass += 1) {
+       89 -        if (pass > 1) await this.#setTimeLeft(tx, deadline);  
+       92 +        if (pass > 1) {                                       
+       93 +          const left = this.#timeLeft(deadline);              
+       94 +          if (left < 1) throw new IdempotencyWaitTimeout();   
+       95 +          await tx.setLockTimeout(left);                      
+       96 +        }                                                     
+       97          if (await tx.keys.claim(claim)) return;
+       91 -        await this.#setTimeLeft(tx, deadline);                
+       92 -        if (await tx.keys.claimExpired(claim)) return;        
+       98 +        const left = this.#timeLeft(deadline);                
+       99 +        if (left >= 1) {                                      
+      100 +          await tx.setLockTimeout(left);                      
+      101 +          if (await tx.keys.claimExpired(claim)) return;      
+      102 +        }                                                     
+      103          const row = await tx.keys.read(request.userId, request
+           .key);
+       94 -        // No row: the cleanup deleted the expired row after s
+          -tep 3. A row read as expired expired                          
+       95 -        // after step 3b. Either way the next pass claims the 
+          -key or finds a live row (IDM-R21).                            
+       96 -        if (row === undefined || row.expired) continue;       
+      104 +        if (row === undefined || row.expired) {               
+      105 +          // Step 3b was skipped: no time is left to replace t
+          +he row or to wait for it again.                               
+      106 +          if (left < 1) throw new IdempotencyWaitTimeout();   
+      107 +          // No row: the cleanup deleted the expired row after
+          + step 3. A row read as expired                                
+      108 +          // expired after step 3b. Either way the next pass c
+          +laims the key or finds a live row                             
+      109 +          // (IDM-R21).                                       
+      110 +          continue;                                           
+      111 +        }                                                     
+      112          if (row.fingerprint !== request.fingerprint) throw new
+            IdempotencyKeyReused();
+      113          throw new Replay(row.response);
+      114        }
+      115      });
+      116    }
+      117  
+      103 -  async #setTimeLeft<Operation>(tx: KeyedTransaction<Operation
+          ->, deadline: number): Promise<void> {                         
+      104 -    const left = Math.floor(deadline - this.#now());          
+      105 -    if (left < 1) throw new IdempotencyWaitTimeout();         
+      106 -    await tx.setLockTimeout(left);                            
+      118 +  /** The whole milliseconds left before the key-wait deadline
+          +. */                                                          
+      119 +  #timeLeft(deadline: number): number {                       
+      120 +    return Math.floor(deadline - this.#now());                
+      121    }
+      122  
+      123    /**
+
+⏺ Bash(npx vitest run --project unit test/unit/idempotency 2>&1 | grep -E
+      "×|Tests ")
+  ⎿        Tests  28 passed (28)
+
+⏺ Now aligning plan 005 section 3 (and section 1 for fix 3).
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Bash(python3 - <<'EOF'
+      p='specs/005-idempotency/plan.md'…)
+  ⎿  67:Steps 3, 3b and 3c share one wait budget: before step 3b and before
+      every pas
+  ⎿  Updated specs/005-idempotency/plan.md (+2 -2)
+      12  | `src/modules/idempotency/domain/outcome.ts`                  
+                                 | 07-idempotency | `StoredResponse` (`st
+          atus`, `headers`, `body` bytes) and `isStored(outcome)`, the ta
+          ble of section 1.3 of the spec as one function (IDM-R14 to IDM-
+          R17).                                                          
+                                                        |
+      13  | `src/modules/idempotency/application/ports.ts`               
+                                 | 07-idempotency | `KeyStore` (claim, re
+          ad, complete) and the `Presenter` contract of plan 000 section 
+          5.                                                             
+                                                                         
+                                                        |
+      14  | `src/modules/idempotency/application/idempotent-runner.ts`   
+                                 | 07-idempotency | Runs one keyed reques
+          t inside one attempt of the transaction runner: the key step, t
+          he savepoint, the operation, and the stored outcome (section 3)
+          .                                                              
+                                                        |
+      15 -| `src/modules/idempotency/adapters/persistence/kysely-key-stor
+         -e.ts`                  | 07-idempotency | The statements of sec
+         -tion 3, and the classification of a 55P03 at a key-wait step (3
+         -, 3b, 3c or a re-pass) as `IdempotencyWaitTimeout` (IDM-R12).  
+         -                                                               
+         -                                              |                
+      15 +| `src/modules/idempotency/adapters/persistence/kysely-key-stor
+         +e.ts`                  | 07-idempotency | The statements of sec
+         +tion 3, run in the unit of work's key-wait scope for the key-wa
+         +it steps (3, 3b, 3c and the re-passes); `sqlstate.ts` classifie
+         +s a 55P03 raised there as `IdempotencyWaitTimeout` (IDM-R12, pl
+         +an 000 section 6.3).                                           
+         +                                                               
+         +     |                                                         
+      16  | `src/modules/idempotency/adapters/cli/cleanup.ts`, `src/cli/i
+          dempotency-cleanup.ts` | 07-idempotency | The cleanup (section 
+          4) as a module, and its executable entry point under `src/`, co
+          mpiled to `dist/cli/idempotency-cleanup.js`. `npm run idempoten
+          cy:cleanup` runs the entry point with `tsx`; the ECS cleanup ta
+          sk runs the compiled file (DEP-R37, IDM-R22). |
+      17  | `src/platform/config/config.ts`                              
+                                 | 08-api         | `IDEMPOTENCY_WAIT_TIM
+          EOUT_MS` (1 to 4999, default 2000) and `IDEMPOTENCY_KEY_TTL_SEC
+          ONDS` (3600 to 2592000, default 86400) (IDM-R20, IDM-R23).     
+                                                                         
+                                                        |
+      18  | `src/modules/idempotency/adapters/http/key-header.ts`        
+                                 | 08-api         | The `preHandler` that
+           parses the header of every route that takes a key: 400 when it
+           is missing on a movement or malformed anywhere (IDM-R01, IDM-R
+          03). Routes that take no key never read it (SYS-R39).          
+                                                        |
+     ...
+      64  - **422 `validation-error`, a 503 (an account lock timeout, ret
+          ries exhausted, a statement timeout, or the request timeout bef
+          ore `COMMIT` was sent) or a 500:** `ROLLBACK`, so the key row g
+          oes too and a retry runs again (IDM-R16, IDM-R17).
+      65  - **Request timeout after `COMMIT` was sent:** the commit finis
+          hes after the 503; the outcome is unknown to the client, as for
+           a gateway error, and if the commit succeeded the key row holds
+           the 201, so a retry with the same key gets it by replay (IDM-R
+          17, SEC-R33). A 40P01 or 40001 re-runs the whole attempt from s
+          tep 1, key insert included.
+      66  
+      67 -Steps 3, 3b and 3c share one wait budget: before step 3b and be
+         -fore every pass back to step 3, the runner calls `SELECT app.se
+         -t_lock_timeout($remaining)` with the whole milliseconds left un
+         -til the deadline of step 2, and answers `IdempotencyWaitTimeout
+         -` (409 `request-in-progress`, `Retry-After: 1`) at once when le
+         -ss than 1 ms remains. `lock_timeout` bounds each wait, not thei
+         -r sum, so without this an attempt could wait for the key once a
+         -t step 3 and again at step 3b; with it, one attempt never waits
+         - for the key longer than `IDEMPOTENCY_WAIT_TIMEOUT_MS` in total
+         -, as SYS-R35 and SEC-R35 count it. A 55P03 at any of these step
+         -s is `IdempotencyWaitTimeout` (409, IDM-R12); one at any later 
+         -step is `AccountLockTimeout` (503, IDM-R13). `kysely-key-store.
+         -ts` tells them apart by the step at which the error was raised.
+      67 +Steps 3, 3b and 3c share one wait budget: before step 3b and be
+         +fore every pass back to step 3, the runner calls `SELECT app.se
+         +t_lock_timeout($remaining)` with the whole milliseconds left un
+         +til the deadline of step 2. When less than 1 ms remains before 
+         +step 3b, step 3b is skipped and step 3c still reads the row, wh
+         +ich takes no lock: a live row is replayed (IDM-R07) or answered
+         + 422 (IDM-R09), so a request whose wait ended just as the first
+         + request committed still gets its stored response (IDM-R10), an
+         +d a missing or expired row answers `IdempotencyWaitTimeout` (40
+         +9 `request-in-progress`, `Retry-After: 1`). When less than 1 ms
+         + remains before a pass back to step 3, the runner answers `Idem
+         +potencyWaitTimeout` at once. `lock_timeout` bounds each wait, n
+         +ot their sum, so without this an attempt could wait for the key
+         + once at step 3 and again at step 3b; with it, one attempt neve
+         +r waits for the key longer than `IDEMPOTENCY_WAIT_TIMEOUT_MS` i
+         +n total, as SYS-R35 and SEC-R35 count it. A 55P03 at any of the
+         +se steps is `IdempotencyWaitTimeout` (409, IDM-R12); one at any
+         + later step is `AccountLockTimeout` (503, IDM-R13). `kysely-key
+         +-store.ts` tells them apart by the step at which the error was 
+         +raised.                                                        
+      68  
+      69  The replay is the stored `status`, `headers` and `body` bytes, 
+          plus the current request's `X-Request-Id` and `Idempotent-Repla
+          yed: true`. The replay step comes before validation and every l
+          ater check, and the query string is not part of the fingerprint
+          , so a replay never depends on `MAX_AMOUNT_MINOR`, the accounts
+          ' state, the query string or the code version (IDM-R08). The pr
+          esenter builds every new body, so the `extra-response-member` s
+          eam (plan 000 section 8) changes new responses only. Account cr
+          eation with a key runs the same steps with no lookup or lock (p
+          lan 001 section 3.1).
+      70  
+
+⏺ Bash(sed -n 67p specs/005-idempotency/plan.md | fold -w 200 | tail -3)
+  ⎿  ld wait for the key once at step 3 and again at step 3b; with it, one
+     attempt never waits for the key longer than `IDEMPOTENCY_WAIT_TIMEOUT_
+     MS` in total, as SYS-R35 and SEC-R35 count it. A 55P03 at an
+     … +4 lines (ctrl+o to expand)
+
+⏺ The end of that paragraph repeats the claim fix 3 corrects
+  ("kysely-key-store.ts tells them apart"). I'll align that sentence too, since
+  it is the same statement.
+
+⏺ Bash(python3 - <<'EOF'
+      p='specs/005-idempotency/plan.md'…)
+  ⎿  specs/004-reversals/tasks.md:22:- [x] Test first in `test/integration/
+     reversals/reversal-transaction.test.ts` (REV-R13, REV-R17, IDM-R14): w
+     ith the statements captured on the unit of work's connection
+     … +3 lines (ctrl+o to expand)
+  ⎿  Updated specs/005-idempotency/plan.md (+1 -1)
+      64  - **422 `validation-error`, a 503 (an account lock timeout, ret
+          ries exhausted, a statement timeout, or the request timeout bef
+          ore `COMMIT` was sent) or a 500:** `ROLLBACK`, so the key row g
+          oes too and a retry runs again (IDM-R16, IDM-R17).
+      65  - **Request timeout after `COMMIT` was sent:** the commit finis
+          hes after the 503; the outcome is unknown to the client, as for
+           a gateway error, and if the commit succeeded the key row holds
+           the 201, so a retry with the same key gets it by replay (IDM-R
+          17, SEC-R33). A 40P01 or 40001 re-runs the whole attempt from s
+          tep 1, key insert included.
+      66  
+      67 -Steps 3, 3b and 3c share one wait budget: before step 3b and be
+         -fore every pass back to step 3, the runner calls `SELECT app.se
+         -t_lock_timeout($remaining)` with the whole milliseconds left un
+         -til the deadline of step 2. When less than 1 ms remains before 
+         -step 3b, step 3b is skipped and step 3c still reads the row, wh
+         -ich takes no lock: a live row is replayed (IDM-R07) or answered
+         - 422 (IDM-R09), so a request whose wait ended just as the first
+         - request committed still gets its stored response (IDM-R10), an
+         -d a missing or expired row answers `IdempotencyWaitTimeout` (40
+         -9 `request-in-progress`, `Retry-After: 1`). When less than 1 ms
+         - remains before a pass back to step 3, the runner answers `Idem
+         -potencyWaitTimeout` at once. `lock_timeout` bounds each wait, n
+         -ot their sum, so without this an attempt could wait for the key
+         - once at step 3 and again at step 3b; with it, one attempt neve
+         -r waits for the key longer than `IDEMPOTENCY_WAIT_TIMEOUT_MS` i
+         -n total, as SYS-R35 and SEC-R35 count it. A 55P03 at any of the
+         -se steps is `IdempotencyWaitTimeout` (409, IDM-R12); one at any
+         - later step is `AccountLockTimeout` (503, IDM-R13). `kysely-key
+         --store.ts` tells them apart by the step at which the error was 
+         -raised.                                                        
+      67 +Steps 3, 3b and 3c share one wait budget: before step 3b and be
+         +fore every pass back to step 3, the runner calls `SELECT app.se
+         +t_lock_timeout($remaining)` with the whole milliseconds left un
+         +til the deadline of step 2. When less than 1 ms remains before 
+         +step 3b, step 3b is skipped and step 3c still reads the row, wh
+         +ich takes no lock: a live row is replayed (IDM-R07) or answered
+         + 422 (IDM-R09), so a request whose wait ended just as the first
+         + request committed still gets its stored response (IDM-R10), an
+         +d a missing or expired row answers `IdempotencyWaitTimeout` (40
+         +9 `request-in-progress`, `Retry-After: 1`). When less than 1 ms
+         + remains before a pass back to step 3, the runner answers `Idem
+         +potencyWaitTimeout` at once. `lock_timeout` bounds each wait, n
+         +ot their sum, so without this an attempt could wait for the key
+         + once at step 3 and again at step 3b; with it, one attempt neve
+         +r waits for the key longer than `IDEMPOTENCY_WAIT_TIMEOUT_MS` i
+         +n total, as SYS-R35 and SEC-R35 count it. A 55P03 at any of the
+         +se steps is `IdempotencyWaitTimeout` (409, IDM-R12); one at any
+         + later step is `AccountLockTimeout` (503, IDM-R13). `kysely-key
+         +-store.ts` runs the key-wait steps in the unit of work's key-wa
+         +it scope, and `sqlstate.ts` tells them apart by the step at whi
+         +ch the error was raised (plan 000 section 6.3).                
+      68  
+      69  The replay is the stored `status`, `headers` and `body` bytes, 
+          plus the current request's `X-Request-Id` and `Idempotent-Repla
+          yed: true`. The replay step comes before validation and every l
+          ater check, and the query string is not part of the fingerprint
+          , so a replay never depends on `MAX_AMOUNT_MINOR`, the accounts
+          ' state, the query string or the code version (IDM-R08). The pr
+          esenter builds every new body, so the `extra-response-member` s
+          eam (plan 000 section 8) changes new responses only. Account cr
+          eation with a key runs the same steps with no lookup or lock (p
+          lan 001 section 3.1).
+      70  
+
+⏺ Fix 2: removing REV-R13 from the test name and the task line.
+
+⏺ Bash(sed -i '' "s/it('REV-R13 REV-R17 a keyed reversal/it('REV-R17 a keyed
+      reversal/" test/integration/reversals/reversal-transaction.test.ts && sed
+      -i '' '22s/(REV-…)
+  ⎿   AGENTS.md                                          | 22 ++++++-----
+      eslint.config.js                                   |  8 ++--
+      package.json                                       |  1 +
+     … +12 lines (ctrl+o to expand)
+  ⎿  Updated specs/004-reversals/tasks.md (+1 -1)
+      19  
+      20  ## 07-idempotency
+      21  
+      22 -- [x] Test first in `test/integration/reversals/reversal-transa
+         -ction.test.ts` (REV-R13, REV-R17, IDM-R14): with the statements
+         - captured on the unit of work's connection, a reversal runs the
+         - skeleton of plan 000 section 6.2 in the order of plan section 
+         -3; a rejection, the 23505 path included, rolls back to the save
+         -point and commits only the stored response; a lock timeout roll
+         -s back everything, key row included; then wire `reverse.ts` int
+         -o the idempotent runner.                                       
+      22 +- [x] Test first in `test/integration/reversals/reversal-transa
+         +ction.test.ts` (REV-R17, IDM-R14): with the statements captured
+         + on the unit of work's connection, a reversal runs the skeleton
+         + of plan 000 section 6.2 in the order of plan section 3; a reje
+         +ction, the 23505 path included, rolls back to the savepoint and
+         + commits only the stored response; a lock timeout rolls back ev
+         +erything, key row included; then wire `reverse.ts` into the ide
+         +mpotent runner.                                                
+      23  
+      24  ## 08-api
+      25  
+  ⎿  Updated test/integration/reversals/reversal-transaction.test.ts (+1 
+     -1)
+      58      await closePools();
+      59    });
+      60  
+      61 -  it('REV-R13 REV-R17 a keyed reversal runs the skeleton in the
+         - order of plan 004 section 3: key row first, lookup, account lo
+         -ck timeout, locks, the existing-reversal check, the writes and 
+         -the stored response', async () => {                            
+      61 +  it('REV-R17 a keyed reversal runs the skeleton in the order o
+         +f plan 004 section 3: key row first, lookup, account lock timeo
+         +ut, locks, the existing-reversal check, the writes and the stor
+         +ed response', async () => {                                    
+      62      const a1 = await createCustomerAccount({ currency: 'EUR', o
+          wnerId: C1 });
+      63      const d = await writeDirectDeposit(a1, '1000');
+      64  
+⏺ Running the three gates.
+
+⏺ Bash(npm run check 2>&1 | grep -E "error|✖|Test Files|Tests |warn" | head;
+      echo "check exit ${PIPESTATUS[0]}"; npm run test:integration 2>&1 | grep
+      -E "×|Test Files|…)
+  ⎿  [warn] specs/005-idempotency/plan.md
+     [warn] Code style issues found in the above file. Run Prettier with --
+     write to fix.
+     … +6 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ Prettier wants the plan table realigned after the longer section 1 row;
+  formatting it and re-running the check.
+
+⏺ Bash(npx prettier --write specs/005-idempotency/plan.md >/dev/null && npm run
+      check > /tmp/claude-check.log 2>&1; echo "check exit $?"; grep -E "Test
+      Files|Tests " /…)
+  ⎿  check exit 0
+      Test Files  23 passed (23)
+           Tests  179 passed (179)
+     … +6 lines (ctrl+o to expand)
+  ⎿  Updated specs/005-idempotency/plan.md (+1 -1)
+      12  | `src/modules/idempotency/domain/outcome.ts`                  
+                                 | 07-idempotency | `StoredResponse` (`st
+          atus`, `headers`, `body` bytes) and `isStored(outcome)`, the ta
+          ble of section 1.3 of the spec as one function (IDM-R14 to IDM-
+          R17).                                                          
+                                                        |
+      13  | `src/modules/idempotency/application/ports.ts`               
+                                 | 07-idempotency | `KeyStore` (claim, re
+          ad, complete) and the `Presenter` contract of plan 000 section 
+          5.                                                             
+                                                                         
+                                                        |
+      14  | `src/modules/idempotency/application/idempotent-runner.ts`   
+                                 | 07-idempotency | Runs one keyed reques
+          t inside one attempt of the transaction runner: the key step, t
+          he savepoint, the operation, and the stored outcome (section 3)
+          .                                                              
+                                                        |
+      15 -| `src/modules/idempotency/adapters/persistence/kysely-key-stor
+         -e.ts`                  | 07-idempotency | The statements of sec
+         -tion 3, run in the unit of work's key-wait scope for the key-wa
+         -it steps (3, 3b, 3c and the re-passes); `sqlstate.ts` classifie
+         -s a 55P03 raised there as `IdempotencyWaitTimeout` (IDM-R12, pl
+         -an 000 section 6.3).                                           
+         -                                                               
+         -     |                                                         
+      15 +| `src/modules/idempotency/adapters/persistence/kysely-key-stor
+         +e.ts`                  | 07-idempotency | The statements of sec
+         +tion 3, run in the unit of work's key-wait scope for the key-wa
+         +it steps (3, 3b, 3c and the re-passes); `sqlstate.ts` classifie
+         +s a 55P03 raised there as `IdempotencyWaitTimeout` (IDM-R12, pl
+         +an 000 section 6.3).                          |                
+      16  | `src/modules/idempotency/adapters/cli/cleanup.ts`, `src/cli/i
+          dempotency-cleanup.ts` | 07-idempotency | The cleanup (section 
+          4) as a module, and its executable entry point under `src/`, co
+          mpiled to `dist/cli/idempotency-cleanup.js`. `npm run idempoten
+          cy:cleanup` runs the entry point with `tsx`; the ECS cleanup ta
+          sk runs the compiled file (DEP-R37, IDM-R22). |
+      17  | `src/platform/config/config.ts`                              
+                                 | 08-api         | `IDEMPOTENCY_WAIT_TIM
+          EOUT_MS` (1 to 4999, default 2000) and `IDEMPOTENCY_KEY_TTL_SEC
+          ONDS` (3600 to 2592000, default 86400) (IDM-R20, IDM-R23).     
+                                                                         
+                                                        |
+      18  | `src/modules/idempotency/adapters/http/key-header.ts`        
+                                 | 08-api         | The `preHandler` that
+           parses the header of every route that takes a key: 400 when it
+           is missing on a movement or malformed anywhere (IDM-R01, IDM-R
+          03). Routes that take no key never read it (SYS-R39).          
+                                                        |
+  ⎿  (timeout 10m)
+
+⏺ Bash(git diff --numstat specs/005-idempotency/plan.md && git diff -U0
+      specs/005-idempotency/plan.md | grep "^@@")
+  ⎿  2  2       specs/005-idempotency/plan.md
+     @@ -15 +15 @@ How the `Idempotency-Key` is parsed, fingerprinted, stor
+     ed, waited on, replayed,
+     … +2 lines (ctrl+o to expand)
+
+⏺ I fixed all three audit follow-ups. npm run check (179 unit tests), npm run 
+  test:integration (133 tests) and npm run trace -- --require unit,integration
+  all pass, and IDM-AC02, IDM-AC06 and IDM-AC24 are still covered.
+
+  1. Runner, IDM-R10 and IDM-R12: when less than 1 ms of the key-wait budget is
+     left before step 3b, the runner now skips step 3b but still runs the step
+     3c read, which takes no lock. A live row is replayed, or refused with
+     IdempotencyKeyReused if its fingerprint differs. Only a missing or expired
+     row ends in IdempotencyWaitTimeout, and a pass back to step 3 with no time
+     left still ends there at once. I added two unit tests with the clock at the
+     deadline; both failed before the change and pass now. Plan 005 section 3
+     now describes this.
+  2. REV-R13: removed from the name of the test in reversal-transaction.test.ts
+     and from the task line in specs/004-reversals/tasks.md. The line still
+     names REV-R17 and IDM-R14.
+  3. Plan 005 section 1: kysely-key-store.ts now runs the key-wait statements in
+     the unit of work's key-wait scope, and sqlstate.ts classifies them (plan
+     000 section 6.3).
+
+  Two things beyond the letter of your list:
+  - The last sentence of plan 005 section 3 repeated the claim fix 3 corrects
+    ("kysely-key-store.ts tells them apart"). I corrected it the same way.
+  - Prettier realigned the section 1 table of plan 005 after the longer row;
+    that is whitespace only. Only two lines of the plan changed.
+
+  Plan 000 section 6.2, step 3c, still says a request with no time left answers
+  409 straight away. It is now out of date with the new behaviour, but I left it
+  unchanged as you asked. It needs a one-line update whenever you allow it.
+
+  As you asked, I did not run another audit. Nothing is committed; what remains
+  is the commit and pull request through /ship, and the phase transcript.
+
+✻ Baked for 1m 54s · done 2:06 PM
+
+❯ /export docs/ai/transcripts/07-idempotency.txt                                
+  ⎿  Conversation exported to: /Users/matiastorsello/supercool-finances/docs/ai/
+     transcripts/07-idempotency.txt
+
+❯ /ship close phase 07: idempotency                                             
+
+⏺ Bash(git branch --show-current)
+  ⎿  phase/07-idempotency
+
+⏺ Bash(npm run check)
+  ⎿  > supercool-finances@0.1.0 check
+     > npm run typecheck && npm run lint && npm run format:check && npm run
+      test
+     … +53 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+  Listed 1 directory (ctrl+o to expand)
+
+⏺ Bash(npm run infra:up)
+  ⎿  > supercool-finances@0.1.0 infra:up
+     > docker compose up -d --wait postgres redis
+     … +6 lines (ctrl+o to expand)
+
+⏺ Bash(npm run test:integration)
+  ⎿  > supercool-finances@0.1.0 test:integration
+     > vitest run --project integration --reporter=default --reporter=json
+     --outputFile.json=reports/vitest-integration.json
+     … +67 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ Shipping: unit and integration gates are green; running trace next, then docs
+  checks, commit, scan and push.
+
+⏺ Bash(npm run trace -- --require unit,integration)
+  ⎿  > supercool-finances@0.1.0 trace
+     > tsx scripts/trace.ts --require unit,integration
+     … +280 lines (ctrl+o to expand)
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ The transcript has no row in docs/ai/README.md yet, so I'm adding it.
+
+⏺ Bash(printf '%s\n' '| 07 | 2026-10-08 |
+      [07-idempotency.txt](transcripts/07-idempotency.txt) | Idempotency: the
+      key parser, RFC 8785 fingerprint, stored-outcome tabl…)
+  ⎿  mpotency: the key parser, RFC 8785 fingerprint, stored-outcome table a
+     nd idempotent runner with the shared key-wait budget, the Kysely key s
+     tore, the cleanup command and its `src/cli/` entry point, keyed wiring
+     … +2 lines (ctrl+o to expand)
+  ⎿  Updated docs/ai/README.md (+1 -0)
+      31  | 05 | 2026-10-08 | [05-schema.txt](transcripts/05-schema.txt) 
+          | Schema: the owner and runtime roles, eight SQL migrations (ro
+          le settings, session functions, accounts, ledger with deferred 
+          and append-only triggers, settlement accounts, audit records, i
+          dempotency keys, readiness grant), the Kysely instance with exa
+          ct int8 and numeric strings, test helpers, the database-check A
+          Cs, down migrations proven, and an audit round with six fixes.
+      32  | 06 part 1 | 2026-10-08 | [06-domain-part1.txt](transcripts/06
+          -domain-part1.txt) | Domain, part 1: the accounts module, the t
+          ransaction runner and unit of work, module lint rules, the ledg
+          er, money movements and reconciliation domain with tests first.
+           |
+      33  | 06 part 2 | 2026-10-08 | [06-domain-part2.txt](transcripts/06
+          -domain-part2.txt) | Domain, part 2: the reversals domain (`rev
+          ersalOf`, reversal rules, the `Reversals` use case with its tes
+          t seam, the 23505 mapping to `AlreadyReversed`), lock-wait and 
+          racing tests, an audit round with four Low fixes, and ADR follo
+          w-ups marked done. |
+      34 +| 07 | 2026-10-08 | [07-idempotency.txt](transcripts/07-idempot
+         +ency.txt) | Idempotency: the key parser, RFC 8785 fingerprint, 
+         +stored-outcome table and idempotent runner with the shared key-
+         +wait budget, the Kysely key store, the cleanup command and its 
+         +`src/cli/` entry point, keyed wiring of account creation, movem
+         +ents and reversals, and an audit round with three Low fixes. | 
+
+⏺ Bash(npx prettier --check docs/ai/README.md)
+  ⎿  Checking formatting...
+     All matched files use Prettier code style!
+
+⏺ Bash(git add -A)
+  ⎿  (No output)
+
+⏺ Bash(git status --short)
+  ⎿  M  AGENTS.md
+     M  docs/ai/README.md
+     A  docs/ai/transcripts/07-idempotency.txt
+     … +32 lines (ctrl+o to expand)
+
+⏺ Nothing that must stay out of the commit. Committing.
+
+⏺ Bash(git commit -F - <<'EOF'
+      feat(idempotency): key step, idempotent runner and cleanup command…)
+  ⎿  [phase/07-idempotency cbcf370] feat(idempotency): key step, idempotent
+      runner and cleanup command
+      35 files changed, 5793 insertions(+), 51 deletions(-)
+     … +20 lines (ctrl+o to expand)
+
+⏺ Bash(gitleaks git --no-banner --redact --log-opts="origin/main..HEAD")
+  ⎿  2:07PM INF 1 commits scanned.
+     2:07PM INF scanned ~293245 bytes (293.24 KB) in 231ms
+     2:07PM INF no leaks found
+⏺ Bash(git push -u origin HEAD)
+  ⎿  remote:
+     remote: Create a pull request for 'phase/07-idempotency' on GitHub by
+     visiting:
+     … +7 lines (ctrl+o to expand)
+
+⏺ Bash(gh pr view)
+  ⎿  Error: Exit code 1
+     no pull requests found for branch "phase/07-idempotency"
+
+⏺ Bash(gh pr create --base main --title "Phase 07-idempotency: key step,
+      idempotent runner and cleanup command" --body-file - <<'EOF'
+      ## What the phase delivers…)
+  ⎿  https://github.com/torsello/supercool-finances/pull/7
+
+⏺ Phase 07 is closed. Commit cbcf370, feat(idempotency): key step, idempotent 
+  runner and cleanup command, is pushed to phase/07-idempotency.
+
+  - Gates: all green: npm run check (179 unit tests), npm run test:integration
+    (133 tests), and npm run trace -- --require unit,integration (exit 0).
+    gitleaks found no leaks. Checkov was skipped because there is no
+    infra/terraform.
+  - ACs covered: IDM-AC02, IDM-AC06 and IDM-AC24.
+  - Pull request: https://github.com/torsello/supercool-finances/pull/7. I did
+    not merge it.
+  - Docs: I added the missing 07 row to docs/ai/README.md, so that file is in
+    the commit. The transcript docs/ai/transcripts/07-idempotency.txt was
+    already exported.
+  - Staged: nothing was held back.
+
+✻ Worked for 1m 30s · done 2:08 PM

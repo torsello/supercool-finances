@@ -55,10 +55,12 @@ function otherModuleInternals(own) {
 }
 
 /**
- * What use cases may import from `platform/`, as paths under it such as `db/errors.js`. None yet:
- * the application layer declares ports, and adapters implement them with the platform.
+ * What use cases may import from `platform/`, as paths under it. The application layer declares
+ * ports, and adapters implement them with the platform; the only exception is the typed errors of
+ * `db/errors.js`, which import nothing, so the idempotent runner can end a request with
+ * `IdempotencyWaitTimeout` when its key-wait deadline has passed (plan 005 section 3).
  */
-const PLATFORM_FOR_APPLICATION = [];
+const PLATFORM_FOR_APPLICATION = ['db/errors.js'];
 const platformInApplication = {
   regex: `(^|/)platform/${PLATFORM_FOR_APPLICATION.map((path) => `(?!${path.replaceAll('.', '\\.')}$)`).join('')}`,
   message: applicationBoundary,

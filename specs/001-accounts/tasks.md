@@ -20,7 +20,7 @@ These tasks run in the cross-spec order of plan 000 section 1, across every `spe
 
 ## 07-idempotency
 
-- [ ] Test first in `test/integration/accounts/create-account-keyed.test.ts` (ACC-R03, IDM-R02): with a key, account creation runs inside the key step of plan 005 as the skeleton of plan 000 section 6.2 with no lookup or lock, a repeat returns the stored response and creates no account, and the same key of another user creates its own account; then wire `create-account.ts` into the idempotent runner.
+- [x] Test first in `test/integration/accounts/create-account-keyed.test.ts` (ACC-R03, IDM-R02): with a key, account creation runs inside the key step of plan 005 as the skeleton of plan 000 section 6.2 with no lookup or lock, a repeat returns the stored response and creates no account, and the same key of another user creates its own account; then wire `create-account.ts` into the idempotent runner.
 
 ## 08-api
 

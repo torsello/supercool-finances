@@ -25,11 +25,14 @@ export class AccountLockTimeout extends Error {
   }
 }
 
-/** An idempotency key held by another request beyond the idempotency wait timeout (IDM-R12). */
+/**
+ * An idempotency key held by another request beyond the idempotency wait timeout (IDM-R12): a
+ * 55P03 at a key-wait step, or no time left before the key-wait deadline, with no cause.
+ */
 export class IdempotencyWaitTimeout extends Error {
   override readonly name = 'IdempotencyWaitTimeout';
 
-  constructor(options: { cause: unknown }) {
+  constructor(options?: { cause: unknown }) {
     super('idempotency key still held by another request', options);
   }
 }
