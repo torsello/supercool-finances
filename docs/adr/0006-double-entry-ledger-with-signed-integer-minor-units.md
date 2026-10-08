@@ -32,7 +32,7 @@ Every movement is one transaction of two or more immutable ledger entries, each 
   - More rows and more writes per movement than updating a balance.
   - Reading a balance from entries is a sum over a growing table; customer accounts therefore also cache their balance (ADR-0007), which must be kept equal to the entries.
   - Signed amounts need a convention everyone reads the same way (positive credits the account), stated in the glossary of spec 000.
-  - `bigint` amounts need care at every boundary: the `pg` driver returns them as strings, and JSON has no `bigint`, so a stray `Number()` or `parseFloat` would silently lose precision. AGENTS.md forbids converting amounts to `number`; the lint rule forbids `parseFloat` today, and phase 06-domain extends it to `Number()`, `Number.parseInt`, `parseInt` and unary `+` in `src/modules/*/domain/**` and `src/modules/*/application/**`. Until then, review is what catches a stray `Number()`.
+  - `bigint` amounts need care at every boundary: the `pg` driver returns them as strings, and JSON has no `bigint`, so a stray `Number()` or `parseFloat` would silently lose precision. AGENTS.md forbids converting amounts to `number`; the lint rule forbids `parseFloat` today, and phase 06-domain extends it to `Number()`, `Number.parseInt`, `parseInt` and unary `+` in `src/modules/*/domain/**` and `src/modules/*/application/**`. Until then, review is what catches a stray `Number()`. (Update 2026-10-08: phase 06-domain added these lint rules; see eslint.config.js.)
 
 ### Option B: A single mutable balance column per account
 
@@ -83,4 +83,5 @@ Where the specs fix the details, this ADR follows them: every amount accepted by
 - Phase 05-schema: tables, constraints and the deferred balance trigger of section 1.3 of spec 002.
 - Phase 06-domain: `Money`, `Currency` and `LedgerTransaction` with unit tests at the limits (LED-AC22).
 - Phase 06-domain: extend the lint rule so that `Number()`, `Number.parseInt`, `parseInt` and unary `+` are forbidden in `src/modules/*/domain/**` and `src/modules/*/application/**`, with a test that the rule fires.
+  - Done in phase 06-domain on 2026-10-08.
 - ADR-0007 decides how system and customer account balances are stored.

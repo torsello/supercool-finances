@@ -60,7 +60,7 @@ The money guarantees depend on exact control of the database: one transaction pe
 
 Chosen option: **Option A**, because money code needs explicit transactions and row locks. Kysely is a typed SQL builder with `forUpdate()` and no hidden queries, and migrations are plain SQL, so constraints and triggers are reviewable. Prisma and TypeORM hide transaction and locking semantics; raw `pg` alone loses type safety.
 
-Kysely and `pg` live only in persistence adapters and `platform/` (ADR-0003). Lint enforces only the domain import rule today, which forbids them in `domain/`; elsewhere, review enforces it until the follow-up below.
+Kysely and `pg` live only in persistence adapters and `platform/` (ADR-0003). Lint enforces only the domain import rule today, which forbids them in `domain/`; elsewhere, review enforces it until the follow-up below. (Update 2026-10-08: phase 06-domain added these lint rules; see eslint.config.js.)
 
 ## Consequences
 
@@ -85,3 +85,4 @@ Kysely and `pg` live only in persistence adapters and `platform/` (ADR-0003). Li
 - Phase 05-schema: first migrations and the Kysely database interface.
 - Phase 06-domain and later: repositories and the unit of work on Kysely.
 - Phase 06-domain: extend `no-restricted-imports` in `eslint.config.js` so that `src/modules/*/application/**` may not import `kysely`, `pg`, `fastify`, `ioredis` or any `adapters/` path, and no module imports another module's internals. Until then, review enforces it.
+  - Done in phase 06-domain on 2026-10-08.
