@@ -2913,3 +2913,148 @@
   phase.
 
 ✻ Worked for 41s · done 12:36 AM
+❯ /export docs/ai/transcripts/03-adrs.txt                                       
+  ⎿  Conversation exported to:
+     /Users/matiastorsello/supercool-finances/docs/ai/transcripts/03-adrs.txt
+
+❯ /ship close phase 03: adrs                                                    
+
+⏺ Bash(git branch --show-current)
+  ⎿  phase/03-adrs
+
+⏺ Bash(npm run check 2>&1 | tail -8)
+  ⎿   ✓ |unit| test/unit/test-guards.test.ts (1 test) 295ms
+
+      Test Files  5 passed (5)
+     … +7 lines (ctrl+o to expand)
+
+⏺ compose.yaml exists, so step 2 needs the infrastructure and integration tests.
+
+⏺ Bash(npm run infra:up 2>&1 | tail -8)
+  ⎿  > docker compose up -d --wait postgres redis
+
+      Container supercool-finances-redis-1 Running
+     … +5 lines (ctrl+o to expand)
+
+⏺ Bash(npm run test:integration 2>&1 | tail -8)
+  ⎿   ✓ |integration| test/integration/infra.smoke.test.ts (3 tests) 18ms
+
+      Test Files  1 passed (1)
+     … +7 lines (ctrl+o to expand)
+
+⏺ Bash(npm run trace -- --require unit,integration 2>&1 | tail -3; echo "exit
+      ${PIPESTATUS[0]}")
+  ⎿  | DEP-AC26 | 008-deployment | Approved | ci | pending | Verified by: C
+     I job `ci`, step `npm run infra:validate` (phase 12-infra) (npm run in
+     fra:validate is not a script in package.json; npm run infra:validate i
+     … +6 lines (ctrl+o to expand)
+
+⏺ The pipe hid the exit code. Re-running it without a pipe:
+
+⏺ Bash(npm run trace -- --require unit,integration > /dev/null; echo "exit $?")
+  ⎿  exit 0
+
+⏺ Gates pass. Step 3: check that the transcript has a row in docs/ai/README.md.
+
+  Listed 1 directory (ctrl+o to expand)
+
+⏺ The transcript has no row yet, so I'll add one. The summary skill rule says
+  never change code; this is docs only.
+
+⏺ Bash(printf '%s\n' '| 03 | 2026-10-08 | [03-adrs.txt](transcripts/03-adrs.txt)
+      | ADRs: twenty decisions 0001-0020 with the owner'"'"'s reasoning,
+      alternatives and co…)
+  ⎿  | 02 part 4 | 2026-10-07 | [02-specs-part4.txt](transcripts/02-specs-p
+     art4.txt) | Specs, part 4: specs 006-auth, 007-sec
+     | 02 part 5 | 2026-10-07 | [02-specs-part5.txt](transcripts/02-specs-p
+     … +3 lines (ctrl+o to expand)
+  ⎿  Updated docs/ai/README.md (+1 -0)
+      26  | 02 part 3 | 2026-10-07 | [02-specs-part3.txt](transcripts/02-
+          specs-part3.txt) | Specs, part 3: specs 004-reversals and 005-i
+          dempotency with the owner's decisions, an audit round and its f
+          ixes, including a traceability gate that no longer counts a CI 
+          step whose failure is ignored with `||`, and `/ship` of both sp
+          ecs. |
+      27  | 02 part 4 | 2026-10-07 | [02-specs-part4.txt](transcripts/02-
+          specs-part4.txt) | Specs, part 4: specs 006-auth, 007-security-
+          ops and 008-deployment with the owner's decisions, an audit rou
+          nd and its fixes, including a traceability gate that no longer 
+          counts a CI script feeding a pipe without pipefail or a `&&` li
+          st before the last line of its block, and `/ship` of the three 
+          specs. |
+      28  | 02 part 5 | 2026-10-07 | [02-specs-part5.txt](transcripts/02-
+          specs-part5.txt) | Specs, part 5: cross-spec review of specs 00
+          0-008, the owner's answers to every open question folded into t
+          he specs as rules, eight overview ACs retired, all specs set to
+           Approved, an audit round and its fixes, including a traceabili
+          ty gate that accepts a CI script only as the whole command of a
+           step, and `/ship` closing the phase. |
+      29 +| 03 | 2026-10-08 | [03-adrs.txt](transcripts/03-adrs.txt) | AD
+         +Rs: twenty decisions 0001-0020 with the owner's reasoning, alte
+         +rnatives and consequences, the ADR index, links to and from eve
+         +ry spec, the AWS RDS Proxy pinning source checked, and three au
+         +dit rounds and their fixes. |                                  
+
+⏺ Bash(npm run format:check 2>&1 | tail -3)
+  ⎿  Checking formatting...
+     All matched files use Prettier code style!
+
+⏺ Bash(git add -A)
+  ⎿  (No output)
+
+⏺ Bash(git status --short)
+  ⎿  M  AGENTS.md
+     A  docs/adr/0001-spec-driven-development-with-adrs-and-ai-agents.md
+     A  docs/adr/0002-modular-monolith.md
+     … +30 lines (ctrl+o to expand)
+
+⏺ Nothing sensitive is staged (no .env, dist or reports). Committing:
+
+⏺ Bash(git commit -m "docs(adr): record the twenty architecture decisions of
+      phase 03" -m "Adds ADRs 0001-0020 in MADR format with alternatives,
+      consequences and links…)
+  ⎿  [phase/03-adrs c0e45ef] docs(adr): record the twenty architecture deci
+     sions of phase 03
+      33 files changed, 4608 insertions(+), 15 deletions(-)
+     … +22 lines (ctrl+o to expand)
+
+⏺ Step 6, the secret scan of the branch:
+
+⏺ Bash(gitleaks git --no-banner --redact --log-opts="origin/main..HEAD")
+  ⎿  12:37AM INF 1 commits scanned.
+     12:37AM INF scanned ~309266 bytes (309.27 KB) in 168ms
+     12:37AM INF no leaks found
+
+⏺ Bash(git push -u origin HEAD)
+  ⎿  remote:
+     remote: Create a pull request for 'phase/03-adrs' on GitHub by visitin
+     g:
+     … +6 lines (ctrl+o to expand)
+
+⏺ The description starts with "close phase 03", so I'll check for an existing
+  pull request first.
+
+⏺ Bash(gh pr view)
+  ⎿  Error: Exit code 1
+     no pull requests found for branch "phase/03-adrs"
+
+⏺ Bash(gh pr create --base main --title "Phase 03-adrs: twenty architecture
+      decision records" --body-file - <<'EOF'
+      ## What the phase delivered…)  ⎿  https://github.com/torsello/supercool-finances/pull/3
+
+⏺ Phase 03 is committed and pushed, and I opened pull request #3 for you to
+  merge once CI is green.
+
+  - Commit: c0e45ef docs(adr): record the twenty architecture decisions of
+    phase 03.
+  - Gates: npm run check, npm run test:integration (3 tests), npm run trace -- 
+    --require unit,integration (exit 0) and the gitleaks scan of the branch (no
+    leaks) all passed.
+  - ACs covered: none. The phase adds no code, tests or AC changes.
+  - Pull request: https://github.com/torsello/supercool-finances/pull/3
+  - Other change: I added the phase 03 row to docs/ai/README.md, which the
+    docs-in-sync step required. npm run format:check passed after that edit.
+    Everything else in the commit is the 20 ADRs, the index, the spec link
+    lines, the AGENTS.md link and the transcript.
+
+✻ Cogitated for 57s · done 12:38 AM
