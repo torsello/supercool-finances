@@ -68,7 +68,7 @@ A positive amount credits the account (adds to its balance) and a negative amoun
 
 ## 3. Acceptance criteria
 
-Unless stated otherwise: customer user C1 owns account A1 (EUR), customer user C2 owns account B1 (EUR), operator user O1 is an operator, balances are set up by deposits from O1, S is the EUR settlement account `external-settlement:EUR`, `MAX_AMOUNT_MINOR` is unset, and "written directly to the database" means SQL run by the service's runtime database role (LED-R17) outside the service's code. The balance of S is asserted only as a change during a test, never as an absolute value, because the integration tests share one database whose ledger cannot be cleared (Q7).
+Unless stated otherwise: customer user C1 owns account A1 (EUR), customer user C2 owns account B1 (EUR), operator user O1 is an operator, balances are set up by deposits from O1, S is the EUR settlement account `external-settlement:EUR`, `MAX_AMOUNT_MINOR` is unset, every deposit, withdrawal, transfer and reversal carries a fresh Idempotency-Key unless the AC names one or says it has none, and "written directly to the database" means SQL run by the service's runtime database role (LED-R17) outside the service's code. The balance of S is asserted only as a change during a test, never as an absolute value, because the integration tests share one database whose ledger cannot be cleared (Q7).
 
 ### LED-AC01 · The domain builds transactions of the documented shape
 
@@ -262,8 +262,8 @@ Errors shared by every capability are in spec 000. This spec adds:
 | Condition                                                                                                               | HTTP | Problem type                         | Stored for idempotent replay |
 | ----------------------------------------------------------------------------------------------------------------------- | ---- | ------------------------------------ | ---------------------------- |
 | The amount of a deposit, withdrawal or transfer is greater than `MAX_AMOUNT_MINOR`                                      | 422  | /problems/validation-error           | no                           |
-| A deposit or reversal would make a customer account's cached balance greater than 9223372036854775807 (SYS-R40)         | 422  | /problems/balance-limit-exceeded     | decided in spec 005 (000 Q7) |
-| A transfer would make its destination's cached balance greater than 9223372036854775807 (LED-R29, SYS-R41)              | 422  | set by spec 003, the same as SYS-R41 | decided in spec 005 (000 Q7) |
+| A deposit or reversal would make a customer account's cached balance greater than 9223372036854775807 (SYS-R40)         | 422  | /problems/balance-limit-exceeded     | yes (spec 005, section 1.3)  |
+| A transfer would make its destination's cached balance greater than 9223372036854775807 (LED-R29, SYS-R41)              | 422  | set by spec 003, the same as SYS-R41 | yes (spec 005, section 1.3)  |
 | The database rejects a ledger write (unbalanced, too few entries, zero amount, mixed currency, negative cached balance) | 500  | /problems/internal-error             | no                           |
 | `MAX_AMOUNT_MINOR` is invalid                                                                                           | n/a  | none: the service does not start     | n/a                          |
 

@@ -37,8 +37,8 @@ const CI_WORKFLOW = '.github/workflows/ci.yml';
 const NPM_RUN = /\bnpm run ([\w:-]+(?:\.[\w:-]+)*)/g;
 // A "key: value" line of a workflow, as "key: ..." or "- key: ...".
 const WORKFLOW_KEY = /^( *)(- +)?([\w-]+):(?:\s(.*)|$)/;
-// A command whose failure is ignored, so it can never fail the build.
-const CANNOT_FAIL = /\|\|\s*(?:true|:)$/;
+// "||" runs its right side when the left side fails, so a script before it can never fail the build.
+const OR_ELSE = '||';
 // A block scalar header such as "|", ">" or "|-": the command is on the more indented lines below.
 const BLOCK_SCALAR = /^[|>][+-]?\d*$/;
 // A comment: "#" at the start or after whitespace, to the end of the line.
@@ -424,9 +424,9 @@ function isFalse(value: string | undefined): boolean {
 
 /**
  * The commands of every "run:" step of a GitHub Actions workflow that can fail the build, one
- * per line, without comments. A step is left out when it, or the job holding it, has
- * "continue-on-error" set to anything but false or "if: false"; a command line ending in
- * "|| true" or "|| :" is left out too.
+ * per command, without comments; a line ending in a backslash continues on the next one. A step is left
+ * out when it, or the job holding it, has "continue-on-error" set to anything but false or
+ * "if: false".
  */
 export function workflowCommands(content: string): string[] {
   const entries = parseWorkflow(content);
@@ -442,12 +442,33 @@ export function workflowCommands(content: string): string[] {
       at = parent;
     }
     const lines = entry.block.length > 0 ? entry.block : [entry.value];
+    let pending = '';
     for (const line of lines) {
-      const command = line.replace(COMMENT, '').trim();
-      if (command !== '' && !CANNOT_FAIL.test(command)) commands.push(command);
+      const command = `${pending}${line.replace(COMMENT, '').trim()}`;
+      if (command.endsWith('\\')) {
+        pending = `${command.slice(0, -1).trimEnd()} `;
+        continue;
+      }
+      pending = '';
+      if (command !== '') commands.push(command);
     }
+    if (pending.trim() !== '') commands.push(pending.trim());
   });
   return commands;
+}
+
+/**
+ * The scripts that a CI command runs in a way that can fail the build: every "npm run <script>"
+ * with no "||" anywhere after it in the command.
+ */
+export function provenScripts(command: string): string[] {
+  return [
+    ...new Set(
+      [...command.matchAll(NPM_RUN)]
+        .filter((match) => !command.slice(match.index + match[0].length).includes(OR_ELSE))
+        .map(([, name]) => name ?? ''),
+    ),
+  ];
 }
 
 /** The script names of every "npm run <script>" in a text. */
@@ -475,7 +496,7 @@ export function loadCiContext(root: string): {
   const workflowPath = join(root, CI_WORKFLOW);
   const workflowScripts = new Set(
     existsSync(workflowPath)
-      ? workflowCommands(readFileSync(workflowPath, 'utf8')).flatMap(npmRunScripts)
+      ? workflowCommands(readFileSync(workflowPath, 'utf8')).flatMap(provenScripts)
       : [],
   );
   return { packageScripts, workflowScripts, problems };

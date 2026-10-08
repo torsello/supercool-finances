@@ -9,6 +9,7 @@ import {
   linesOutsideFences,
   listFailures,
   npmRunScripts,
+  provenScripts,
   parseArgs,
   parseSpec,
   parseTasks,
@@ -326,8 +327,9 @@ describe('traceability: ci-level proof', () => {
       '      DATABASE_URL=x npm run in-block',
       '',
       '      npm run after-blank-line',
-      '      npm run ignored-failure || true',
-      '      npm run ignored-failure-colon ||:',
+      '      npm run or-else || true',
+      '      npm run continued \\',
+      '        --flag',
       '  - name: Next step',
       '    env:',
       '      NOTE: npm run not-a-command',
@@ -346,8 +348,38 @@ describe('traceability: ci-level proof', () => {
       'npm run inline',
       'DATABASE_URL=x npm run in-block',
       'npm run after-blank-line',
+      'npm run or-else || true',
+      'npm run continued --flag',
       'npm run step-kept',
     ]);
+  });
+
+  it('never counts a script with || anywhere after it as proof', () => {
+    expect(provenScripts('npm run reconcile')).toEqual(['reconcile']);
+    expect(provenScripts('DATABASE_URL=x npm run reconcile -- --json && npm run b')).toEqual([
+      'reconcile',
+      'b',
+    ]);
+    for (const command of [
+      'npm run reconcile || true',
+      'npm run reconcile ||:',
+      'npm run reconcile || echo skipped',
+      'npm run reconcile || exit 0',
+      'npm run reconcile && npm run b || true',
+      'npm run reconcile; npm run b || true',
+    ]) {
+      expect(provenScripts(command)).not.toContain('reconcile');
+    }
+    expect(provenScripts('npm run a || npm run b')).toEqual(['b']);
+
+    const workflow = [
+      'steps:',
+      '  - run: |',
+      '      npm run reconcile \\',
+      '        || echo skipped',
+      '  - run: npm run kept',
+    ].join('\n');
+    expect(workflowCommands(workflow).flatMap(provenScripts)).toEqual(['kept']);
   });
 
   it('leaves out every step of a job that may fail or never runs', () => {
