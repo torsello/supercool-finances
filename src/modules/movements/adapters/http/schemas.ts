@@ -12,7 +12,11 @@ const SAME_ACCOUNT = 'Must be another account than the source account.';
  * the refinement, so every amount gets one issue, whose message holds no part of the value.
  */
 function movementAmount(maxAmountMinor: bigint) {
-  return amountSchema.refine((amount) => amount <= maxAmountMinor, { error: ABOVE_MAXIMUM });
+  return amountSchema
+    .refine((amount) => amount <= maxAmountMinor, { error: ABOVE_MAXIMUM })
+    .meta({
+      description: `A positive amount in minor units of the currency (cents for EUR, whole yen for JPY), as a string of decimal digits without sign, leading zero, separator or exponent: "1050" is 10.50 EUR. At most ${maxAmountMinor.toString()}, the service's MAX_AMOUNT_MINOR; a larger amount answers 422.`,
+    });
 }
 
 /** The body of a deposit or withdrawal: an amount and a currency, nothing else (MOV-R08, MOV-R09). */

@@ -33,3 +33,15 @@ describe('unit of work statement classification', () => {
     await expect(uow.setLockTimeout(2000)).rejects.toBeInstanceOf(AccountLockTimeout);
   });
 });
+
+describe('unit of work hook points', () => {
+  it('SYS-R37 writes each entry with its own amount unless the fault seam rewrites it', () => {
+    const entry = { accountId: 'a', amount: -100n };
+    expect(new UnitOfWork(lockTimingOutClient()).entryAmount(entry)).toBe(-100n);
+    const rewriting = new UnitOfWork(lockTimingOutClient(), {
+      entryAmount: (written) => (written.accountId === 'a' ? -99n : written.amount),
+    });
+    expect(rewriting.entryAmount(entry)).toBe(-99n);
+    expect(rewriting.entryAmount({ accountId: 'b', amount: 100n })).toBe(100n);
+  });
+});

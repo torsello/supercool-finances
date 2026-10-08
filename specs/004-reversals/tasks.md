@@ -27,19 +27,19 @@ These tasks run in the cross-spec order of plan 000 section 1 for 08-api: authen
 
 - [x] Test first: REV-AC16 in `test/unit/movements/reversal-schema.test.ts`; then the reversal body schema in `src/modules/movements/adapters/http/schemas.ts`.
 - [x] Build the reversal presenter and route, registered by the composition root, with `test/integration/reversals/routes.test.ts` (REV-R16) proving the response has the fields of section 1.3 and no `reason`.
-- [ ] Test first: REV-AC01 and REV-AC02 in `test/integration/reversals/reversals.test.ts`.
-- [ ] Test first: REV-AC04 and REV-AC05 in `test/integration/reversals/authorization.test.ts`.
-- [ ] Test first: REV-AC06 and REV-AC09 in `test/integration/reversals/at-most-once.test.ts`.
-- [ ] Test first: REV-AC07 in `test/integration/reversals/at-most-once.test.ts`.
-- [ ] Test first: REV-AC08 in `test/integration/reversals/at-most-once.test.ts`, with the `skip-existing-reversal-check` seam, asserting from the hook's record that the check was skipped and the insert refused with SQLSTATE 23505 on `transactions_reversed_transaction_id_key`.
-- [ ] Test first: REV-AC10, REV-AC11 and REV-AC12 in `test/integration/reversals/business-rules.test.ts`.
-- [ ] Test first: REV-AC13, REV-AC14 and REV-AC24 in `test/integration/reversals/business-rules.test.ts`.
-- [ ] Test first: REV-AC15 and REV-AC17 in `test/integration/reversals/request.test.ts`.
-- [ ] Test first: REV-AC18 in `test/integration/reversals/audit.test.ts`.
-- [ ] Test first: REV-AC19 in `test/integration/reversals/atomicity.test.ts`, with the `after-balances` fault of the `unit-of-work-faults` seam.
-- [ ] Test first: REV-AC21 in `test/integration/reversals/lock-timeout.test.ts`.
-- [ ] Test first: REV-AC22 in `test/integration/reversals/concurrency.test.ts`.
-- [ ] Test first: REV-AC25 in `test/integration/reversals/read-reversal.test.ts`.
+- [x] Test first: REV-AC01 and REV-AC02 in `test/integration/reversals/reversals.test.ts`.
+- [x] Test first: REV-AC04 and REV-AC05 in `test/integration/reversals/authorization.test.ts`.
+- [x] Test first: REV-AC06 and REV-AC09 in `test/integration/reversals/at-most-once.test.ts`.
+- [x] Test first: REV-AC07 in `test/integration/reversals/at-most-once.test.ts`.
+- [x] Test first: REV-AC08 in `test/integration/reversals/at-most-once.test.ts`, with the `skip-existing-reversal-check` seam, asserting from the hook's record that the check was skipped and the insert refused with SQLSTATE 23505 on `transactions_reversed_transaction_id_key`.
+- [x] Test first: REV-AC10, REV-AC11 and REV-AC12 in `test/integration/reversals/business-rules.test.ts`.
+- [x] Test first: REV-AC13, REV-AC14 and REV-AC24 in `test/integration/reversals/business-rules.test.ts`.
+- [x] Test first: REV-AC15 and REV-AC17 in `test/integration/reversals/request.test.ts`.
+- [x] Test first: REV-AC18 in `test/integration/reversals/audit.test.ts`.
+- [x] Test first: REV-AC19 in `test/integration/reversals/atomicity.test.ts`, with the `after-balances` fault of the `unit-of-work-faults` seam.
+- [x] Test first: REV-AC21 in `test/integration/reversals/lock-timeout.test.ts`.
+- [x] Test first: REV-AC22 in `test/integration/reversals/concurrency.test.ts`.
+- [x] Test first: REV-AC25 in `test/integration/reversals/read-reversal.test.ts`.
 
 ## 09-hardening
 

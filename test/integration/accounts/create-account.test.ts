@@ -98,6 +98,38 @@ describe('account creation', () => {
     );
   });
 
+  it('ACC-AC03 a creation repeated with the same Idempotency-Key replays, the key is scoped per user, and another body with it is refused', async () => {
+    const c1 = randomUUID();
+    const c2 = randomUUID();
+    const key = randomUUID();
+    const send = async (owner: string, currency: string) =>
+      await built.app.inject({
+        method: 'POST',
+        url: '/v1/accounts',
+        headers: { ...bearer(tokenFor(owner, 'customer')), 'idempotency-key': key },
+        payload: { currency },
+      });
+
+    const first = await send(c1, 'EUR');
+    const second = await send(c1, 'EUR');
+    expect(first.statusCode).toBe(201);
+    expect(second.statusCode).toBe(201);
+    expect(second.body).toBe(first.body);
+    const created = first.json<AccountJson>();
+    expect(await accountsOwnedBy(c1)).toEqual([{ id: created.id, currency: 'EUR' }]);
+
+    const other = await send(c2, 'EUR');
+    expect(other.statusCode).toBe(201);
+    const own = other.json<AccountJson>();
+    expect(own.id).not.toBe(created.id);
+    expect(await accountsOwnedBy(c2)).toEqual([{ id: own.id, currency: 'EUR' }]);
+
+    const reused = await send(c1, 'JPY');
+    expect(reused.statusCode).toBe(422);
+    expect(problemOf(reused).type).toBe('/problems/idempotency-key-reused');
+    expect(await accountsOwnedBy(c1)).toEqual([{ id: created.id, currency: 'EUR' }]);
+  });
+
   it('ACC-AC04 two creations without Idempotency-Key make two accounts with different ids', async () => {
     const c1 = randomUUID();
     const token = tokenFor(c1, 'customer');

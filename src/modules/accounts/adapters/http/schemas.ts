@@ -56,7 +56,13 @@ export const entryRepresentation = z.strictObject({
   id: z.guid(),
   transactionId: z.guid(),
   kind: z.enum(['deposit', 'withdrawal', 'transfer', 'reversal']),
-  amount: z.string().regex(/^-?[1-9][0-9]*$/),
+  amount: z
+    .string()
+    .regex(/^-?[1-9][0-9]*$/)
+    .meta({
+      description:
+        'The signed amount of the entry in minor units, as a string of decimal digits: "5000" added to the balance, "-1200" subtracted from it.',
+    }),
   currency: currencySchema,
   createdAt: timestamp,
 });

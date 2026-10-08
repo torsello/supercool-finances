@@ -6,6 +6,7 @@ import {
   bearer,
   changeStatus,
   createAccount,
+  deposit,
   problemOf,
   withoutRequestId,
   type AccountJson,
@@ -111,6 +112,26 @@ describe('account status changes', () => {
     }
   });
 
+  it('ACC-AC13 closing an account with money answers 409 account-balance-not-zero and changes nothing', async () => {
+    const customer = tokenFor(randomUUID(), 'customer');
+    const o1 = tokenFor(randomUUID(), 'operator');
+    const a1 = await createAccount(built.app, customer);
+    const f1 = await createAccount(built.app, customer);
+    expect((await deposit(built.app, o1, a1.id, '1')).statusCode).toBe(201);
+    expect((await deposit(built.app, o1, f1.id, '2500')).statusCode).toBe(201);
+    expect((await changeStatus(built.app, o1, f1.id, 'freeze')).statusCode).toBe(200);
+
+    for (const [account, status, balance] of [
+      [a1, 'active', '1'],
+      [f1, 'frozen', '2500'],
+    ] as const) {
+      const response = await changeStatus(built.app, o1, account.id, 'close');
+      expect(response.statusCode, account.id).toBe(409);
+      expect(problemOf(response).type).toBe('/problems/account-balance-not-zero');
+      expect(await read(o1, account.id)).toMatchObject({ status, balance });
+    }
+  });
+
   it('ACC-AC15 a customer gets 403 for every status change of any account, with one body whatever the id', async () => {
     const c1 = tokenFor(randomUUID(), 'customer');
     const c2 = tokenFor(randomUUID(), 'customer');
@@ -135,6 +156,50 @@ describe('account status changes', () => {
     expect(new Set(bodies.map((body) => JSON.stringify(body))).size).toBe(1);
     expect(await storedStatus(a1.id)).toBe('active');
     expect(await storedStatus(b1.id)).toBe('frozen');
+  });
+
+  it('ACC-AC23 a status change writes one audit record with its correlation id; a no-op and a rejection write none', async () => {
+    const customer = tokenFor(randomUUID(), 'customer');
+    const o1Id = randomUUID();
+    const o1 = tokenFor(o1Id, 'operator');
+    const a1 = await createAccount(built.app, customer);
+    const a2 = await createAccount(built.app, customer);
+    expect((await deposit(built.app, o1, a2.id, '100')).statusCode).toBe(201);
+    const a2Records = await auditCount(a2.id);
+
+    const first = await built.app.inject({
+      method: 'POST',
+      url: `/v1/accounts/${a1.id}/freeze`,
+      headers: { ...bearer(o1), 'x-request-id': 'req-7' },
+    });
+    expect(first.statusCode).toBe(200);
+    const again = await changeStatus(built.app, o1, a1.id, 'freeze');
+    expect(again.statusCode).toBe(200);
+    expect(again.json<AccountJson>().status).toBe('frozen');
+    const rejected = await changeStatus(built.app, o1, a2.id, 'close');
+    expect(rejected.statusCode).toBe(409);
+
+    const records = await runtimePool().query(
+      `SELECT actor_id, actor_role, action, account_ids, old_status, new_status, request_id,
+              transaction_id, reversed_transaction_id, reason
+         FROM audit_records WHERE $1::uuid = ANY (account_ids)`,
+      [a1.id],
+    );
+    expect(records.rows).toEqual([
+      {
+        actor_id: o1Id,
+        actor_role: 'operator',
+        action: 'freeze',
+        account_ids: [a1.id],
+        old_status: 'active',
+        new_status: 'frozen',
+        request_id: 'req-7',
+        transaction_id: null,
+        reversed_transaction_id: null,
+        reason: null,
+      },
+    ]);
+    expect(await auditCount(a2.id)).toBe(a2Records);
   });
 
   it('ACC-AC25 a status change waits for the row lock at most ACCOUNT_LOCK_TIMEOUT_MS, then answers 503 with Retry-After: 1', async () => {

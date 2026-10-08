@@ -17,6 +17,7 @@ import { registerAuthorization } from './modules/auth/adapters/http/authorize.js
 import {
   KeyedHandler,
   type AfterCommitHook,
+  type KeyedHandlerTestHook,
   type ResponseBodyHook,
 } from './modules/idempotency/adapters/http/keyed-handler.js';
 import { KyselyKeyedTransactions } from './modules/idempotency/adapters/persistence/kysely-key-store.js';
@@ -31,17 +32,24 @@ import {
 import {
   Reversals,
   type MovementTransaction,
+  type ReversalTestHook,
   type SkipExistingReversalCheck,
 } from './modules/movements/index.js';
 import { loadConfig, type Config, type Environment } from './platform/config/config.js';
 import { createDatabase, createPool } from './platform/db/database.js';
 import { TransactionRunner } from './platform/db/transaction-runner.js';
-import { UnitOfWorkRunner, type UnitOfWorkFaults } from './platform/db/unit-of-work.js';
+import {
+  UnitOfWorkRunner,
+  type UnitOfWorkFaults,
+  type UnitOfWorkTestHook,
+} from './platform/db/unit-of-work.js';
 import {
   clientErrorHandler,
   handleFrameworkError,
   MAX_PARAM_LENGTH,
 } from './platform/http/framework-errors.js';
+import { registerDocs } from './platform/http/docs.js';
+import { registerRequestId, requestIdOf } from './platform/http/request-id.js';
 import { registerRoutes, type RouteModule } from './platform/http/routes.js';
 import { UuidV7Generator } from './platform/ids/uuid-v7.js';
 import { loggerOptions, type LogDestination } from './platform/logging/logger.js';
@@ -66,6 +74,27 @@ export interface TestSeams {
   skipExistingReversalCheck?: SkipExistingReversalCheck;
 }
 
+/** The name of a test seam of SYS-R37. */
+export type TestSeamName =
+  UnitOfWorkTestHook | 'throwing-route' | ReversalTestHook | KeyedHandlerTestHook;
+
+/** The seams attached to each component with a hook point (plan 000 section 8). */
+export interface AttachedTestHooks {
+  unitOfWork: UnitOfWorkTestHook[];
+  reversals: ReversalTestHook[];
+  responseHandling: KeyedHandlerTestHook[];
+  connectionHandling: KeyedHandlerTestHook[];
+}
+
+declare module 'fastify' {
+  interface FastifyInstance {
+    /** The names of the test seams `buildApp` attached: none in the production app (SYS-R37). */
+    testSeams: readonly TestSeamName[];
+    /** The seams attached to each component with a hook point, read from the components. */
+    attachedTestHooks(): AttachedTestHooks;
+  }
+}
+
 export interface AppOptions {
   /** Where log lines go instead of standard output; tests capture them. */
   logStream?: LogDestination;
@@ -87,11 +116,14 @@ export function buildApp(config: Config, options: AppOptions = {}) {
   const app = Fastify({
     logger: loggerOptions(config.logLevel, options.logStream),
     routerOptions: { maxParamLength: MAX_PARAM_LENGTH },
+    requestIdHeader: false,
+    genReqId: requestIdOf,
     frameworkErrors: handleFrameworkError,
     clientErrorHandler: clientErrorHandler(),
   }).withTypeProvider<ZodTypeProvider>();
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
+  registerRequestId(app);
 
   const pool = createPool({ connectionString: config.databaseUrl, logger: app.log });
   const db = createDatabase(pool);
@@ -126,6 +158,12 @@ export function buildApp(config: Config, options: AppOptions = {}) {
     () => ({ status: 'ok' }) as const,
   );
 
+  const reversals = new Reversals({
+    ...(options.seams?.skipExistingReversalCheck === undefined
+      ? {}
+      : { skipExistingReversalCheck: options.seams.skipExistingReversalCheck }),
+  });
+
   const movementDependencies: MovementDependencies = {
     ids,
     ledger: (uow) => new KyselyLedgerWriter(uow, ids),
@@ -153,17 +191,34 @@ export function buildApp(config: Config, options: AppOptions = {}) {
         operation: (uow) => movementTransactionOn(uow, movementDependencies),
       }),
       queries: new KyselyTransactionQueries(db),
-      reversals: new Reversals({
-        ...(options.seams?.skipExistingReversalCheck === undefined
-          ? {}
-          : { skipExistingReversalCheck: options.seams.skipExistingReversalCheck }),
-      }),
+      reversals,
       settings: { accountLockTimeoutMs: config.accountLockTimeoutMs },
       maxAmountMinor: config.maxAmountMinor,
     }),
   ];
   if (options.seams?.throwingRoute !== undefined) modules.push(options.seams.throwingRoute);
 
+  const attachedTestHooks = (): AttachedTestHooks => {
+    const keyedHooks = keyed.attachedTestHooks();
+    return {
+      unitOfWork: unitOfWork.attachedTestHooks(),
+      reversals: reversals.attachedTestHooks(),
+      responseHandling: keyedHooks.filter((hook) => hook === 'extra-response-member'),
+      connectionHandling: keyedHooks.filter((hook) => hook === 'destroy-connection-after-commit'),
+    };
+  };
+  const hooks = attachedTestHooks();
+  const testSeams: TestSeamName[] = [
+    ...hooks.unitOfWork,
+    ...(options.seams?.throwingRoute === undefined ? [] : (['throwing-route'] as const)),
+    ...hooks.reversals,
+    ...hooks.responseHandling,
+    ...hooks.connectionHandling,
+  ];
+  app.decorate('testSeams', testSeams);
+  app.decorate('attachedTestHooks', attachedTestHooks);
+
+  registerDocs(app);
   registerRoutes(app, {
     protect: (scope) => {
       registerAuthentication(scope, config.jwt, options.clock);

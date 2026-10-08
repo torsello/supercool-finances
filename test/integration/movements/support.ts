@@ -111,3 +111,74 @@ export async function settlementSum(settlementId: string): Promise<bigint> {
 export async function setStatus(accountId: string, status: 'frozen' | 'closed'): Promise<void> {
   await runtimePool().query('UPDATE accounts SET status = $2 WHERE id = $1', [accountId, status]);
 }
+
+/** The number of transactions with an entry on any of `accountIds`, to prove none was added. */
+export async function transactionsOn(...accountIds: string[]): Promise<number> {
+  const result = await runtimePool().query<{ count: string }>(
+    `SELECT count(DISTINCT transaction_id)::text AS count FROM ledger_entries
+     WHERE account_id = ANY ($1::uuid[])`,
+    [accountIds],
+  );
+  return Number(result.rows[0]?.count ?? 'NaN');
+}
+
+/** The number of ledger entries on any of `accountIds`. */
+export async function entriesOn(...accountIds: string[]): Promise<number> {
+  const result = await runtimePool().query<{ count: string }>(
+    'SELECT count(*)::text AS count FROM ledger_entries WHERE account_id = ANY ($1::uuid[])',
+    [accountIds],
+  );
+  return Number(result.rows[0]?.count ?? 'NaN');
+}
+
+/** The number of audit records naming any of `accountIds`. */
+export async function auditsOn(...accountIds: string[]): Promise<number> {
+  const result = await runtimePool().query<{ count: string }>(
+    'SELECT count(*)::text AS count FROM audit_records WHERE account_ids && $1::uuid[]',
+    [accountIds],
+  );
+  return Number(result.rows[0]?.count ?? 'NaN');
+}
+
+/** The audit records written for one correlation id. */
+export async function auditsWithRequestId(
+  requestId: string,
+): Promise<(StoredAudit & { transaction_id: string | null; created_at: Date })[]> {
+  const result = await runtimePool().query<
+    StoredAudit & { transaction_id: string | null; created_at: Date }
+  >(
+    `SELECT actor_id, actor_role, action, account_ids::text[] AS account_ids, request_id,
+            transaction_id, created_at
+     FROM audit_records WHERE request_id = $1`,
+    [requestId],
+  );
+  return result.rows;
+}
+
+/** The idempotency record of a user's key, with its stored body parsed, or undefined. */
+export async function keyRecord(
+  userId: string,
+  key: string,
+): Promise<{ status: number | null; body: Record<string, unknown> | null } | undefined> {
+  const result = await runtimePool().query<{ status: number | null; body: Buffer | null }>(
+    'SELECT status, body FROM idempotency_keys WHERE user_id = $1 AND key = $2',
+    [userId, key],
+  );
+  const row = result.rows[0];
+  if (row === undefined) return undefined;
+  return {
+    status: row.status,
+    body:
+      row.body === null ? null : (JSON.parse(row.body.toString('utf8')) as Record<string, unknown>),
+  };
+}
+
+/** The transactions of a kind with an entry on an account. */
+export async function transactionsOfKind(accountId: string, kind: string): Promise<string[]> {
+  const result = await runtimePool().query<{ id: string }>(
+    `SELECT DISTINCT t.id FROM transactions t JOIN ledger_entries e ON e.transaction_id = t.id
+     WHERE e.account_id = $1 AND t.kind = $2`,
+    [accountId, kind],
+  );
+  return result.rows.map((row) => row.id);
+}

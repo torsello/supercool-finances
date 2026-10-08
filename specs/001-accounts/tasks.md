@@ -30,19 +30,19 @@ These tasks run in the cross-spec order of plan 000 section 1 for 08-api: authen
 - [x] Test first: ACC-AC20 in `test/unit/accounts/keyset.test.ts`, paging with real cursors.
 - [x] Build `schemas.ts`, `presenters.ts` (timestamps truncated to milliseconds by `apiTimestamp` of `src/platform/http/timestamp.ts`, plan section 5) and `routes.ts` for the seven routes, registered by the composition root, with `test/integration/accounts/routes.test.ts` (ACC-R07) proving a read answers the representation of section 1.3.
 - [x] Test first: ACC-AC01, ACC-AC02 and ACC-AC04 in `test/integration/accounts/create-account.test.ts`.
-- [ ] Test first: ACC-AC03 in `test/integration/accounts/create-account.test.ts`.
+- [x] Test first: ACC-AC03 in `test/integration/accounts/create-account.test.ts`.
 - [x] Test first: ACC-AC05 and ACC-AC06 in `test/integration/accounts/create-account.test.ts`.
-- [ ] Test first: ACC-AC07, ACC-AC09 and ACC-AC10 in `test/integration/accounts/read-accounts.test.ts`.
-- [ ] Test first: ACC-AC08, ACC-AC22 and ACC-AC24 in `test/integration/accounts/read-accounts.test.ts`.
-- [ ] Test first: ACC-AC11, ACC-AC12 and ACC-AC13 in `test/integration/accounts/status-changes.test.ts`.
-- [ ] Test first: ACC-AC15 and ACC-AC23 in `test/integration/accounts/status-changes.test.ts`.
+- [x] Test first: ACC-AC07, ACC-AC09 and ACC-AC10 in `test/integration/accounts/read-accounts.test.ts`.
+- [x] Test first: ACC-AC08, ACC-AC22 and ACC-AC24 in `test/integration/accounts/read-accounts.test.ts`.
+- [x] Test first: ACC-AC11, ACC-AC12 and ACC-AC13 in `test/integration/accounts/status-changes.test.ts`.
+- [x] Test first: ACC-AC15 and ACC-AC23 in `test/integration/accounts/status-changes.test.ts`.
 - [x] Test first: ACC-AC25 in `test/integration/accounts/status-changes.test.ts`.
-- [ ] Test first: ACC-AC14 in `test/integration/accounts/status-concurrency.test.ts`, once deposits and withdrawals are served (plan 003).
-- [ ] Test first: ACC-AC16 and ACC-AC17 in `test/integration/accounts/status-effects.test.ts`, once the movements of plan 003 are served.
-- [ ] Test first: ACC-AC18 and ACC-AC27 in `test/integration/accounts/history.test.ts`.
-- [ ] Test first: ACC-AC19 and ACC-AC21 in `test/integration/accounts/history.test.ts`.
-- [ ] Test first: ACC-AC26 in `test/integration/accounts/cursor-replicas.test.ts`.
-- [ ] Update the docs: the OpenAPI descriptions of the seven routes (paging, cursors, the operator view, the status lifecycle and its errors), the README section on accounts, and the Related ADRs of this spec.
+- [x] Test first: ACC-AC14 in `test/integration/accounts/status-concurrency.test.ts`, once deposits and withdrawals are served (plan 003).
+- [x] Test first: ACC-AC16 and ACC-AC17 in `test/integration/accounts/status-effects.test.ts`, once the movements of plan 003 are served.
+- [x] Test first: ACC-AC18 and ACC-AC27 in `test/integration/accounts/history.test.ts`.
+- [x] Test first: ACC-AC19 and ACC-AC21 in `test/integration/accounts/history.test.ts`.
+- [x] Test first: ACC-AC26 in `test/integration/accounts/cursor-replicas.test.ts`.
+- [x] Update the docs: the OpenAPI descriptions of the seven routes (paging, cursors, the operator view, the status lifecycle and its errors), the README section on accounts, and the Related ADRs of this spec.
 
 ## 09-hardening
 

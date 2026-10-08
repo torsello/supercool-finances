@@ -39,22 +39,34 @@ const throwingRoute: RouteModule = (scope) => {
 };
 
 /**
- * `unit-of-work-faults`: throws `error` when the work reaches `step`, until cleared. A test sets it
- * just before the request it faults and clears it afterwards.
+ * `unit-of-work-faults`: throws `error` when the work reaches `step`, or writes the ledger entry of
+ * one account with another amount, until cleared. A test sets it just before the request it faults
+ * and clears it afterwards.
  */
 export class UnitOfWorkFaultSeam implements UnitOfWorkFaults {
   #fault: { step: FaultStep; error: Error } | undefined;
+  #rewrite: { accountId: string; amount: bigint } | undefined;
 
   failAt(step: FaultStep, error: Error): void {
     this.#fault = { step, error };
   }
 
+  /** Writes the entry on `accountId` as `amount` instead of its own amount (LED-AC23). */
+  rewriteEntry(accountId: string, amount: bigint): void {
+    this.#rewrite = { accountId, amount };
+  }
+
   clear(): void {
     this.#fault = undefined;
+    this.#rewrite = undefined;
   }
 
   atStep(step: FaultStep): void {
     if (this.#fault?.step === step) throw this.#fault.error;
+  }
+
+  entryAmount(entry: { accountId: string; amount: bigint }): bigint {
+    return this.#rewrite?.accountId === entry.accountId ? this.#rewrite.amount : entry.amount;
   }
 }
 

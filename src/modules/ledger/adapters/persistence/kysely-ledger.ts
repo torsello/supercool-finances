@@ -60,7 +60,7 @@ export class KyselyLedgerWriter implements LedgerWriter {
           id: this.ids.next(),
           transaction_id: transactionId,
           account_id: entry.accountId,
-          amount: entry.amount.toString(),
+          amount: this.uow.entryAmount(entry).toString(),
           currency: entry.currency,
         })),
       )

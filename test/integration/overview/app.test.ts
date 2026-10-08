@@ -6,6 +6,9 @@ import { bearer, problemOf, withoutRequestId } from '../../support/http.js';
 import { LOG_LEVEL } from '../../support/logs.js';
 import { C1, O1, tokenFor } from '../../support/tokens.js';
 
+/** A UUIDv7 in canonical lowercase, the id SYS-R21 generates. */
+const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
 describe('the app built by the composition root', () => {
   let built: BuiltApp;
 
@@ -83,7 +86,7 @@ describe('the app built by the composition root', () => {
     }
   });
 
-  it('SYS-R24 SYS-R32 answers a path that does not decode with the not-found problem and its request id', async () => {
+  it('SYS-R21 SYS-R24 SYS-R32 answers a path that does not decode with the not-found problem and a generated UUIDv7 request id', async () => {
     const ids = new Set<string>();
     const urls = ['/%zz', '/v1/%E0%A4%A'];
     for (const url of urls) {
@@ -92,8 +95,8 @@ describe('the app built by the composition root', () => {
       expect(response.statusCode, url).toBe(404);
       const body = problemOf(response);
       expect(withoutRequestId(body), url).toEqual(NOT_FOUND);
-      expect(body.requestId, url).toEqual(expect.any(String));
-      expect(body.requestId, url).not.toBe('');
+      expect(body.requestId, url).toMatch(UUID_V7);
+      expect(response.headers['x-request-id'], url).toBe(body.requestId);
       ids.add(body.requestId);
       expect(response.body, url).not.toContain('%');
       expect(
@@ -119,7 +122,7 @@ describe('the app built by the composition root', () => {
     });
   }
 
-  it('SYS-R24 SYS-R26 answers every request the HTTP parser refuses with 400 malformed-request from the registry and a generated id', async () => {
+  it('SYS-R21 SYS-R24 SYS-R26 answers every request the HTTP parser refuses with 400 malformed-request from the registry and a generated UUIDv7 id', async () => {
     const tcp = buildProductionApp();
     await tcp.app.listen({ host: '127.0.0.1', port: 0 });
     try {
@@ -153,8 +156,9 @@ describe('the app built by the composition root', () => {
           title: PROBLEM_TYPES['/problems/malformed-request'].title,
           status: 400,
           detail: 'The request could not be parsed.',
-          requestId: expect.stringMatching(/./) as unknown,
+          requestId: expect.stringMatching(UUID_V7) as unknown,
         });
+        expect(headers['x-request-id'], name).toBe(problem['requestId']);
         ids.add(String(problem['requestId']));
       }
       expect(ids.size).toBe(cases.length);

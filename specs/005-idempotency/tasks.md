@@ -33,16 +33,16 @@ These tasks run in the cross-spec order of plan 000 section 1 for 08-api: authen
 - [x] Test first: IDM-AC25 in `test/unit/platform/config.test.ts`; then `IDEMPOTENCY_WAIT_TIMEOUT_MS` and `IDEMPOTENCY_KEY_TTL_SECONDS` in `src/platform/config/config.ts`.
 - [x] Extend `test/unit/idempotency/idempotent-runner.test.ts` so both typed errors are mapped by `toProblem` to 409 `/problems/request-in-progress` and 503 `/problems/service-unavailable`, each with `Retry-After: 1`: IDM-AC14.
 - [x] Build `key-header.ts` and `replay.ts` and wire the runner into the composition root, with `test/integration/idempotency/http-replay.test.ts` (IDM-R07) proving a replay carries the stored `Content-Type` and `Location`, the current `X-Request-Id` and `Idempotent-Replayed: true`.
-- [ ] Test first: IDM-AC01 and IDM-AC03 in `test/integration/idempotency/key-required.test.ts`.
-- [ ] Test first: IDM-AC04 in `test/integration/idempotency/account-creation.test.ts`.
-- [ ] Test first: IDM-AC05 in `test/integration/idempotency/key-scope.test.ts`.
-- [ ] Test first: IDM-AC07 and IDM-AC08 in `test/integration/idempotency/replay.test.ts`, the second with the `extra-response-member` seam.
-- [ ] Test first: IDM-AC09 in `test/integration/idempotency/key-reused.test.ts`.
-- [ ] Test first: IDM-AC15 and IDM-AC16 in `test/integration/idempotency/stored-rejections.test.ts`.
-- [ ] Test first: IDM-AC17 in `test/integration/idempotency/stored-rejections.test.ts`, with the `skip-existing-reversal-check` seam and its record.
-- [ ] Test first: IDM-AC18 and IDM-AC19 in `test/integration/idempotency/not-stored.test.ts`, the second with the `unit-of-work-faults` seam.
-- [ ] Test first: IDM-AC21 in `test/integration/idempotency/lost-response.test.ts`, with the `destroy-connection-after-commit` seam on a TCP port.
-- [ ] Test first: IDM-AC22 and IDM-AC23 in `test/integration/idempotency/expiry.test.ts`.
+- [x] Test first: IDM-AC01 and IDM-AC03 in `test/integration/idempotency/key-required.test.ts`.
+- [x] Test first: IDM-AC04 in `test/integration/idempotency/account-creation.test.ts`.
+- [x] Test first: IDM-AC05 in `test/integration/idempotency/key-scope.test.ts`.
+- [x] Test first: IDM-AC07 and IDM-AC08 in `test/integration/idempotency/replay.test.ts`, the second with the `extra-response-member` seam.
+- [x] Test first: IDM-AC09 in `test/integration/idempotency/key-reused.test.ts`.
+- [x] Test first: IDM-AC15 and IDM-AC16 in `test/integration/idempotency/stored-rejections.test.ts`.
+- [x] Test first: IDM-AC17 in `test/integration/idempotency/stored-rejections.test.ts`, with the `skip-existing-reversal-check` seam and its record.
+- [x] Test first: IDM-AC18 and IDM-AC19 in `test/integration/idempotency/not-stored.test.ts`, the second with the `unit-of-work-faults` seam.
+- [x] Test first: IDM-AC21 in `test/integration/idempotency/lost-response.test.ts`, with the `destroy-connection-after-commit` seam on a TCP port.
+- [x] Test first: IDM-AC22 and IDM-AC23 in `test/integration/idempotency/expiry.test.ts`.
 
 ## 09-hardening
 

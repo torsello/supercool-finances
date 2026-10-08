@@ -82,4 +82,5 @@ No movement updates a system account's row or takes `FOR UPDATE`, `FOR NO KEY UP
 ### Follow-ups
 
 - Phase 05-schema: settlement accounts per currency created by a migration (LED-R08), the constraint forbidding a cached balance on system accounts, and `CHECK (balance >= 0)` on customer accounts.
+  - Done in phase 05-schema on 2026-10-08.
 - Phase 11-e2e: report the measured cost in `docs/performance.md`; if multixacts become a problem, a new ADR revisits the foreign key or introduces balance snapshots.

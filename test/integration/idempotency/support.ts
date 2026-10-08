@@ -241,3 +241,42 @@ export function step(statement: Recorded): string {
   if (write !== null) return `${(write[1] ?? '').toLowerCase()} ${write[2] ?? ''}`;
   return 'select';
 }
+
+/** The transactions with an entry on a customer account, by kind, as `kind → count`. */
+export async function transactionsOn(accountId: string): Promise<Record<string, number>> {
+  const result = await runtimePool().query<{ kind: string; count: number }>(
+    `SELECT t.kind, count(DISTINCT t.id)::int AS count
+     FROM transactions t JOIN ledger_entries e ON e.transaction_id = t.id
+     WHERE e.account_id = $1 GROUP BY t.kind`,
+    [accountId],
+  );
+  return Object.fromEntries(result.rows.map((row) => [row.kind, row.count]));
+}
+
+/** The audit records that name a customer account, by action, as `action → count`. */
+export async function auditsOn(accountId: string): Promise<Record<string, number>> {
+  const result = await runtimePool().query<{ action: string; count: number }>(
+    `SELECT action, count(*)::int AS count FROM audit_records
+     WHERE $1::uuid = ANY (account_ids) GROUP BY action`,
+    [accountId],
+  );
+  return Object.fromEntries(result.rows.map((row) => [row.action, row.count]));
+}
+
+/** The number of key rows of a user. */
+export async function keyRowCount(userId: string): Promise<number> {
+  const result = await runtimePool().query<{ count: number }>(
+    'SELECT count(*)::int AS count FROM idempotency_keys WHERE user_id = $1',
+    [userId],
+  );
+  return result.rows[0]?.count ?? 0;
+}
+
+/** The ids of the reversals of a transaction. */
+export async function reversalsOf(transactionId: string): Promise<string[]> {
+  const result = await runtimePool().query<{ id: string }>(
+    'SELECT id FROM transactions WHERE reversed_transaction_id = $1',
+    [transactionId],
+  );
+  return result.rows.map((row) => row.id);
+}

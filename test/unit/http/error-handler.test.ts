@@ -243,6 +243,37 @@ describe('toProblem', () => {
     expect(toProblem(new MalformedRequest('cursor')).detail).toMatch(/cursor/);
   });
 
+  it('SYS-R26 answers the errors of the JSON body parser, and any other unrecognised Fastify error with status 400, as a malformed body, and nothing else of Fastify', () => {
+    const malformedBody = toProblem(new MalformedRequest('body'));
+    const cases: [string, Error][] = [
+      ...[
+        'FST_ERR_CTP_INVALID_JSON_BODY',
+        'FST_ERR_CTP_EMPTY_JSON_BODY',
+        'FST_ERR_CTP_INVALID_CONTENT_LENGTH',
+        'FST_ERR_OTHER',
+      ].map((code): [string, Error] => [
+        code,
+        Object.assign(new Error('parse failed'), { code, statusCode: 400 }),
+      ]),
+      // The request stream failing when a client aborts mid-body.
+      ['aborted', Object.assign(new Error('aborted'), { code: 'ECONNRESET', statusCode: 400 })],
+    ];
+    for (const [name, error] of cases) {
+      const problem = toProblem(error);
+      expect(problem.status, name).toBe(400);
+      expect(problem.type, name).toBe('/problems/malformed-request');
+      expect(problem.detail, name).toBe(malformedBody.detail);
+    }
+    // 413, 415 and every other status keep their planned mappings; until then, a 500.
+    for (const statusCode of [401, 404, 413, 415, 500, 503]) {
+      const other = toProblem(Object.assign(new Error('x'), { code: 'FST_ERR_OTHER', statusCode }));
+      expect(other.type, String(statusCode)).toBe('/problems/internal-error');
+    }
+    expect(toProblem(Object.assign(new Error('x'), { statusCode: '400' })).type).toBe(
+      '/problems/internal-error',
+    );
+  });
+
   it('SYS-R27 adds the errors member to a validation error, after the standard members', () => {
     const errors = [
       { pointer: '/amount', detail: 'Must be a string of digits.' },

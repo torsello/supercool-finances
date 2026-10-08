@@ -20,6 +20,7 @@ import {
   transactionBody,
   transactionLocation,
 } from './presenters.js';
+import { MOVEMENT_ROUTE_DOCS } from './openapi.js';
 import {
   accountMovementRepresentation,
   depositRepresentation,
@@ -76,6 +77,7 @@ export function movementRoutes(deps: MovementRoutesDeps): (scope: FastifyInstanc
       '/accounts/:id/deposits',
       {
         schema: {
+          ...MOVEMENT_ROUTE_DOCS['POST /accounts/{id}/deposits'],
           params: idParams,
           querystring: noQuery,
           body: amountBody,
@@ -111,6 +113,7 @@ export function movementRoutes(deps: MovementRoutesDeps): (scope: FastifyInstanc
       '/accounts/:id/withdrawals',
       {
         schema: {
+          ...MOVEMENT_ROUTE_DOCS['POST /accounts/{id}/withdrawals'],
           params: idParams,
           querystring: noQuery,
           body: amountBody,
@@ -146,6 +149,7 @@ export function movementRoutes(deps: MovementRoutesDeps): (scope: FastifyInstanc
       '/accounts/:id/transfers',
       {
         schema: {
+          ...MOVEMENT_ROUTE_DOCS['POST /accounts/{id}/transfers'],
           params: idParams,
           querystring: noQuery,
           body: transferBody(deps.maxAmountMinor),
@@ -187,6 +191,7 @@ export function movementRoutes(deps: MovementRoutesDeps): (scope: FastifyInstanc
       '/transactions/:id',
       {
         schema: {
+          ...MOVEMENT_ROUTE_DOCS['GET /transactions/{id}'],
           params: idParams,
           querystring: noQuery,
           response: { 200: transactionRepresentation },
@@ -208,6 +213,7 @@ export function movementRoutes(deps: MovementRoutesDeps): (scope: FastifyInstanc
       '/transactions/:id/reversals',
       {
         schema: {
+          ...MOVEMENT_ROUTE_DOCS['POST /transactions/{id}/reversals'],
           params: idParams,
           querystring: noQuery,
           body: reversalBody,

@@ -25,6 +25,7 @@ import {
   RetriesExhausted,
   StatementTimeout,
 } from '../db/errors.js';
+import { sqlstateOf } from '../db/sqlstate.js';
 import {
   MalformedRequest,
   RouteNotFound,
@@ -79,6 +80,31 @@ const REJECTIONS: readonly [new (...args: never[]) => Error, ProblemTypeUri][] =
   [InsufficientFundsForReversal, '/problems/insufficient-funds-for-reversal'],
 ];
 
+/**
+ * The errors of Fastify's JSON body parser for a body that is not parseable JSON: invalid or
+ * poisoned JSON, an empty body, or fewer or more bytes than `Content-Length` says (SYS-R26).
+ */
+const BODY_PARSE_ERRORS: ReadonlySet<string> = new Set([
+  'FST_ERR_CTP_INVALID_JSON_BODY',
+  'FST_ERR_CTP_EMPTY_JSON_BODY',
+  'FST_ERR_CTP_INVALID_CONTENT_LENGTH',
+]);
+
+function isBodyParseError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null || !('code' in error)) return false;
+  return typeof error.code === 'string' && BODY_PARSE_ERRORS.has(error.code);
+}
+
+/**
+ * A Fastify error with status exactly 400 that no mapping above recognises, such as the request
+ * stream failing when a client aborts mid-body: a request that could not be read, answered as a
+ * malformed body and not logged as a failure (SYS-R25, SYS-R26). 413, 415 and every other status
+ * are left to their own mappings.
+ */
+function isUnrecognisedClientError(error: unknown): boolean {
+  return error instanceof Error && 'statusCode' in error && error.statusCode === 400;
+}
+
 function problemOf(type: ProblemTypeUri, headers: Readonly<Record<string, string>> = {}): Problem {
   const { status, title, detail } = PROBLEM_TYPES[type];
   return { status, type, title, detail, headers };
@@ -97,6 +123,9 @@ export function toProblem(error: unknown): Problem {
   if (error instanceof MalformedRequest) {
     return { ...problemOf('/problems/malformed-request'), detail: MALFORMED_DETAILS[error.part] };
   }
+  if (isBodyParseError(error)) {
+    return { ...problemOf('/problems/malformed-request'), detail: MALFORMED_DETAILS.body };
+  }
   if (error instanceof ValidationFailed) {
     return { ...problemOf('/problems/validation-error'), errors: error.errors };
   }
@@ -113,6 +142,9 @@ export function toProblem(error: unknown): Problem {
   }
   const rejection = REJECTIONS.find(([type]) => error instanceof type);
   if (rejection !== undefined) return problemOf(rejection[1]);
+  if (isUnrecognisedClientError(error)) {
+    return { ...problemOf('/problems/malformed-request'), detail: MALFORMED_DETAILS.body };
+  }
   return problemOf('/problems/internal-error');
 }
 
@@ -170,16 +202,18 @@ export async function handleError(
 }
 
 /**
- * Logs an error answered as a 500 at `error`, with the error, which stays in the log only; a
- * `LedgerWriteRejected` also names its SQLSTATE and constraint (LED-R28). Every other answer is
- * not logged here.
+ * Logs an error answered as a 500 at `error`, with the error, which stays in the log only, and
+ * the SQLSTATE of a database error, so the request whose connection was lost names it with its
+ * `reqId` (SYS-R22); a `LedgerWriteRejected` also names its constraint (LED-R28). Every other
+ * answer is not logged here.
  */
 export function logFailure(request: FastifyRequest, error: unknown, problem: Problem): void {
   if (problem.status >= 500 && problem.type === '/problems/internal-error') {
+    const sqlstate = sqlstateOf(error);
     const fields =
       error instanceof LedgerWriteRejected
         ? { err: error, sqlstate: error.sqlstate, constraint: error.constraint }
-        : { err: error };
+        : { err: error, ...(sqlstate === undefined ? {} : { sqlstate }) };
     request.log.error(fields, 'request failed');
   }
 }

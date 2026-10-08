@@ -38,14 +38,14 @@ These tasks run in the cross-spec order of plan 000 section 1 for 08-api: authen
 
 - [x] Test first: LED-AC20 in `test/unit/platform/config.test.ts`; then `MAX_AMOUNT_MINOR` in `src/platform/config/config.ts`.
 - [x] Test first in `test/unit/movements/movement-schemas.test.ts` (LED-R23, LED-R24): the movement amount schema accepts the configured maximum and refuses one more with one `errors` entry for `/amount`; then the refinement in `src/modules/movements/adapters/http/schemas.ts`.
-- [ ] Test first: LED-AC18 and LED-AC19 in `test/integration/ledger/amount-limits.test.ts`.
-- [ ] Test first: LED-AC07 in `test/integration/ledger/settlement-flows.test.ts`.
-- [ ] Test first: LED-AC09 in `test/integration/ledger/system-account-locks.test.ts`.
-- [ ] Test first: LED-AC10 in `test/integration/ledger/overflow.test.ts`.
-- [ ] Test first: LED-AC21 in `test/integration/ledger/balance-limit.test.ts`.
-- [ ] Test first: LED-AC13 in `test/integration/ledger/entry-timestamps.test.ts`.
-- [ ] Test first: LED-AC23 in `test/integration/ledger/rejected-write.test.ts`, with the entry-rewrite fault of the `unit-of-work-faults` seam.
-- [ ] Update the docs: the OpenAPI description of minor units, signed entry amounts and `MAX_AMOUNT_MINOR`; a runbook `docs/runbooks/reconciliation.md` on running `npm run reconcile` and reading its report; the README section on the ledger; and the follow-ups closed in ADR-0006, ADR-0007 and ADR-0018.
+- [x] Test first: LED-AC18 and LED-AC19 in `test/integration/ledger/amount-limits.test.ts`.
+- [x] Test first: LED-AC07 in `test/integration/ledger/settlement-flows.test.ts`.
+- [x] Test first: LED-AC09 in `test/integration/ledger/system-account-locks.test.ts`.
+- [x] Test first: LED-AC10 in `test/integration/ledger/overflow.test.ts`.
+- [x] Test first: LED-AC21 in `test/integration/ledger/balance-limit.test.ts`.
+- [x] Test first: LED-AC13 in `test/integration/ledger/entry-timestamps.test.ts`.
+- [x] Test first: LED-AC23 in `test/integration/ledger/rejected-write.test.ts`, with the entry-rewrite fault of the `unit-of-work-faults` seam.
+- [x] Update the docs: the OpenAPI description of minor units, signed entry amounts and `MAX_AMOUNT_MINOR`; a runbook `docs/runbooks/reconciliation.md` on running `npm run reconcile` and reading its report; the README section on the ledger; and the follow-ups closed in ADR-0006, ADR-0007 and ADR-0018.
 
 ## 09-hardening
 

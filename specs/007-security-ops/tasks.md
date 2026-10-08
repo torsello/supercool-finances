@@ -20,8 +20,8 @@ No task for this spec.
 
 These tasks run in the cross-spec order of plan 000 section 1 for 08-api: authentication, error handler and pipeline, account routes, idempotency wiring, movement and reversal routes, then the ACs that need them.
 
-- [ ] Test first: SEC-AC16 in `test/integration/security/json-logs.test.ts`, against the logger of plan 000.
-- [ ] Test first: SEC-AC34 in `test/integration/security/api-docs.test.ts`; then `src/platform/http/docs.ts` with the route schemas of plans 001, 003 and 004.
+- [x] Test first: SEC-AC16 in `test/integration/security/json-logs.test.ts`, against the logger of plan 000.
+- [x] Test first: SEC-AC34 in `test/integration/security/api-docs.test.ts`; then `src/platform/http/docs.ts` with the route schemas of plans 001, 003 and 004.
 
 ## 09-hardening
 

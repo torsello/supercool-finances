@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildProductionApp, type BuiltApp } from '../../support/app.js';
+import { closePools, settlementAccountId } from '../../support/db.js';
 import {
   bearer,
   changeStatus,
   createAccount,
+  deposit,
   problemOf,
   withoutRequestId,
   type AccountJson,
@@ -14,6 +16,15 @@ import { tokenFor } from '../../support/tokens.js';
 interface PageJson {
   items: AccountJson[];
   nextCursor?: string;
+}
+
+interface EntryJson {
+  id: string;
+  transactionId: string;
+  kind: string;
+  amount: string;
+  currency: string;
+  createdAt: string;
 }
 
 describe('reading and listing accounts', () => {
@@ -26,6 +37,94 @@ describe('reading and listing accounts', () => {
 
   afterAll(async () => {
     await built.app.close();
+    await closePools();
+  });
+
+  const operator = tokenFor(randomUUID(), 'operator');
+
+  async function get(token: string, url: string) {
+    return await built.app.inject({ method: 'GET', url, headers: bearer(token) });
+  }
+
+  async function funded(token: string, currency: string, amount: string): Promise<AccountJson> {
+    const account = await createAccount(built.app, token, currency);
+    const response = await deposit(built.app, operator, account.id, amount, { currency });
+    expect(response.statusCode).toBe(201);
+    return account;
+  }
+
+  it('ACC-AC07 a customer reads their own accounts with exactly the six fields and balances as strings', async () => {
+    const c1 = tokenFor(randomUUID(), 'customer');
+    const a1 = await funded(c1, 'EUR', '1050');
+    const j1 = await funded(c1, 'JPY', '1500');
+
+    for (const [account, balance] of [
+      [a1, '1050'],
+      [j1, '1500'],
+    ] as const) {
+      const response = await get(c1, `/v1/accounts/${account.id}`);
+      expect(response.statusCode).toBe(200);
+      const body = response.json<AccountJson>();
+      expect(Object.keys(body).sort()).toEqual(
+        ['balance', 'createdAt', 'currency', 'id', 'status', 'updatedAt'].sort(),
+      );
+      expect(body).toMatchObject({
+        id: account.id,
+        currency: account.currency,
+        status: 'active',
+        balance,
+      });
+      expect(typeof body.balance).toBe('string');
+      expect(body.updatedAt >= body.createdAt).toBe(true);
+    }
+  });
+
+  it('ACC-AC10 an operator reads any customer account with its ownerId, and lists its history', async () => {
+    const c1 = randomUUID();
+    const c2 = randomUUID();
+    const a1 = await funded(tokenFor(c1, 'customer'), 'EUR', '1000');
+    const b1 = await createAccount(built.app, tokenFor(c2, 'customer'));
+
+    for (const [account, ownerId, balance] of [
+      [a1, c1, '1000'],
+      [b1, c2, '0'],
+    ] as const) {
+      const response = await get(operator, `/v1/accounts/${account.id}`);
+      expect(response.statusCode).toBe(200);
+      const body = response.json<AccountJson>();
+      expect(Object.keys(body).sort()).toEqual(
+        ['balance', 'createdAt', 'currency', 'id', 'ownerId', 'status', 'updatedAt'].sort(),
+      );
+      expect(body).toMatchObject({ id: account.id, ownerId, balance, status: 'active' });
+    }
+
+    const history = await get(operator, `/v1/accounts/${a1.id}/entries`);
+    expect(history.statusCode).toBe(200);
+    const items = history.json<{ items: EntryJson[] }>().items;
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ kind: 'deposit', amount: '1000', currency: 'EUR' });
+  });
+
+  it('ACC-AC22 the settlement account is never visible: not in a customer list, 404 to a customer and to an operator', async () => {
+    const c1 = tokenFor(randomUUID(), 'customer');
+    const a1 = await funded(c1, 'EUR', '1000');
+    const s = await settlementAccountId('EUR');
+
+    const list = await get(c1, '/v1/accounts');
+    expect(list.statusCode).toBe(200);
+    expect(list.json<PageJson>().items.map((account) => account.id)).toEqual([a1.id]);
+
+    const bodies = [];
+    for (const token of [c1, operator]) {
+      for (const url of [`/v1/accounts/${s}`, `/v1/accounts/${s}/entries`]) {
+        const response = await get(token, url);
+        expect(response.statusCode, url).toBe(404);
+        const body = problemOf(response);
+        expect(body.type).toBe('/problems/not-found');
+        bodies.push(withoutRequestId(body));
+      }
+    }
+    expect(new Set(bodies.map((body) => JSON.stringify(body))).size).toBe(1);
   });
 
   it('ACC-AC08 a customer lists their accounts in pages of 2, newest first, in every status, and never sees another customer’s', async () => {

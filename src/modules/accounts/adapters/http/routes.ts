@@ -18,6 +18,7 @@ import type {
   IdGenerator,
 } from '../../application/ports.js';
 import type { CursorCodec, CursorScope } from './cursor.js';
+import { ACCOUNT_ROUTE_DOCS } from './openapi.js';
 import { accountBody, entryBody, operatorAccountBody, pageBody, readBody } from './presenters.js';
 import {
   accountPage,
@@ -47,7 +48,7 @@ export interface AccountRoutesDeps {
 /** A path id stays a plain string: one that is not a UUID answers 404 at the lookup (SYS-R42). */
 const idParams = z.object({ id: z.string() });
 
-const STATUS_ROUTES: readonly [StatusAction, RouteKey][] = [
+const STATUS_ROUTES: readonly [StatusAction, RouteKey & keyof typeof ACCOUNT_ROUTE_DOCS][] = [
   ['freeze', 'POST /accounts/{id}/freeze'],
   ['unfreeze', 'POST /accounts/{id}/unfreeze'],
   ['close', 'POST /accounts/{id}/close'],
@@ -84,6 +85,7 @@ export function accountRoutes(deps: AccountRoutesDeps): (scope: FastifyInstance)
       '/accounts',
       {
         schema: {
+          ...ACCOUNT_ROUTE_DOCS['POST /accounts'],
           body: createAccountBody,
           querystring: noQuery,
           response: { 201: accountRepresentation },
@@ -123,7 +125,11 @@ export function accountRoutes(deps: AccountRoutesDeps): (scope: FastifyInstance)
     app.get(
       '/accounts',
       {
-        schema: { querystring: listQuery, response: { 200: accountPage } },
+        schema: {
+          ...ACCOUNT_ROUTE_DOCS['GET /accounts'],
+          querystring: listQuery,
+          response: { 200: accountPage },
+        },
         attachValidation: true,
         config: { roles: rolesFor('GET /accounts') },
       },
@@ -149,6 +155,7 @@ export function accountRoutes(deps: AccountRoutesDeps): (scope: FastifyInstance)
       '/accounts/:id',
       {
         schema: {
+          ...ACCOUNT_ROUTE_DOCS['GET /accounts/{id}'],
           params: idParams,
           querystring: noQuery,
           response: { 200: z.union([operatorAccountRepresentation, accountRepresentation]) },
@@ -167,7 +174,12 @@ export function accountRoutes(deps: AccountRoutesDeps): (scope: FastifyInstance)
     app.get(
       '/accounts/:id/entries',
       {
-        schema: { params: idParams, querystring: listQuery, response: { 200: entryPage } },
+        schema: {
+          ...ACCOUNT_ROUTE_DOCS['GET /accounts/{id}/entries'],
+          params: idParams,
+          querystring: listQuery,
+          response: { 200: entryPage },
+        },
         attachValidation: true,
         config: { roles: rolesFor('GET /accounts/{id}/entries') },
       },
@@ -195,6 +207,7 @@ export function accountRoutes(deps: AccountRoutesDeps): (scope: FastifyInstance)
         `/accounts/:id/${action}`,
         {
           schema: {
+            ...ACCOUNT_ROUTE_DOCS[route],
             params: idParams,
             querystring: noQuery,
             body: statusChangeBody,

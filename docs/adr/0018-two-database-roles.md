@@ -69,4 +69,5 @@ The owner role also sets the runtime role's `statement_timeout` and `idle_in_tra
 ### Follow-ups
 
 - Phase 05-schema: create both roles, the grants, the append-only triggers and the role settings.
+  - Done in phase 05-schema on 2026-10-08.
 - Phase 12-infra: both credentials in Secrets Manager and in RDS Proxy (section 1.7 of spec 008).

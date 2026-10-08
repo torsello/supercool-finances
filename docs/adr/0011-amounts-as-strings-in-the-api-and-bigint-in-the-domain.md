@@ -75,3 +75,4 @@ Details fixed by the specs: an accepted amount never has a sign, and the directi
 - Phase 06-domain: the `Money` value object and its parsing from strings.
   - Done in phase 06-domain on 2026-10-08.
 - Phase 08-api: the shared Zod amount schema and the OpenAPI description of minor units.
+  - Done in phase 08-api on 2026-10-08.
