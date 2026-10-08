@@ -2,7 +2,7 @@
 
 - **Status:** Approved
 - **ID prefix:** LED
-- **Related ADRs:** [ADR-0001](../../docs/adr/0001-spec-driven-development-with-adrs-and-ai-agents.md), [ADR-0002](../../docs/adr/0002-modular-monolith.md), [ADR-0003](../../docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md), [ADR-0005](../../docs/adr/0005-postgresql-as-the-only-source-of-truth.md), [ADR-0006](../../docs/adr/0006-double-entry-ledger-with-signed-integer-minor-units.md), [ADR-0007](../../docs/adr/0007-system-accounts-without-a-cached-balance.md), [ADR-0008](../../docs/adr/0008-read-committed-with-ordered-pessimistic-row-locks.md), [ADR-0010](../../docs/adr/0010-kysely-and-pg-instead-of-an-orm.md), [ADR-0011](../../docs/adr/0011-amounts-as-strings-in-the-api-and-bigint-in-the-domain.md), [ADR-0016](../../docs/adr/0016-error-model.md), [ADR-0017](../../docs/adr/0017-keyset-pagination-with-signed-cursors.md), [ADR-0018](../../docs/adr/0018-two-database-roles.md)
+- **Related ADRs:** [ADR-0001](../../docs/adr/0001-spec-driven-development-with-adrs-and-ai-agents.md), [ADR-0002](../../docs/adr/0002-modular-monolith.md), [ADR-0003](../../docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md), [ADR-0005](../../docs/adr/0005-postgresql-as-the-only-source-of-truth.md), [ADR-0006](../../docs/adr/0006-double-entry-ledger-with-signed-integer-minor-units.md), [ADR-0007](../../docs/adr/0007-system-accounts-without-a-cached-balance.md), [ADR-0008](../../docs/adr/0008-read-committed-with-ordered-pessimistic-row-locks.md), [ADR-0010](../../docs/adr/0010-kysely-and-pg-instead-of-an-orm.md), [ADR-0011](../../docs/adr/0011-amounts-as-strings-in-the-api-and-bigint-in-the-domain.md), [ADR-0016](../../docs/adr/0016-error-model.md), [ADR-0017](../../docs/adr/0017-keyset-pagination-with-signed-cursors.md), [ADR-0018](../../docs/adr/0018-two-database-roles.md), [ADR-0021](../../docs/adr/0021-statement-timeout-function-for-maintenance-scripts.md)
 - **Depends on specs:** 000-overview, 001-accounts, 003-money-movements, 004-reversals, 005-idempotency
 
 ## 1. Context and goal
@@ -86,7 +86,7 @@ A positive amount credits the account (adds to its balance) and a negative amoun
 
 ## 3. Acceptance criteria
 
-Unless stated otherwise: customer user C1 owns account A1 (EUR), customer user C2 owns account B1 (EUR), operator user O1 is an operator, balances are set up by deposits from O1, S is the EUR settlement account `external-settlement:EUR`, `MAX_AMOUNT_MINOR` is unset, every deposit, withdrawal, transfer and reversal carries a fresh Idempotency-Key unless the AC names one or says it has none, and "written directly to the database" means SQL run by the service's runtime database role (LED-R17) outside the service's code. The balance of S is asserted only as a change during a test, never as an absolute value, because the integration tests share one database whose ledger cannot be cleared (section 1.5).
+Unless stated otherwise: customer user C1 owns account A1 (EUR), customer user C2 owns account B1 (EUR), operator user O1 is an operator, balances are set up by deposits from O1, S is the EUR settlement account `external-settlement:EUR`, `MAX_AMOUNT_MINOR` is unset, every deposit, withdrawal, transfer and reversal carries a fresh Idempotency-Key unless the AC names one or says it has none, and "written directly to the database" means SQL run by the service's runtime database role (LED-R17) outside the service's code. In an AC whose When sends no request through the service (it writes directly to the database, runs the reconciliation or runs a script), the balances of the Given, deposits by O1 included, may be set up by a test helper that writes, as the runtime role and in one database transaction, a complete deposit as the service would: the transaction, both ledger entries, the cached balance change and the audit record, so the shared test database still reconciles (LED-R22). The balance of S is asserted only as a change during a test, never as an absolute value, because the integration tests share one database whose ledger cannot be cleared (section 1.5).
 
 ### LED-AC01 · The domain builds transactions of the documented shape
 
@@ -204,7 +204,7 @@ Unless stated otherwise: customer user C1 owns account A1 (EUR), customer user C
 
 - **Level:** integration
 - **Covers:** LED-R20
-- **Given** ten customer accounts in EUR, each with "10000" EUR
+- **Given** the service started with `DB_POOL_ACQUIRE_TIMEOUT_MS` "10000", `REQUEST_TIMEOUT_MS` "30000" and `SHUTDOWN_TIMEOUT_MS` "30000", so the whole burst can queue for a connection (SEC-R38); and ten customer accounts in EUR, each with "10000" EUR
 - **When** 200 transfers of "10" EUR run at the same time, transfer i going from account i mod 10 to account (i + 1) mod 10, each with a fresh Idempotency-Key, while the reconciliation runs 20 times; and then the reconciliation runs once more while a separate database session holds `SELECT ... FOR UPDATE` on the row of one of the ten accounts
 - **Then** every one of the 20 reports has no discrepancy and a global sum of "0" in every currency; every transfer succeeds with no 5xx response; and the last reconciliation completes, with no discrepancy, before that session releases its lock
 

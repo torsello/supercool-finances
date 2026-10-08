@@ -23,24 +23,25 @@ A new dependency needs an ADR or the owner's approval recorded here (AGENTS.md Â
 | `@fastify/helmet`           | Security headers.                                                                                                           | 09-hardening                          |
 | `@fastify/rate-limit`       | Rate limiting. Must use the Redis store (spec 007): in-process counters are forbidden with several replicas.                | 09-hardening                          |
 | `close-with-grace`          | Graceful shutdown on SIGTERM and SIGINT.                                                                                    | 09-hardening                          |
-| `@prometheus-io/client`     | Prometheus metrics (`prom-client` is deprecated).                                                                           | 10-runtime                            |
+| `@prometheus-io/client`     | Prometheus metrics (`prom-client` is deprecated).                                                                           | 09-hardening                          |
 
 ## Development
 
-| Package                  | Purpose                                                                | First used in |
-| ------------------------ | ---------------------------------------------------------------------- | ------------- |
-| `typescript`             | Compiler and type checker (strict).                                    | 01-bootstrap  |
-| `@types/node`            | Node 24 type definitions.                                              | 01-bootstrap  |
-| `@types/pg`              | `pg` type definitions.                                                 | 01-bootstrap  |
-| `tsx`                    | Runs TypeScript directly: `npm run dev` and `npm run env:sync`.        | 01-bootstrap  |
-| `vitest`                 | Unit and integration test runner.                                      | 01-bootstrap  |
-| `@vitest/coverage-v8`    | Coverage for `npm run test:coverage`.                                  | 01-bootstrap  |
-| `eslint`                 | Linter.                                                                | 01-bootstrap  |
-| `@eslint/js`             | ESLint recommended rules.                                              | 01-bootstrap  |
-| `typescript-eslint`      | Type-checked lint rules (`strictTypeChecked`, `no-floating-promises`). | 01-bootstrap  |
-| `eslint-config-prettier` | Turns off lint rules that conflict with Prettier.                      | 01-bootstrap  |
-| `prettier`               | Formatter.                                                             | 01-bootstrap  |
-| `pino-pretty`            | Readable local logs.                                                   | 08-api        |
-| `@redocly/cli`           | OpenAPI linting and bundling.                                          | 08-api        |
-| `autocannon`             | Load and concurrency tests against the running stack.                  | 11-e2e        |
-| `@types/autocannon`      | `autocannon` type definitions.                                         | 11-e2e        |
+| Package                  | Purpose                                                                                                       | First used in |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------- | ------------- |
+| `typescript`             | Compiler and type checker (strict).                                                                           | 01-bootstrap  |
+| `@types/node`            | Node 24 type definitions.                                                                                     | 01-bootstrap  |
+| `@types/pg`              | `pg` type definitions.                                                                                        | 01-bootstrap  |
+| `tsx`                    | Runs TypeScript directly: `npm run dev` and `npm run env:sync`.                                               | 01-bootstrap  |
+| `vitest`                 | Unit and integration test runner.                                                                             | 01-bootstrap  |
+| `@vitest/coverage-v8`    | Coverage for `npm run test:coverage`.                                                                         | 01-bootstrap  |
+| `eslint`                 | Linter.                                                                                                       | 01-bootstrap  |
+| `@eslint/js`             | ESLint recommended rules.                                                                                     | 01-bootstrap  |
+| `typescript-eslint`      | Type-checked lint rules (`strictTypeChecked`, `no-floating-promises`).                                        | 01-bootstrap  |
+| `eslint-config-prettier` | Turns off lint rules that conflict with Prettier.                                                             | 01-bootstrap  |
+| `prettier`               | Formatter.                                                                                                    | 01-bootstrap  |
+| `pino-pretty`            | Readable local logs.                                                                                          | 08-api        |
+| `@redocly/cli`           | OpenAPI linting and bundling.                                                                                 | 08-api        |
+| `autocannon`             | Load and concurrency tests against the running stack.                                                         | 11-e2e        |
+| `@types/autocannon`      | `autocannon` type definitions.                                                                                | 11-e2e        |
+| `yaml`                   | Parses `compose.yaml` in the deployment unit tests (plan 007 section 8). Approved by the owner on 2026-10-08. | 10-runtime    |
