@@ -2,14 +2,14 @@
 
 - **Status:** Approved
 - **ID prefix:** IDM
-- **Related ADRs:** none yet (phase 03-adrs)
+- **Related ADRs:** [ADR-0001](../../docs/adr/0001-spec-driven-development-with-adrs-and-ai-agents.md), [ADR-0002](../../docs/adr/0002-modular-monolith.md), [ADR-0003](../../docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md), [ADR-0004](../../docs/adr/0004-typescript-with-fastify.md), [ADR-0005](../../docs/adr/0005-postgresql-as-the-only-source-of-truth.md), [ADR-0008](../../docs/adr/0008-read-committed-with-ordered-pessimistic-row-locks.md), [ADR-0009](../../docs/adr/0009-idempotency-inside-the-movements-transaction.md), [ADR-0010](../../docs/adr/0010-kysely-and-pg-instead-of-an-orm.md), [ADR-0012](../../docs/adr/0012-simulated-authentication-with-jwt-and-two-roles.md), [ADR-0014](../../docs/adr/0014-aws-deployment-on-ecs-fargate-with-rds-postgresql.md), [ADR-0016](../../docs/adr/0016-error-model.md), [ADR-0019](../../docs/adr/0019-timeout-layers-and-rds-proxy.md)
 - **Depends on specs:** 000-overview, 001-accounts, 002-ledger, 003-money-movements, 004-reversals, 007-security-ops, 008-deployment
 
 ## 1. Context and goal
 
 Clients retry: a timeout, a dropped connection or a crashed replica leaves them not knowing whether money moved. A retry must never move money twice, and must get the same answer as the first attempt. Every money-moving POST (deposit, withdrawal, transfer, reversal) therefore carries an `Idempotency-Key`, and account creation may carry one. The service remembers, per user and key, a fingerprint of the request and the response it gave, and answers a retry with that stored response instead of running the request again.
 
-Several replicas run behind a load balancer (SYS-R16), so this state lives only in PostgreSQL. The key row is inserted inside the request's own database transaction, as its first write: the movement and the record of its result commit together or not at all, and a second request with the same key, on any replica, waits on that row until the first finishes. This design is decided and will be recorded in an ADR (phase 03-adrs). Terms have the meanings in the glossary of spec 000.
+Several replicas run behind a load balancer (SYS-R16), so this state lives only in PostgreSQL. The key row is inserted inside the request's own database transaction, as its first write: the movement and the record of its result commit together or not at all, and a second request with the same key, on any replica, waits on that row until the first finishes. This design is recorded in [ADR-0009](../../docs/adr/0009-idempotency-inside-the-movements-transaction.md). Terms have the meanings in the glossary of spec 000.
 
 ### 1.1 Life of a request with a key
 

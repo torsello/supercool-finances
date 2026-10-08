@@ -2,12 +2,12 @@
 
 - **Status:** Approved
 - **ID prefix:** AUT
-- **Related ADRs:** none yet (phase 03-adrs)
+- **Related ADRs:** [ADR-0001](../../docs/adr/0001-spec-driven-development-with-adrs-and-ai-agents.md), [ADR-0004](../../docs/adr/0004-typescript-with-fastify.md), [ADR-0005](../../docs/adr/0005-postgresql-as-the-only-source-of-truth.md), [ADR-0012](../../docs/adr/0012-simulated-authentication-with-jwt-and-two-roles.md), [ADR-0016](../../docs/adr/0016-error-model.md)
 - **Depends on specs:** 000-overview, 001-accounts, 003-money-movements, 004-reversals, 005-idempotency, 007-security-ops
 
 ## 1. Context and goal
 
-Every request to the service, except the health checks and the API documentation, acts for one user with one role (SYS-R01). The challenge allows authentication to be simulated (docs/challenge.md), so this version verifies bearer JWTs signed with HS256 and a shared secret from the environment, and the only way to get a token is a local CLI script. The API has no login and no endpoint that issues tokens. In production the tokens would come from an external OpenID Connect provider, signed with an asymmetric key (RS256 or ES256) and verified through its JWKS; that is out of scope here and will be recorded in an ADR (phase 03-adrs).
+Every request to the service, except the health checks and the API documentation, acts for one user with one role (SYS-R01). The challenge allows authentication to be simulated (docs/challenge.md), so this version verifies bearer JWTs signed with HS256 and a shared secret from the environment, and the only way to get a token is a local CLI script. The API has no login and no endpoint that issues tokens. In production the tokens would come from an external OpenID Connect provider, signed with an asymmetric key (RS256 or ES256) and verified through its JWKS; that is out of scope here and is recorded in [ADR-0012](../../docs/adr/0012-simulated-authentication-with-jwt-and-two-roles.md).
 
 This spec defines what a valid token is, how the caller's identity and role are taken from it and from nowhere else, what a request with no valid token answers, and which role may do what on whose account, written once as the authorization matrix of section 1.3. Terms have the meanings in the glossary of spec 000.
 
@@ -252,7 +252,7 @@ Errors shared by every capability are in spec 000. For authentication and author
 
 ## 6. Out of scope
 
-- An external OpenID Connect provider, asymmetric signatures (RS256, ES256) and key discovery through JWKS. The production design is recorded in an ADR in phase 03-adrs, including the mapping an OIDC provider whose subjects are not UUIDs would need.
+- An external OpenID Connect provider, asymmetric signatures (RS256, ES256) and key discovery through JWKS. The production design is recorded in [ADR-0012](../../docs/adr/0012-simulated-authentication-with-jwt-and-two-roles.md), including the mapping an OIDC provider whose subjects are not UUIDs would need.
 - Login, user registration, passwords, multi-factor authentication, refresh tokens and token revocation. A token lives at most 15 minutes and cannot be revoked before it expires.
 - Rotating `JWT_SECRET` without a restart, and accepting more than one secret at a time.
 - Scopes or permissions beyond the two roles.
