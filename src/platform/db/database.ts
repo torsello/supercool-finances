@@ -34,27 +34,46 @@ export interface PoolLogger {
 export interface PoolOptions {
   connectionString: string;
   max?: number;
+  /** How long a new connection may take before `connect()` fails; pg waits forever by default. */
+  connectionTimeoutMillis?: number;
   logger: PoolLogger;
 }
 
+function sqlstateOf(error: Error): string | null {
+  return error instanceof pg.DatabaseError ? (error.code ?? null) : null;
+}
+
 /**
- * A `pg` pool whose `int8` and `numeric` values are exact strings. A pooled connection that is
- * lost while idle (a terminated backend, a database restart or failover) makes the pool emit
- * `'error'`; without a listener Node would end the process. The listener logs it at `warn` with
- * the SQLSTATE only, never the error message or the connection string, which can hold the host
- * or credentials; pg has already removed the broken client, and the next query opens a new one.
+ * A `pg` pool whose `int8` and `numeric` values are exact strings. A lost connection (a terminated
+ * backend, a database restart or failover) makes its client emit `'error'`, and the pool too while
+ * the client is idle; without a listener Node would end the process. pg-pool listens on idle
+ * clients only, so every client gets its own listener when it connects, which covers a client
+ * checked out by a request. A loss is logged at `warn` with the SQLSTATE only, never the error
+ * message or the connection string, which can hold the host or credentials; the request that holds
+ * a broken client fails, and pg removes the client, so the next query opens a new one.
  */
 export function createPool(options: PoolOptions): pg.Pool {
   const pool = new pg.Pool({
     connectionString: options.connectionString,
     ...(options.max === undefined ? {} : { max: options.max }),
+    ...(options.connectionTimeoutMillis === undefined
+      ? {}
+      : { connectionTimeoutMillis: options.connectionTimeoutMillis }),
     types: exactTypes(),
   });
   pool.on('error', (error) => {
-    options.logger.warn(
-      { sqlstate: error instanceof pg.DatabaseError ? (error.code ?? null) : null },
-      'idle database connection lost',
-    );
+    options.logger.warn({ sqlstate: sqlstateOf(error) }, 'idle database connection lost');
+  });
+  // An idle client's loss is logged once, by the pool's listener above. A checked-out client's
+  // listener may log one loss twice: pg reports the server's error, then the closed socket.
+  const checkedOut = new WeakSet<pg.PoolClient>();
+  pool.on('acquire', (client) => checkedOut.add(client));
+  pool.on('release', (_error, client) => checkedOut.delete(client));
+  pool.on('connect', (client) => {
+    client.on('error', (error) => {
+      if (!checkedOut.has(client)) return;
+      options.logger.warn({ sqlstate: sqlstateOf(error) }, 'database connection lost');
+    });
   });
   return pool;
 }

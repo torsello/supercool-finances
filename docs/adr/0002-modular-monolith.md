@@ -30,7 +30,7 @@ One deployable with internal modules: `accounts`, `ledger`, `movements`, `idempo
   - Explicit module interfaces (ports, ADR-0003) keep the boundaries visible, so a module could be extracted later.
 - **Cons:**
   - Modules cannot be deployed or scaled independently; a change to any module redeploys all of them.
-  - Boundaries are enforced by convention, review and lint, not by the network, so they can erode if not reviewed. Lint enforces only the domain import rule today (`src/modules/*/domain/**` may not import infrastructure, `adapters/` or `platform/`); imports between modules are enforced by review.
+  - Boundaries are enforced by convention, review and lint, not by the network, so they can erode if not reviewed. Lint enforces only the domain import rule today (`src/modules/*/domain/**` may not import infrastructure, `adapters/` or `platform/`); imports between modules are enforced by review. (Update 2026-10-08: phase 06-domain added these lint rules; see eslint.config.js.)
   - All modules share one database, which is a single scaling point for writes.
 
 ### Option B: Microservices (for example accounts, ledger and movements as separate services)
@@ -77,4 +77,5 @@ Chosen option: **Option A**, because there is one bounded context in which a tra
 
 - ADR-0003 defines the layers inside each module.
 - Phase 06-domain: extend `no-restricted-imports` in `eslint.config.js` so that `src/modules/*/application/**` may not import `kysely`, `pg`, `fastify`, `ioredis` or any `adapters/` path, and no module imports another module's internals. Until then, review enforces it.
+  - Done in phase 06-domain on 2026-10-08.
 - If a module ever needs to be split out, a new ADR must first address how its writes stay atomic with the ledger.

@@ -10,12 +10,12 @@ These tasks run in the cross-spec order of plan 000 section 1, across every `spe
 
 ## 06-domain
 
-- [ ] Test first: REV-AC03 in `test/unit/movements/reversal.test.ts`; then `reversalOf` in `src/modules/ledger/domain/ledger-transaction.ts` and `TransactionNotReversible`.
-- [ ] Test first: REV-AC20 in `test/unit/movements/lock-plan.test.ts`, reusing `planLocks` over the original's entries.
-- [ ] Test first in `test/unit/movements/reversal-rules.test.ts` (REV-R06, REV-R08 to REV-R11, REV-R22): steps 5 to 8 of section 1.4 in order, `frozen` passing and `closed` failing, funds checked on the accounts the reversal debits only, and the balance limit on those it credits; then `src/modules/movements/domain/reversal-rules.ts`.
-- [ ] Test first in `test/integration/reversals/reverse-use-case.test.ts` (REV-R01, REV-R02, REV-R15, REV-R18): reversing a deposit, a withdrawal and a transfer appends the negated entries, changes the customer balances, leaves the original's rows unchanged and writes one audit record with the reason; an unknown id is not found and a reversal is not reversible; then `reverse.ts` and the lookup of the original in `kysely-movements.ts`.
-- [ ] Test first in the same file (REV-R05, REV-R06): with the existing-reversal check skipped through the hook point, the hook records the skip and the `cause` of the `AlreadyReversed` the ledger writer threw for the second reversal's insert (23505 on `transactions_reversed_transaction_id_key`), and the use case ends with `AlreadyReversed`, not an internal error; then the hook point in `reverse.ts` and the mapping in `kysely-ledger.ts`.
-- [ ] Test first in `test/integration/reversals/reverse-lock-wait.test.ts` (REV-R19, REV-R20): with a session holding A1's row, a reversal ends with `AccountLockTimeout` and writes nothing; a reversal and a transfer racing on the same accounts never let a balance go below zero.
+- [x] Test first: REV-AC03 in `test/unit/movements/reversal.test.ts`; then `reversalOf` in `src/modules/ledger/domain/ledger-transaction.ts` and `TransactionNotReversible`.
+- [x] Test first: REV-AC20 in `test/unit/movements/lock-plan.test.ts`, reusing `planLocks` over the original's entries.
+- [x] Test first in `test/unit/movements/reversal-rules.test.ts` (REV-R06, REV-R08 to REV-R11, REV-R22): steps 5 to 8 of section 1.4 in order, `frozen` passing and `closed` failing, funds checked on the accounts the reversal debits only, and the balance limit on those it credits; then `src/modules/movements/domain/reversal-rules.ts`.
+- [x] Test first in `test/integration/reversals/reverse-use-case.test.ts` (REV-R01, REV-R02, REV-R15, REV-R18): reversing a deposit, a withdrawal and a transfer appends the negated entries, changes the customer balances, leaves the original's rows unchanged and writes one audit record with the reason; an unknown id is not found and a reversal is not reversible; then `reverse.ts` and the lookup of the original in `kysely-movements.ts`.
+- [x] Test first in the same file (REV-R05, REV-R06): with the existing-reversal check skipped through the hook point, the hook records the skip and the `cause` of the `AlreadyReversed` the ledger writer threw for the second reversal's insert (23505 on `transactions_reversed_transaction_id_key`), and the use case ends with `AlreadyReversed`, not an internal error; then the hook point in `reverse.ts` and the mapping in `kysely-ledger.ts`.
+- [x] Test first in `test/integration/reversals/reverse-lock-wait.test.ts` (REV-R19, REV-R20): with a session holding A1's row, a reversal ends with `AccountLockTimeout` and writes nothing; a reversal and a transfer racing on the same accounts never let a balance go below zero.
 
 ## 07-idempotency
 

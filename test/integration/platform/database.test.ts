@@ -202,3 +202,45 @@ describe('Kysely instance', () => {
     expect(after.rows[0]?.pid).not.toBe(pid);
   });
 });
+
+describe('pool clients checked out outside the transaction runner', () => {
+  it('SYS-R11 survives the loss of a checked-out connection and logs it at warn with the SQLSTATE only', async () => {
+    const url = requireEnv('TEST_DATABASE_URL');
+    const lines: LogLine[] = [];
+    const pool = createPool({ connectionString: url, max: 1, logger: capturingLogger(lines) });
+    try {
+      const client = await pool.connect();
+      const before = await client.query<{ pid: number }>('SELECT pg_backend_pid() AS pid');
+      const pid = before.rows[0]?.pid;
+
+      // The runtime role may end its own sessions; the client stays checked out meanwhile.
+      const killer = new pg.Client({ connectionString: url });
+      await killer.connect();
+      try {
+        await killer.query('SELECT pg_terminate_backend($1)', [pid]);
+      } finally {
+        await killer.end();
+      }
+      const deadline = Date.now() + 5000;
+      while (lines.length === 0 && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      client.release();
+
+      expect(lines.length).toBeGreaterThan(0);
+      expect(lines[0]).toEqual({
+        fields: { sqlstate: '57P01' },
+        message: 'database connection lost',
+      });
+      expect(lines.every((line) => Object.keys(line.fields).join() === 'sqlstate')).toBe(true);
+      const logged = JSON.stringify(lines);
+      const { password, host, username } = new URL(url);
+      for (const secret of [url, password, host, username]) expect(logged).not.toContain(secret);
+
+      const after = await pool.query<{ pid: number }>('SELECT pg_backend_pid() AS pid');
+      expect(after.rows[0]?.pid).not.toBe(pid);
+    } finally {
+      await pool.end();
+    }
+  });
+});

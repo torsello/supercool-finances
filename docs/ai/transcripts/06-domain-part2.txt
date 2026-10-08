@@ -1,0 +1,1596 @@
+ ▐▛███▛█   Claude Code v2.1.292
+▝▜██████▀  Opus 5.5 · Claude Max
+ ▝▝   ▝▝   ~/supercool-finances
+
+▎ [✻] [✻] [✻] · Share Claude Code and earn $10 in usage credits · /passes
+
+❯ /clear                                                                        
+
+❯ /effort high                                                                  
+  ⎿  Set effort level to high (saved as your default for new sessions):
+     Comprehensive implementation with extensive testing and documentation
+
+❯ Implement the 06-domain tasks of specs/004-reversals, and every other         
+  06-domain task still unticked in specs/*/tasks.md, tests first, as their      
+  plans describe them. The specs, ADRs, plans and tasks are the source; where   
+  this prompt and a plan differ, the plan wins, and tell me. Tick only          
+  06-domain tasks. Run npm run check, npm run test:integration and npm run      
+  trace.                                                                        
+
+⏺ Bash(ls specs/ && grep -n "06-domain\|^- \[" specs/*/tasks.md | head -150 &&
+      git log --oneline -8)
+  ⎿  000-overview
+     001-accounts
+     002-ledger
+     … +426 lines (ctrl+o to expand)
+
+⏺ Bash(for f in specs/*/tasks.md; do echo "=== $f"; awk '/^## /{sec=$0} /^- \[
+      \]/{print sec" :: "$0}' $f | grep "06-domain" ; done; git log --oneline
+      -8; git status)
+  ⎿  === specs/000-overview/tasks.md
+     === specs/001-accounts/tasks.md
+     === specs/002-ledger/tasks.md
+     … +40 lines (ctrl+o to expand)
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+⏺ Only the six 06-domain tasks of spec 004 are still unticked; I'm reading the
+  existing ledger and movements code before writing the tests.
+
+⏺ Bash(for f in src/modules/ledger/domain/ledger-transaction.ts
+      src/modules/ledger/domain/errors.ts src/modules/ledger/domain/money.ts
+      src/modules/ledger/index.ts src/…)
+  ⎿  === src/modules/ledger/domain/ledger-transaction.ts
+     import type { CurrencyCode } from './currency.js';
+     import {
+     … +431 lines (ctrl+o to expand)
+
+⏺ Bash(for f in src/modules/movements/index.ts src/modules/movements/domain/*.ts
+      src/modules/movements/application/*.ts
+      src/modules/movements/adapters/persistence/kyse…)
+  ⎿  === src/modules/movements/index.ts
+     // The movements module's public API (plan 000 section 2): domain type
+     s, errors, use cases and
+     … +731 lines (ctrl+o to expand)
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Bash(sed -n 55,125p specs/002-ledger/plan.md; sed -n 140,230p
+      specs/000-overview/plan.md)
+  ⎿  - **Append-only** (LED-R16). `ledger_refuse_change()` raises on `BEFOR
+     E UPDATE OR DELETE ... FOR EACH ROW` and `BEFORE TRUNCATE ... FOR EACH
+      STATEMENT`, on both tables. Triggers apply to the owner role too; onl
+     … +424 lines (ctrl+o to expand)
+
+⏺ Bash(sed -n 64,80p specs/002-ledger/plan.md | cut -c1-1500; echo ----; sed -n
+      160,226p specs/000-overview/plan.md | cut -c1-1200)
+  ⎿  ## 3. Domain
+
+     - **`LedgerTransaction.create({kind, currency, entries, reversedTransa
+     … +316 lines (ctrl+o to expand)
+
+  Read 2 files (ctrl+o to expand)
+
+⏺ Bash(cat test/unit/movements/lock-plan.test.ts; sed -n 1,80p
+      test/unit/movements/movement-rules.test.ts; sed -n 1,60p
+      test/unit/ledger/ledger-transaction.test.ts)
+  ⎿  import { describe, expect, it } from 'vitest';
+     import { planLocks } from '../../../src/modules/movements/domain/lock-
+     plan.js';
+     … +174 lines (ctrl+o to expand)
+
+⏺ Now checking the test helpers, lint config and the existing reversal-link
+  test, then I'll write the unit tests first.
+
+⏺ Bash(grep -n "export" test/support/db.ts test/support/sessions.ts && sed -n
+      1,200p test/support/sessions.ts | grep -n "lockRow\|mode\|FOR " ; cat
+      eslint.config.* | h…)
+  ⎿  test/support/db.ts:23:export function runtimePool(): pg.Pool {
+     test/support/db.ts:33:export function ownerPool(): pg.Pool {
+     test/support/db.ts:42:export async function closePools(): Promise<void
+     … +171 lines (ctrl+o to expand)
+
+⏺ Bash(sed -n 95,170p test/support/db.ts; cat tsconfig.json; head -30
+      test/integration/movements/deposit-use-case.test.ts; grep -n "it("
+      test/integration/movements/mov…)
+  ⎿    if (balance === undefined || balance === null)
+         throw new Error(`No customer account ${accountId}`);
+       return balance;
+     … +126 lines (ctrl+o to expand)
+
+⏺ Writing the first test (REV-AC03) now.
+
+⏺ Write(test/unit/movements/reversal.test.ts)
+  ⎿  Wrote 124 lines to test/unit/movements/reversal.test.ts
+       1 import { describe, expect, it } from 'vitest';
+       2 import {
+       3   LedgerTransaction,
+       4   reversalOf,
+       5   TransactionNotReversible,
+       6   type RecordedTransaction,
+       7 } from '../../../src/modules/ledger/index.js';
+       8 
+       9 const A1 = {
+      10   id: '0192f0c4-0000-7000-8000-0000000000a1',
+     … +127 lines (ctrl+o to expand)
+
+⏺ Bash(npx vitest run --project unit test/unit/movements/reversal.test.ts 2>&1 |
+      tail -15)
+  ⎿      109|   it('REV-R01 only a reversal carries a link, and every rever
+     sal has o…
+         110|     const entries = LedgerTransaction.deposit(A1, S, 5n).entr
+     … +17 lines (ctrl+o to expand)
+
+⏺ Failing as expected. Now the domain code: errors first.
+
+⏺ Bash(cat >> src/modules/ledger/domain/errors.ts <<'EOF'…)
+  ⎿  Updated src/modules/ledger/domain/errors.ts (+29 -0)
+       86      super('amounts and balances are bigint minor units');
+       87    }
+       88  }
+       89 +                                                              
+       90 +/** Reversing a transaction of kind `reversal` (REV-R07): 422 
+          +`/problems/transaction-not-reversible`. */                    
+       91 +export class TransactionNotReversible extends Error {         
+       92 +  override readonly name = 'TransactionNotReversible';        
+       93 +                                                              
+       94 +  constructor() {                                             
+       95 +    super('a reversal cannot be reversed');                   
+       96 +  }                                                           
+       97 +}                                                             
+       98 +                                                              
+       99 +/** The database's refusal of a second reversal: SQLSTATE and 
+          +constraint, never the driver error. */                        
+      100 +export interface AlreadyReversedCause {                       
+      101 +  sqlstate: string;                                           
+      102 +  constraint: string;                                         
+      103 +}                                                             
+      104 +                                                              
+      105 +/**                                                           
+      106 + * The transaction already has a reversal (REV-R06): 409 `/pro
+          +blems/already-reversed`. Found by the                         
+      107 + * check after the locks, without a cause, or raised by the un
+          +ique constraint of REV-R05 at the                             
+      108 + * reversal's insert, with its SQLSTATE and constraint as `cau
+          +se` (plan 002 section 4).                                     
+      109 + */                                                           
+      110 +export class AlreadyReversed extends Error {                  
+      111 +  override readonly name = 'AlreadyReversed';                 
+      112 +  declare readonly cause: AlreadyReversedCause | undefined;   
+      113 +                                                              
+      114 +  constructor(options?: { cause: AlreadyReversedCause }) {    
+      115 +    super('the transaction already has a reversal', options); 
+      116 +  }                                                           
+      117 +}                                                             
+
+⏺ Bash(python3 - <<'EOF'
+      p='src/modules/ledger/domain/ledger-transaction.ts'…)
+  ⎿   RUN  v5.0.3 /Users/matiastorsello/supercool-finances
+     … +5 lines (ctrl+o to expand)
+  ⎿  Updated src/modules/ledger/domain/ledger-transaction.ts (+41 -2)
+       5    MixedCurrencies,
+       6    TooFewEntries,
+       7    TransactionCurrencyMismatch,
+       8 +  TransactionNotReversible,                                    
+       9    Unbalanced,
+      10    ZeroAmount,
+      11  } from './errors.js';
+     ...
+      32    currency: CurrencyCode;
+      33  }
+      34  
+      35 +/** A transaction as the ledger recorded it, under the id it wa
+         +s written with. */                                             
+      36 +export interface RecordedTransaction {                         
+      37 +  id: string;                                                  
+      38 +  kind: TransactionKind;                                       
+      39 +  currency: CurrencyCode;                                      
+      40 +  entries: readonly LedgerEntryInput[];                        
+      41 +}                                                              
+      42 +                                                               
+      43  export interface BalanceChange {
+      44    accountId: string;
+      45    change: bigint;
+     ...
+      73    readonly kind: TransactionKind;
+      74    readonly currency: CurrencyCode;
+      75    readonly entries: readonly LedgerEntry[];
+      76 +  /** The transaction a reversal reverses; `null` for every oth
+         +er kind (REV-R01). */                                          
+      77 +  readonly reversedTransactionId: string | null;               
+      78  
+      68 -  private constructor(kind: TransactionKind, currency: Currency
+         -Code, entries: LedgerEntry[]) {                                
+      79 +  private constructor(                                         
+      80 +    kind: TransactionKind,                                     
+      81 +    currency: CurrencyCode,                                    
+      82 +    entries: LedgerEntry[],                                    
+      83 +    reversedTransactionId: string | null,                      
+      84 +  ) {                                                          
+      85      this.kind = kind;
+      86      this.currency = currency;
+      87      this.entries = Object.freeze(entries);
+      88 +    this.reversedTransactionId = reversedTransactionId;        
+      89    }
+      90  
+     … 41 more lines (ctrl+o to expand)
+  ⎿  Updated src/modules/ledger/index.ts (+5 -0)
+      2  // The composition root imports the adapters directly, so no oth
+         er module loads Kysely through here.
+      3  export { CURRENCIES, findCurrency, type Currency, type CurrencyC
+         ode } from './domain/currency.js';
+      4  export {
+      5 +  AlreadyReversed,                                              
+      6    AmountOutOfRange,
+      7    BalanceLimitExceeded,
+      8    EntryCurrencyMismatch,
+     ...
+      10    MixedCurrencies,
+      11    TooFewEntries,
+      12    TransactionCurrencyMismatch,
+      13 +  TransactionNotReversible,                                    
+      14    Unbalanced,
+      15    ZeroAmount,
+      16 +  type AlreadyReversedCause,                                   
+      17  } from './domain/errors.js';
+      18  export {
+      19    LedgerTransaction,
+      20 +  reversalOf,                                                  
+      21    type AccountKind,
+      22    type AccountRef,
+      23    type BalanceChange,
+      24    type LedgerEntry,
+      25    type LedgerEntryInput,
+      26 +  type RecordedTransaction,                                    
+      27    type TransactionKind,
+      28  } from './domain/ledger-transaction.js';
+      29  export { credit, debit, MAX_MINOR_UNITS, toAmount, type Amount 
+          } from './domain/money.js';
+⏺ Task 1 passes. Task 2: REV-AC20 in the lock-plan test.
+
+⏺ Bash(python3 - <<'EOF'
+      p='test/unit/movements/lock-plan.test.ts'…)
+  ⎿   Test Files  1 passed (1)
+           Tests  3 passed (3)
+        Start at  13:13:14
+     … +2 lines (ctrl+o to expand)
+  ⎿  Updated test/unit/movements/lock-plan.test.ts (+43 -0)
+      1  import { describe, expect, it } from 'vitest';
+      2 +import {                                                        
+      3 +  LedgerTransaction,                                            
+      4 +  reversalOf,                                                   
+      5 +  type AccountRef,                                              
+      6 +} from '../../../src/modules/ledger/index.js';                  
+      7  import { planLocks } from '../../../src/modules/movements/domain
+         /lock-plan.js';
+      8  
+      9  const a = '018f2a00-0000-7000-8000-00000000000a';
+     ...
+      14  const customer = (id: string) => ({ id, kind: 'customer' as con
+          st });
+      15  const settlement = { id: S, kind: 'system' as const };
+      16  
+      17 +const ref = (id: string): AccountRef => ({ id, kind: 'customer'
+         +, currency: 'EUR' });                                          
+      18 +const settlementRef: AccountRef = { id: S, kind: 'system', curr
+         +ency: 'EUR' };                                                 
+      19 +                                                               
+      20 +/** The lock plan of reversing `original`: `planLocks` over the
+         + accounts of the original's entries. */                        
+      21 +function reversalPlan(original: LedgerTransaction): string[] { 
+      22 +  const id = '018f2a00-0000-7000-8000-0000000000f0';           
+      23 +  // Built first, as the use case does, so a plan exists only f
+         +or a reversible original.                                      
+      24 +  reversalOf({ id, kind: original.kind, currency: original.curr
+         +ency, entries: original.entries });                            
+      25 +  return planLocks(                                            
+      26 +    original.entries.map((entry) => ({ id: entry.accountId, kin
+         +d: entry.accountKind })),                                      
+      27 +  );                                                           
+      28 +}                                                              
+      29 +                                                               
+      30  describe('lock plan', () => {
+      31    it('MOV-AC15 locks customer accounts in ascending canonical l
+          owercase order, never a system account', () => {
+      32      // As plain strings the uppercase id sorts first; in canoni
+          cal form a comes before b.
+     ...
+      52      expect(planLocks([customer(b), customer(B), customer(a), cu
+          stomer(a)])).toEqual([a, b]);
+      53      expect(planLocks([])).toEqual([]);
+      54    });
+      55 +                                                               
+      56 +  it('REV-AC20 plans the locks of a reversal like a transfer: c
+         +ustomer accounts of the original, ascending, lowercase, never S
+         +', () => {                                                     
+      57 +    const plans = {                                            
+      58 +      reversalOfTransferFromUpperBToA: reversalPlan(LedgerTrans
+         +action.transfer(ref(B), ref(a), 5n)),                          
+      59 +      reversalOfTransferFromAToB: reversalPlan(LedgerTransactio
+         +n.transfer(ref(a), ref(b), 5n)),                               
+      60 +      reversalOfDepositIntoUpperB: reversalPlan(               
+      61 +        LedgerTransaction.deposit(ref(B), settlementRef, 5n),  
+      62 +      ),                                                       
+      63 +      reversalOfWithdrawalFromA: reversalPlan(                 
+     … 17 more lines (ctrl+o to expand)
+  ⎿  Updated test/unit/movements/reversal.test.ts (+9 -4)
+      25  
+      26  /** A domain transaction as the ledger recorded it, under the i
+          d it was written with. */
+      27  function recorded(id: string, transaction: LedgerTransaction): 
+          RecordedTransaction {
+      28 -  return { id, kind: transaction.kind, currency: transaction.cu
+         -rrency, entries: transaction.entries };                        
+      28 +  return {                                                     
+      29 +    id,                                                        
+      30 +    kind: transaction.kind,                                    
+      31 +    currency: transaction.currency,                            
+      32 +    entries: transaction.entries,                              
+      33 +  };                                                           
+      34  }
+      35  
+      36  /** Everything a transaction holds, as plain data, to compare b
+          efore and after a call. */
+     ...
+      114    it('REV-R01 only a reversal carries a link, and every revers
+           al has one', () => {
+      115      const entries = LedgerTransaction.deposit(A1, S, 5n).entri
+           es;
+      116      expect(LedgerTransaction.deposit(A1, S, 5n).reversedTransa
+           ctionId).toBeNull();
+      112 -    expect(() =>                                              
+      113 -      LedgerTransaction.create({ kind: 'reversal', currency: '
+          -EUR', entries }),                                             
+      114 -    ).toThrow(RangeError);                                    
+      117 +    expect(() => LedgerTransaction.create({ kind: 'reversal', 
+          +currency: 'EUR', entries })).toThrow(                         
+      118 +      RangeError,                                             
+      119 +    );                                                        
+      120      expect(() =>
+      121        LedgerTransaction.create({
+      122          kind: 'deposit',
+
+⏺ REV-AC20 passes as soon as it is written, since it only reuses the existing
+  planLocks. Task 3: the reversal rules test.
+
+⏺ Write(test/unit/movements/reversal-rules.test.ts)
+  ⎿  Wrote 141 lines to test/unit/movements/reversal-rules.test.ts
+       1 import { describe, expect, it } from 'vitest';
+       2 import { AccountNotActive, type AccountStatus } from '../../../s
+         rc/modules/accounts/index.js';
+       4   AlreadyReversed,
+       5   BalanceLimitExceeded,
+       6   LedgerTransaction,
+       7   reversalOf,
+       9 } from '../../../src/modules/ledger/index.js';
+      10 import { InsufficientFundsForReversal } from '../../../src/modul
+         es/movements/domain/errors.js';
+     … +158 lines (ctrl+o to expand)
+
+⏺ Bash(npx vitest run --project unit test/unit/movements/reversal-rules.test.ts
+      2>&1 | grep -E "Error|failed|passed" | head -5
+      cat >> src/modules/movements/domain/erro…)
+  ⎿  Error: Cannot find module '../../../src/modules/movements/domain/rever
+     sal-rules.js' imported from /Users/matiastorsello/supercool-finances/t
+     est/unit/movements/reversal-rules.test.ts
+     … +3 lines (ctrl+o to expand)
+  ⎿  Updated src/modules/movements/domain/errors.ts (+12 -0)
+      35      super('the destination cannot receive this transfer');
+      36    }
+      37  }
+      38 +                                                               
+      39 +/**                                                            
+      40 + * A reversal would debit a customer account by more than its b
+         +alance (REV-R08): 422                                          
+      41 + * `/problems/insufficient-funds-for-reversal`.                
+      42 + */                                                            
+      43 +export class InsufficientFundsForReversal extends Error {      
+      44 +  override readonly name = 'InsufficientFundsForReversal';     
+      45 +                                                               
+      46 +  constructor() {                                              
+      47 +    super('the balance does not cover the reversal');          
+      48 +  }                                                            
+      49 +}                                                              
+  ⎿  Created src/modules/movements/domain/reversal-rules.ts (+52 -0)
+       1 +import { AccountNotActive, type AccountStatus } from '../../acc
+         +ounts/index.js';                                               
+       2 +import {                                                       
+       3 +  AlreadyReversed,                                             
+       4 +  credit,                                                      
+       5 +  toAmount,                                                    
+       6 +  type BalanceChange,                                          
+       7 +  type LedgerTransaction,                                      
+       8 +} from '../../ledger/index.js';                                
+       9 +import { InsufficientFundsForReversal } from './errors.js';    
+      10 +                                                               
+      11 +/** A customer account of the reversal, as read under its row l
+         +ock (REV-R18). */                                              
+      12 +export interface ReversalAccount {                             
+      13 +  status: AccountStatus;                                       
+      14 +  balance: bigint;                                             
+      15 +}                                                              
+      16 +                                                               
+      17 +/** What steps 5 to 8 read after every lock is held. */        
+      18 +export interface ReversalState {                               
+      19 +  /** Whether the original already has a reversal (step 5). */ 
+      20 +  alreadyReversed: boolean;                                    
+      21 +  /** Every customer account of the original, by canonical id. 
+         +*/                                                             
+      22 +  accounts: ReadonlyMap<string, ReversalAccount>;              
+      23 +}                                                              
+      24 +                                                               
+      25 +function lockedRow(state: ReversalState, change: BalanceChange)
+         +: ReversalAccount {                                            
+      26 +  const row = state.accounts.get(change.accountId);            
+      27 +  if (row === undefined) throw new Error(`customer account ${ch
+         +ange.accountId} was not locked`);                              
+      28 +  return row;                                                  
+      29 +}                                                              
+      30 +                                                               
+      31 +/**                                                            
+      32 + * Steps 5 to 8 of section 1.4 of spec 004, in order, each over
+         + every customer account ascending                              
+      33 + * by id, and throws the first failure (REV-R22): an existing r
+         +eversal (REV-R06); a `closed`                                  
+      34 + * account, while `frozen` passes (REV-R09, REV-R10); the funds
+         + of each account the reversal                                  
+      35 + * debits (REV-R08); the balance limit of each account it credi
+         +ts (REV-R11). Each account's change                            
+      36 + * is its entry sum in the reversal: the negated sum of its ent
+         +ries in the original.                                          
+      37 + */                                                            
+      38 +export function checkReversal(reversal: LedgerTransaction, stat
+         +e: ReversalState): void {                                      
+      39 +  if (state.alreadyReversed) throw new AlreadyReversed();      
+      40 +  const changes = reversal.balanceChanges();                   
+     … 12 more lines (ctrl+o to expand)
+  ⎿  Updated src/modules/movements/index.ts (+11 -1)
+       1  // The movements module's public API (plan 000 section 2): doma
+          in types, errors, use cases and
+       2  // ports. The composition root imports the adapters directly.
+       3 -export { CurrencyMismatch, DestinationUnavailable, Insufficient
+         -Funds } from './domain/errors.js';                             
+       3 +export {                                                       
+       4 +  CurrencyMismatch,                                            
+       5 +  DestinationUnavailable,                                      
+       6 +  InsufficientFunds,                                           
+       7 +  InsufficientFundsForReversal,                                
+       8 +} from './domain/errors.js';                                   
+       9  export { planLocks } from './domain/lock-plan.js';
+      10 +export {                                                       
+      11 +  checkReversal,                                               
+      12 +  type ReversalAccount,                                        
+      13 +  type ReversalState,                                          
+      14 +} from './domain/reversal-rules.js';                           
+      15  export {
+      16    depositTransaction,
+      17    transferTransaction,
+
+⏺ Unit tasks 1–3 pass. Now the integration test for the use case (tasks 4 and
+  5), written before reverse.ts.
+
+⏺ Write(test/integration/reversals/reverse-use-case.test.ts)
+  ⎿  Wrote 283 lines to test/integration/reversals/reverse-use-case.test.ts
+       1 import { randomUUID } from 'node:crypto';
+       2 import { afterAll, describe, expect, it } from 'vitest';
+       3 import { NotFound } from '../../../src/modules/accounts/index.js
+         ';
+       4 import {
+       6   TransactionNotReversible,
+       7   type AlreadyReversedCause,
+       8 } from '../../../src/modules/ledger/index.js';
+       9 import {
+      10   deposit,
+     … +316 lines (ctrl+o to expand)
+
+⏺ Bash(docker compose ps --format '{{.Service}} {{.State}}' 2>&1; npx vitest run
+      --project integration test/integration/reversals/reverse-use-case.test.ts
+      2>&1 | grep…)
+  ⎿  postgres running
+     redis running
+      ❯ |integration| test/integration/reversals/reverse-use-case.test.ts (
+     … +5 lines (ctrl+o to expand)
+
+⏺ Failing as expected. Now the ports, adapters and reverse.ts.
+
+⏺ Bash(python3 - <<'EOF'
+      import re…)
+  ⎿  32:  AppendedTransaction,
+  ⎿  Updated src/modules/movements/application/ports.ts (+24 -4)
+       1  import type { AccountStatus } from '../../accounts/index.js';
+       2 -import type { CurrencyCode, LedgerWriter, TransactionKind } fro
+         -m '../../ledger/index.js';                                     
+       2 +import type {                                                  
+       3 +  CurrencyCode,                                                
+       4 +  LedgerWriter,                                                
+       5 +  RecordedTransaction,                                         
+       6 +  TransactionKind,                                             
+       7 +} from '../../ledger/index.js';                                
+       8  
+       9  /** The columns of an account that never change, read without a
+           lock (plan 003 section 3). */
+      10  export interface AccountLookup {
+     ...
+      35    lock(id: string): Promise<LockedAccount | undefined>;
+      36  }
+      37  
+      33 -/** The audit record of a movement (MOV-R24). */               
+      34 -export interface MovementAuditRecord {                         
+      38 +interface AuditRecordBase {                                    
+      39    actorId: string;
+      40    actorRole: 'customer' | 'operator';
+      37 -  action: 'deposit' | 'withdrawal' | 'transfer';               
+      41    /** The customer accounts involved; the settlement account fo
+          llows from the action. */
+      42    accountIds: readonly string[];
+      43    transactionId: string;
+      44    requestId: string;
+      45  }
+      46  
+      47 +/** The ledger reads of a reversal (plan 004 section 3), withou
+         +t locks. */                                                    
+      48 +export interface TransactionLookup {                           
+      49 +  /**                                                          
+      50 +   * Step 6: a transaction with its entries, each with its acco
+         +unt's kind and currency, in the                                
+      51 +   * order they were written; a transaction and its entries nev
+         +er change.                                                     
+      52 +   */                                                          
+      53 +  findTransaction(id: string): Promise<RecordedTransaction | un
+         +defined>;                                                      
+      54 +  /** Step 7, after every lock is held: the id of the transacti
+         +on's reversal, if it has one. */                               
+      55 +  findReversalOf(id: string): Promise<string | undefined>;     
+      56 +}                                                              
+      57 +                                                               
+      58 +/** The audit record of a movement (MOV-R24), or of a reversal 
+         +with its reason (REV-R15). */                                  
+      59 +export type MovementAuditRecord =                              
+      60 +  | (AuditRecordBase & { action: 'deposit' | 'withdrawal' | 'tr
+         +ansfer' })                                                     
+     … 12 more lines (ctrl+o to expand)
+  ⎿  Updated src/modules/movements/application/results.ts (+11 -0)
+      14    accountId: string;
+      15    balance: bigint;
+      16  }
+      17 +                                                               
+      18 +/** A reversal that was applied (section 1.3 of spec 004): no b
+         +alance and no reason (REV-R16). */                             
+      19 +export interface ReversalResult {                              
+      20 +  transactionId: string;                                       
+      21 +  kind: 'reversal';                                            
+      22 +  /** The original's amount. */                                
+      23 +  amount: bigint;                                              
+      24 +  currency: CurrencyCode;                                      
+      25 +  createdAt: string;                                           
+      26 +  reversedTransactionId: string;                               
+      27 +}                                                              
+  ⎿  Created src/modules/movements/application/reverse.ts (+106 -0)
+        1 +import { NotFound } from '../../accounts/index.js';           
+        2 +import {                                                      
+        3 +  AlreadyReversed,                                            
+        4 +  reversalOf,                                                 
+        5 +  type AlreadyReversedCause,                                  
+        6 +  type AppendedTransaction,                                   
+        7 +  type LedgerTransaction,                                     
+        8 +} from '../../ledger/index.js';                               
+        9 +import { checkReversal } from '../domain/reversal-rules.js';  
+       10 +import type { MovementSettings, MovementTransaction } from './
+          +ports.js';                                                    
+       11 +import type { ReversalResult } from './results.js';           
+       12 +import { lockAccounts, parseUuid } from './steps.js';         
+       13 +                                                              
+       14 +export interface ReverseCommand {                             
+       15 +  /** The id from the path, not yet parsed. */                
+       16 +  transactionId: string;                                      
+       17 +  /** Validated at the HTTP edge (REV-R14); stored exactly as 
+          +sent, in the audit record only. */                            
+       18 +  reason: string;                                             
+       19 +  actor: { id: string; role: 'operator' };                    
+       20 +  requestId: string;                                          
+       21 +}                                                             
+       22 +                                                              
+       23 +/**                                                           
+       24 + * The hook point of the `skip-existing-reversal-check` test s
+          +eam (plan 000 section 8). Only the                            
+       25 + * test app passes it; the production composition root never d
+          +oes.                                                          
+       26 + */                                                           
+       27 +export interface SkipExistingReversalCheck {                  
+       28 +  /** Called in place of step 5 of section 1.4 of spec 004, wh
+          +ich is then skipped. */                                       
+       29 +  skipped(originalId: string): void;                          
+       30 +  /** Called with the `cause` of the `AlreadyReversed` the led
+          +ger writer threw for the insert. */                           
+       31 +  insertRefused(cause: AlreadyReversedCause | undefined): void
+          +;                                                             
+       32 +}                                                             
+       33 +                                                              
+       34 +export interface ReverseHooks {                               
+       35 +  skipExistingReversalCheck?: SkipExistingReversalCheck;      
+       36 +}                                                             
+       37 +                                                              
+       38 +async function append(                                        
+       39 +  tx: MovementTransaction,                                    
+       40 +  reversal: LedgerTransaction,                                
+     … 66 more lines (ctrl+o to expand)
+  ⎿  Updated src/modules/movements/application/steps.ts (+1 -1)
+      21  export async function lockAccounts(
+      22    tx: MovementTransaction,
+      23    settings: MovementSettings,
+      24 -  accounts: readonly AccountLookup[],                          
+      24 +  accounts: readonly Pick<AccountLookup, 'id' | 'kind'>[],     
+      25  ): Promise<Map<string, LockedAccount>> {
+      26    await tx.setLockTimeout(settings.accountLockTimeoutMs);
+      27    const locked = new Map<string, LockedAccount>();
+  ⎿  Updated src/modules/movements/index.ts (+12 -1)
+      22  export { deposit, type DepositCommand } from './application/dep
+          osit.js';
+      23  export { withdraw, type WithdrawCommand } from './application/w
+          ithdraw.js';
+      24  export { transfer, type TransferCommand } from './application/t
+          ransfer.js';
+      25 +export {                                                       
+      26 +  reverse,                                                     
+      27 +  type ReverseCommand,                                         
+      28 +  type ReverseHooks,                                           
+      29 +  type SkipExistingReversalCheck,                              
+      30 +} from './application/reverse.js';                             
+      31  export { getTransaction, type TransactionView } from './applica
+          tion/get-transaction.js';
+      26 -export type { AccountMovementResult, MovementResult } from './a
+         -pplication/results.js';                                        
+      32 +export type {                                                  
+      33 +  AccountMovementResult,                                       
+      34 +  MovementResult,                                              
+      35 +  ReversalResult,                                              
+      36 +} from './application/results.js';                             
+      37  export type {
+      38    AccountLookup,
+      39    AccountWithSettlement,
+     ...
+      46    MovementTransaction,
+      47    MovementTransactions,
+      48    StoredTransaction,
+      49 +  TransactionLookup,                                           
+      50    TransactionQueries,
+      51  } from './application/ports.js';
+
+⏺ Now the adapters: the lookup in kysely-movements.ts and the link plus 23505
+  mapping in kysely-ledger.ts.
+
+⏺ Bash(python3 - <<'EOF'
+      p='src/modules/movements/adapters/persistence/kysely-movements.ts'…)
+  ⎿  65:  reversed_transaction_id: Immutable<string | null, string | null |
+      undefined>;
+     87:  reversed_transaction_id: Immutable<string | null, string | null |
+      undefined>;
+  ⎿  Updated src/modules/ledger/adapters/persistence/kysely-ledger.ts (+30 
+     -2)
+       1  import { sql, type Kysely } from 'kysely';
+       2 +import pg from 'pg';                                           
+       3  import type { Database } from '../../../../platform/db/schema.j
+          s';
+       4  import { clockTimestamp, timestampText } from '../../../../plat
+          form/db/timestamp.js';
+       5  import type { UnitOfWork } from '../../../../platform/db/unit-o
+          f-work.js';
+       6 +import { AlreadyReversed } from '../../domain/errors.js';      
+       7  import type { LedgerTransaction } from '../../domain/ledger-tra
+          nsaction.js';
+       8  import type { AppendedTransaction, BalanceQueries, LedgerWriter
+           } from '../../application/ports.js';
+       9  
+      10 +/** The unique constraint that keeps a transaction reversed at 
+         +most once (REV-R05). */                                        
+      11 +const REVERSAL_LINK_KEY = 'transactions_reversed_transaction_id
+         +_key';                                                         
+      12 +                                                               
+      13 +/**                                                            
+      14 + * A second reversal refused at its insert by the unique constr
+         +aint of REV-R05: `AlreadyReversed`,                            
+      15 + * with only the SQLSTATE and constraint as cause, so no layer 
+         +above reads a `pg` error (REV-R06).                            
+      16 + */                                                            
+      17 +function asAlreadyReversed(error: unknown): unknown {          
+      18 +  if (                                                         
+      19 +    error instanceof pg.DatabaseError &&                       
+      20 +    error.code === '23505' &&                                  
+      21 +    error.constraint === REVERSAL_LINK_KEY                     
+      22 +  ) {                                                          
+      23 +    return new AlreadyReversed({ cause: { sqlstate: error.code,
+         + constraint: error.constraint } });                            
+      24 +  }                                                            
+      25 +  return error;                                                
+      26 +}                                                              
+      27 +                                                               
+      28  /**
+      29   * Step 8 of the movement skeleton on the unit of work's connec
+          tion, after the row locks (plan 002
+      30   * section 4). It reports the end of the entries and of the bal
+          ance changes to the unit of work,
+     ...
+      40      const transactionId = this.ids.next();
+      41      const inserted = await this.uow.db
+      42        .insertInto('transactions')
+      23 -      .values({ id: transactionId, kind: transaction.kind, curr
+         -ency: transaction.currency })                                  
+      43 +      .values({                                                
+      44 +        id: transactionId,                                     
+      45 +        kind: transaction.kind,                                
+      46 +        currency: transaction.currency,                        
+      47 +        reversed_transaction_id: transaction.reversedTransactio
+         +nId,                                                           
+      48 +      })                                                       
+     … 9 more lines (ctrl+o to expand)
+  ⎿  Updated src/modules/movements/adapters/persistence/kysely-movements.ts
+     (+51 -1)
+      3  import type { Database } from '../../../../platform/db/schema.js
+         ';
+      4  import { timestampText } from '../../../../platform/db/timestamp
+         .js';
+      5  import type { UnitOfWork, UnitOfWorkRunner } from '../../../../p
+         latform/db/unit-of-work.js';
+      6 -import type { LedgerWriter } from '../../../ledger/index.js';   
+      6 +import type { LedgerWriter, RecordedTransaction } from '../../..
+        +/ledger/index.js';                                              
+      7  import type {
+      8    AccountLookup,
+      9    AccountWithSettlement,
+     ...
+      13    MovementTransaction,
+      14    MovementTransactions,
+      15    StoredTransaction,
+      16 +  TransactionLookup,                                           
+      17    TransactionQueries,
+      18  } from '../../application/ports.js';
+      19  
+     ...
+       72    }
+       73  }
+       74  
+       75 +/** The ledger reads of a reversal (plan 004 section 3), on th
+          +e executor it is given, without locks. */                     
+       76 +export class KyselyTransactionLookup implements TransactionLoo
+          +kup {                                                         
+       77 +  constructor(private readonly db: Kysely<Database>) {}       
+       78 +                                                              
+       79 +  async findTransaction(id: string): Promise<RecordedTransacti
+          +on | undefined> {                                             
+       80 +    const rows = await this.db                                
+       81 +      .selectFrom('transactions as t')                        
+       82 +      .innerJoin('ledger_entries as e', 'e.transaction_id', 't
+          +.id')                                                         
+       83 +      .innerJoin('accounts as a', 'a.id', 'e.account_id')     
+       84 +      .select([                                               
+       85 +        't.id',                                               
+       86 +        't.kind',                                             
+       87 +        't.currency',                                         
+       88 +        'e.account_id',                                       
+       89 +        'e.amount',                                           
+       90 +        'e.currency as entry_currency',                       
+       91 +        'a.kind as account_kind',                             
+       92 +        'a.currency as account_currency',                     
+       93 +      ])                                                      
+       94 +      .where('t.id', '=', id)                                 
+       95 +      .orderBy('e.id')                                        
+       96 +      .execute();                                             
+     … 36 more lines (ctrl+o to expand)
+
+⏺ Bash(npx vitest run --project integration
+      test/integration/reversals/reverse-use-case.test.ts 2>&1 | grep -E
+      "✓|×|Error|failed|passed|Expected|Received" | head -20)
+  ⎿   ❯ |integration| test/integration/reversals/reverse-use-case.test.ts (
+     5 tests | 1 failed) 154ms
+          × REV-R06 a second reversal found by the check is AlreadyReversed
+     … +5 lines (ctrl+o to expand)
+
+⏺ The property is absent rather than undefined; fixing the assertion.
+
+⏺ Bash(python3 - <<'EOF'
+      p='test/integration/reversals/reverse-use-case.test.ts'…)
+  ⎿   Test Files  2 passed (2)
+           Tests  6 passed (6)
+  ⎿  Updated test/integration/reversals/reverse-use-case.test.ts (+3 -3)
+      238      await depositInto(a1, 1000n);
+      239      const before = await writtenRows();
+      240  
+      241 -    const refused = reverseTransaction(d);                    
+      242 -    await expect(refused).rejects.toBeInstanceOf(AlreadyRevers
+          -ed);                                                          
+      243 -    await expect(refused).rejects.toHaveProperty('cause', unde
+          -fined);                                                       
+      241 +    const refused = await reverseTransaction(d).catch((error: 
+          +unknown) => error);                                           
+      242 +    expect(refused).toBeInstanceOf(AlreadyReversed);          
+      243 +    expect((refused as AlreadyReversed).cause).toBeUndefined()
+          +;                                                             
+      244  
+      245      expect(await writtenRows()).toEqual(before);
+      246      expect(await reversalsOf(d)).toEqual([first.transactionId]
+           );
+
+⏺ Task 6: the lock-wait and race test.
+
+⏺ Write(test/integration/reversals/reverse-lock-wait.test.ts)
+  ⎿  Wrote 134 lines to
+     test/integration/reversals/reverse-lock-wait.test.ts
+       1 import { afterAll, describe, expect, it } from 'vitest';
+         rc/modules/movements/index.js';
+       3 import { InsufficientFundsForReversal } from '../../../src/modul
+         es/movements/index.js';
+         ';
+       5 import { AccountLockTimeout } from '../../../src/platform/db/err
+       6 import {
+       7   balanceOf,
+       8   closePools,
+      10   runtimePool,
+     … +141 lines (ctrl+o to expand)
+
+⏺ Bash(npx prettier --write test/integration/reversals src/modules
+      test/unit/movements >/dev/null && npx vitest run --project integration
+      test/integration/reversals/ 2…)
+  ⎿   Test Files  3 passed (3)
+           Tests  8 passed (8)
+
+⏺ All three reversal test files pass. Tidying a duplicate import, then running
+  the full checks.
+
+⏺ Bash(python3 - <<'EOF'
+      p='test/integration/reversals/reverse-lock-wait.test.ts'…)
+  ⎿  > supercool-finances@0.1.0 check
+     > npm run typecheck && npm run lint && npm run format:check && npm run
+      test
+     … +16 lines (ctrl+o to expand)
+  ⎿  Updated test/integration/reversals/reverse-lock-wait.test.ts (+6 -2)
+       1  import { afterAll, describe, expect, it } from 'vitest';
+       2 -import { InsufficientFunds, reverse, transfer } from '../../../
+         -src/modules/movements/index.js';                               
+       3 -import { InsufficientFundsForReversal } from '../../../src/modu
+         -les/movements/index.js';                                       
+       2 +import {                                                       
+       3 +  InsufficientFunds,                                           
+       4 +  InsufficientFundsForReversal,                                
+       5 +  reverse,                                                     
+       6 +  transfer,                                                    
+       7 +} from '../../../src/modules/movements/index.js';              
+       8  import { createPool } from '../../../src/platform/db/database.j
+          s';
+       9  import { AccountLockTimeout } from '../../../src/platform/db/er
+          rors.js';
+      10  import {
+
+⏺ Bash(python3 - <<'EOF'
+      p='test/integration/reversals/reverse-use-case.test.ts'…)
+  ⎿   ✓ |unit| test/unit/toolchain.test.ts (33 tests) 171ms
+
+      Test Files  19 passed (19)
+     … +7 lines (ctrl+o to expand)
+  ⎿  Updated test/integration/reversals/reverse-use-case.test.ts (+1 -1)
+      57  
+      58  /** Every column of a transaction and of its entries, to prove 
+          a reversal changes none. */
+      59  async function storedRows(transactionId: string): Promise<unkno
+          wn[]> {
+      60 -  const result = await runtimePool().query(                    
+      60 +  const result = await runtimePool().query<Record<string, unkno
+         +wn>>(                                                          
+      61      `SELECT t.*, e.id AS entry_id, e.account_id, e.amount, e.cu
+          rrency AS entry_currency,
+      62              e.created_at AS entry_created_at
+      63       FROM transactions t JOIN ledger_entries e ON e.transaction
+          _id = t.id
+
+⏺ Check is green. Ticking the six 06-domain tasks, then running the integration
+  suite and the trace.
+
+⏺ Bash(python3 - <<'EOF'
+      p='specs/004-reversals/tasks.md'…)
+  ⎿   Test Files  35 passed (35)
+           Tests  110 passed (110)
+     | DEP-AC14 | 008-deployment | Approved | unit | pending | - |
+     … +45 lines (ctrl+o to expand)
+  ⎿  Updated specs/004-reversals/tasks.md (+6 -6)
+      10  
+      11  ## 06-domain
+      12  
+      13 -- [ ] Test first: REV-AC03 in `test/unit/movements/reversal.tes
+         -t.ts`; then `reversalOf` in `src/modules/ledger/domain/ledger-t
+         -ransaction.ts` and `TransactionNotReversible`.                 
+      14 -- [ ] Test first: REV-AC20 in `test/unit/movements/lock-plan.te
+         -st.ts`, reusing `planLocks` over the original's entries.       
+      15 -- [ ] Test first in `test/unit/movements/reversal-rules.test.ts
+         -` (REV-R06, REV-R08 to REV-R11, REV-R22): steps 5 to 8 of secti
+         -on 1.4 in order, `frozen` passing and `closed` failing, funds c
+         -hecked on the accounts the reversal debits only, and the balanc
+         -e limit on those it credits; then `src/modules/movements/domain
+         -/reversal-rules.ts`.                                           
+      16 -- [ ] Test first in `test/integration/reversals/reverse-use-cas
+         -e.test.ts` (REV-R01, REV-R02, REV-R15, REV-R18): reversing a de
+         -posit, a withdrawal and a transfer appends the negated entries,
+         - changes the customer balances, leaves the original's rows unch
+         -anged and writes one audit record with the reason; an unknown i
+         -d is not found and a reversal is not reversible; then `reverse.
+         -ts` and the lookup of the original in `kysely-movements.ts`.   
+      17 -- [ ] Test first in the same file (REV-R05, REV-R06): with the 
+         -existing-reversal check skipped through the hook point, the hoo
+         -k records the skip and the `cause` of the `AlreadyReversed` the
+         - ledger writer threw for the second reversal's insert (23505 on
+         - `transactions_reversed_transaction_id_key`), and the use case 
+         -ends with `AlreadyReversed`, not an internal error; then the ho
+         -ok point in `reverse.ts` and the mapping in `kysely-ledger.ts`.
+      18 -- [ ] Test first in `test/integration/reversals/reverse-lock-wa
+         -it.test.ts` (REV-R19, REV-R20): with a session holding A1's row
+         -, a reversal ends with `AccountLockTimeout` and writes nothing;
+         - a reversal and a transfer racing on the same accounts never le
+         -t a balance go below zero.                                     
+      13 +- [x] Test first: REV-AC03 in `test/unit/movements/reversal.tes
+         +t.ts`; then `reversalOf` in `src/modules/ledger/domain/ledger-t
+         +ransaction.ts` and `TransactionNotReversible`.                 
+      14 +- [x] Test first: REV-AC20 in `test/unit/movements/lock-plan.te
+         +st.ts`, reusing `planLocks` over the original's entries.       
+      15 +- [x] Test first in `test/unit/movements/reversal-rules.test.ts
+         +` (REV-R06, REV-R08 to REV-R11, REV-R22): steps 5 to 8 of secti
+         +on 1.4 in order, `frozen` passing and `closed` failing, funds c
+         +hecked on the accounts the reversal debits only, and the balanc
+         +e limit on those it credits; then `src/modules/movements/domain
+         +/reversal-rules.ts`.                                           
+      16 +- [x] Test first in `test/integration/reversals/reverse-use-cas
+         +e.test.ts` (REV-R01, REV-R02, REV-R15, REV-R18): reversing a de
+         +posit, a withdrawal and a transfer appends the negated entries,
+         + changes the customer balances, leaves the original's rows unch
+         +anged and writes one audit record with the reason; an unknown i
+         +d is not found and a reversal is not reversible; then `reverse.
+         +ts` and the lookup of the original in `kysely-movements.ts`.   
+      17 +- [x] Test first in the same file (REV-R05, REV-R06): with the 
+         +existing-reversal check skipped through the hook point, the hoo
+         +k records the skip and the `cause` of the `AlreadyReversed` the
+         + ledger writer threw for the second reversal's insert (23505 on
+         + `transactions_reversed_transaction_id_key`), and the use case 
+         +ends with `AlreadyReversed`, not an internal error; then the ho
+         +ok point in `reverse.ts` and the mapping in `kysely-ledger.ts`.
+      18 +- [x] Test first in `test/integration/reversals/reverse-lock-wa
+         +it.test.ts` (REV-R19, REV-R20): with a session holding A1's row
+         +, a reversal ends with `AccountLockTimeout` and writes nothing;
+         + a reversal and a transfer racing on the same accounts never le
+         +t a balance go below zero.                                     
+      19  
+      20  ## 07-idempotency
+      21  
+
+⏺ Bash(npm run trace >/dev/null 2>&1; echo "exit $?"; npm run trace 2>&1 | grep
+      -E "REV-AC0?3 |REV-AC20" ; npm run trace -- --require unit,integration
+      >/dev/null 2>&1;…)
+  ⎿  exit 0
+     | REV-AC03 | 004-reversals | Approved, task ticked | unit | covered |
+     test/unit/movements/reversal.test.ts |
+     … +47 lines (ctrl+o to expand)
+
+⏺ I implemented all six 06-domain tasks of spec 004, tests first, and ticked
+  them. They were the only unticked 06-domain tasks in specs/*/tasks.md. npm run
+  check, npm run test:integration (35 files, 110 tests) and npm run trace all
+  pass, including with --require unit,integration. REV-AC03 and REV-AC20 now
+  show as covered. I did not commit.
+
+  What changed
+  - Ledger domain: reversalOf and TransactionNotReversible. AlreadyReversed
+    carries {sqlstate, constraint} as its cause when the database refused the
+    insert. LedgerTransaction now has a reversedTransactionId field.
+  - Movements domain: reversal-rules.ts (checkReversal, steps 5 to 8 in order)
+    and InsufficientFundsForReversal.
+  - Use case: application/reverse.ts, with the optional
+    skip-existing-reversal-check hook. The audit record of a movement can now
+    also be a reversal record, carrying the reversed id and the reason.
+  - Adapters: kysely-movements.ts adds the lookup of the original and the check
+    for an existing reversal. kysely-ledger.ts now writes
+    reversed_transaction_id and maps 23505 on
+    transactions_reversed_transaction_id_key to AlreadyReversed.
+  - Tests: test/unit/movements/reversal.test.ts, reversal-rules.test.ts, the new
+    REV-AC20 case in lock-plan.test.ts, and
+    test/integration/reversals/reverse-use-case.test.ts and
+    reverse-lock-wait.test.ts.
+
+  Where I differ from the plans
+  1. Signature of reversalOf: it takes the original with its id ({id, kind, 
+     currency, entries}), because a domain LedgerTransaction has no id until it
+     is written.
+  2. How the rules get each account's change: checkReversal reads it from the
+     reversal's balanceChanges(). The plan describes negating the original's
+     entries; the result is the same.
+  3. Link check in LedgerTransaction.create: it now throws a RangeError unless a
+     reversal, and only a reversal, has a link. This mirrors the
+     transactions_reversal_link database check, and a REV-R01 unit test covers
+     it. No plan asked for it.
+  4. Lookup SQL: compared with plan 004 section 3, step 6, it adds ORDER BY e.id
+     and reads both the entry's and the account's currency, so the reversal's
+     entries come out in the original's order.
+
+  Worth knowing
+  - The REV-AC20 test and the task-6 tests (lock timeout, and a reversal racing
+    a transfer over 10 runs) passed as soon as I wrote them. REV-AC20 only
+    reuses planLocks, and the code task 6 tests was already written in task 4,
+    so neither failed first.
+
+  What's left for later phases
+  - attachedTestHooks() on the hook point, for SYS-AC24, is left for 08-api.
+  - Running the reversal inside the savepoint and idempotent runner is the
+    07-idempotency task.
+✻ Sautéed for 6m 33s · done 1:16 PM
+
+❯ /audit                                                                        
+  ⎿  No Critical, High or Medium findings. The reversal use case, the ledger writer change and the rest of the phase's money code hold up, and the only findings are four Low ones about test strength and docs.
+
+     Scope: both commits on phase/06-domain since main, plus the uncommitted reversal work (spec 004, 06-domain tasks). I read every changed source file in full, and the reversal, movement and platform tests. The last saved test reports (13:16) show 149 unit and 110 integration tests passing, including every reversal test. I did not run the tests myself.
+
+     Findings
+
+     1. Low · test/integration/reversals/reverse-lock-wait.test.ts:89-91
+     - What: the REV-R19 test only checks that the timeout comes in under 5 s. It never checks that the reversal actually waited the configured 200 ms. The movement and account versions of this test check that minimum using the database clock.
+     - How to trigger: change KyselyMovementAccounts.lock to NOWAIT, or have lockAccounts set a 1 ms timeout. PostgreSQL still raises 55P03, which becomes AccountLockTimeout, so the test still passes.
+     - Impact: a reversal that stops waiting ACCOUNT_LOCK_TIMEOUT_MS goes unnoticed until REV-AC21 in 08-api.
+     - Fix: copy databaseClockMs() from lock-wait-use-case.test.ts and assert >= 200.
+     - AC: REV-R19 (REV-AC21 later).
+
+     2. Low · test/integration/reversals/reverse-lock-wait.test.ts:118-121
+     - What: the REV-R20 race starts the reversal and the transfer with Promise.allSettled but never makes them overlap. Both outcome branches are accepted, so if the two run one after the other the test still passes.
+     - How to trigger: make the reversal skip locking the account it debits. The test only fails when the two calls happen to interleave, which the database's balance >= 0 check then catches.
+     - Impact: catching a lock-order or missing-lock regression is a matter of chance.
+     - Fix: hold B1's row with openLockSession(), start both calls, wait for both backends with waitUntilBlocked, then release the lock. That forces the contention every time.
+     - AC: REV-R20 (REV-AC22 later).
+
+     3. Low · src/modules/movements/application/reverse.ts:34-36, 61
+     - What: the skip-existing-reversal-check hook is passed as an argument to each reverse() call. Plan 000 section 8 says hook points are optional constructor options, and that each component exposes attachedTestHooks().
+     - How to trigger: SYS-AC24 (08-api) must show that the production app's reversal use case has no hook attached. A bare function has no component to ask. Whether production passes the hook would depend on every route call site.
+     - Impact: the production-app half of SYS-AC24 cannot be checked on the reversal use case. The SYS-R37 guarantee becomes a convention instead.
+     - Fix: either wrap reverse in a class or factory that the composition root builds with { skipExistingReversalCheck? } and that exposes attachedTestHooks(), or amend plan 000 section 8.
+     - AC: SYS-R37 (SYS-AC24).
+
+     4. Low · docs/adr/0008-read-committed-with-ordered-pessimistic-row-locks.md:85, 0003-hexagonal-architecture-with-tactical-ddd.md:87, 0021-statement-timeout-function-for-maintenance-scripts.md:82
+     - What: these 06-domain follow-ups are not marked done. ADR-0002, 0006, 0010 and 0011 were updated with "Done in phase 06-domain on 2026-10-08". ADR-0008's line also names SYS-AC16, which plan 000 places in 08-api.
+     - How to trigger: read the ADR follow-ups against the ticked tasks in specs/000-overview/tasks.md.
+     - Impact: the ADRs disagree with the tasks about what this phase delivered.
+     - Fix: mark the lock plan, the runner and the reconcile statement timeout as done. Note that SYS-AC16 itself waits for toProblem in 08-api.
+     - AC: missing AC (docs).
+
+     Deferred, already planned: the key row as first write, the savepoint and stored rejections, the 23505 rollback to savepoint, and 409 vs 503 separation (07-idempotency); routes, reason schema REV-AC16, presenters with millisecond createdAt, toProblem and problem+json, the SYS-AC16 503 mapping, LED-R28 error logging, role and ownership checks at the edge, MAX_AMOUNT_MINOR and ACCOUNT_LOCK_TIMEOUT_MS config, the test-seam list and attachedTestHooks(), and REV-AC01 to AC25 at API level (08-api); REV-AC23, MOV-AC14, LED-AC15, and the pool acquire, request and shutdown timeouts (09-hardening); OpenAPI, README and runbooks (08/09); the 06-domain transcript row in docs/ai/README.md (/ship).
+
+     - Spec conformance: no findings beyond #3.
+     - Money: no findings.
+     - Transactions and concurrency: no findings.
+     - Idempotency: no findings (all deferred to 07).
+     - Security: no findings.
+     - Failure handling: no findings (timeouts and shutdown deferred to 09/10).
+     - Tests: #1, #2.
+     - Docs drift: #4.
+
+     Follow-ups: 1, 2, 3, 4
+     Verdict: ready to ship
+
+❯ The audit says ready to ship with four Low follow-ups. Fix all four, then     
+  close the phase without another audit:                                        
+  1. test/integration/reversals/reverse-lock-wait.test.ts, REV-R19: also assert 
+  that the reversal waited at least the configured 200 ms, measured with the    
+  database clock as the movement and account versions do (databaseClockMs).     
+  2. The REV-R20 race: force the contention every time. Hold B1's row with      
+  openLockSession(), start the reversal and the transfer, wait until both       
+  backends are blocked with waitUntilBlocked, then release the lock, and assert 
+  the outcome.                                                                  
+  3. Make the reversal a component the composition root builds with an optional 
+  { skipExistingReversalCheck } option and that exposes attachedTestHooks(),    
+  as plan 000 section 8 describes, instead of passing the hook on each call.    
+  Update its tests.                                                             
+  4. Mark as done in phase 06-domain on 2026-10-08, one line each under         
+  Follow-ups and without rewriting the ADRs: the lock plan and the runner in    
+  ADR-0008 (noting that SYS-AC16 itself waits for toProblem in 08-api), the     
+  matching follow-up in ADR-0003, and the reconcile statement timeout in        
+  ADR-0021.                                                                     
+     Change nothing else. Run npm run check, npm run test:integration and npm   
+  run trace.                                                                    
+
+⏺ I'll work through the four follow-ups. First, the session helper and the ADR
+  follow-up sections.
+
+⏺ Bash(cat test/support/sessions.ts; for f in docs/adr/0008-*.md
+      docs/adr/0003-*.md docs/adr/0021-*.md docs/adr/0002-*.md; do echo "===
+      $f"; awk '/^## Follow-ups/,0' $…)
+  ⎿  import pg from 'pg';
+     import { requireEnv } from './env.js';
+     … +94 lines (ctrl+o to expand)
+
+⏺ Bash(grep -n "^#\|Done in phase" docs/adr/0002-*.md docs/adr/0006-*.md | tail
+      -12; for f in docs/adr/0008-*.md docs/adr/0003-*.md docs/adr/0021-*.md; do
+      echo "=== $f…)
+  ⎿  docs/adr/0002-modular-monolith.md:11:## Decision drivers
+     docs/adr/0002-modular-monolith.md:19:## Considered options
+     docs/adr/0002-modular-monolith.md:21:### Option A: Modular monolith
+     … +52 lines (ctrl+o to expand)
+
+⏺ Bash(sed -n '76,90p' docs/adr/0002-*.md; for f in docs/adr/0008-*.md
+      docs/adr/0003-*.md docs/adr/0021-*.md; do echo "=== $f"; sed -n '/^###
+      Follow-ups/,$p' $f; done)
+  ⎿  ### Follow-ups
+
+     - ADR-0003 defines the layers inside each module.
+     … +21 lines (ctrl+o to expand)
+
+⏺ Checking the reconcile script does call the statement timeout before marking
+  ADR-0021.
+
+  Searched for 2 patterns (ctrl+o to expand)
+
+⏺ Item 2 needs both calls to wait on the same row, which means B1 must be the
+  lower id so both lock it first. Checking how test accounts get their ids.
+
+⏺ Bash(sed -n 45,80p test/support/db.ts; sed -n 1,40p
+      src/platform/db/database.ts | grep -n "export\|max\|idle"; cat src/app.ts)
+  ⎿    owner = undefined;
+       await Promise.all(pools.map(async (pool) => await pool?.end()));
+     }
+     … +59 lines (ctrl+o to expand)
+
+⏺ Since test account IDs are random UUIDs, B1 ends up as the lower ID, so both
+  the reversal and transfer lock it first and wait on the session. Now I'll
+  check createPool's idle settings to make sure each racer's backend pid stays
+  stable.
+
+⏺ Bash(sed -n 25,84p src/platform/db/database.ts)
+  ⎿    types.setTypeParser(NUMERIC_ARRAY_OID, 'text', parseStringArray);
+       return types;
+     }
+     … +57 lines (ctrl+o to expand)
+
+⏺ Each racer gets a one-connection pool, and its pid is read again on every run.
+  Item 3 first: turning the reversal into a component.
+
+⏺ Bash(python3 - <<'EOF'
+      p='src/modules/movements/application/reverse.ts'…)
+  ⎿  import { NotFound } from '../../accounts/index.js';
+     import {
+       AlreadyReversed,
+     … +36 lines (ctrl+o to expand)
+  ⎿  Updated src/modules/movements/application/reverse.ts (+70 -51)
+      31    insertRefused(cause: AlreadyReversedCause | undefined): void;
+      32  }
+      33  
+      34 -export interface ReverseHooks {                                
+      34 +/** The test seam this component attaches, as plan 000 section 
+         +8 names it. */                                                 
+      35 +export type ReversalTestHook = 'skip-existing-reversal-check'; 
+      36 +                                                               
+      37 +export interface ReversalsOptions {                            
+      38    skipExistingReversalCheck?: SkipExistingReversalCheck;
+      39  }
+      40  
+     ...
+       52  }
+       53  
+       54  /**
+       52 - * Steps 6 to 8 of a reversal (plan 004 section 3) on the unit
+          - of work it is given: the lookup of                           
+       53 - * the original and its kind, the locks of the original's cust
+          -omer accounts in ascending order,                             
+       54 - * steps 5 to 8 of section 1.4 of spec 004 on the rows read un
+          -der them, then the ledger and the                             
+       55 - * audit record. `MAX_AMOUNT_MINOR` is never read (REV-R12).  
+       55 + * The reversal use case, built once by the composition root. 
+          +Its only option is the hook point of                          
+       56 + * the `skip-existing-reversal-check` seam, which the producti
+          +on composition root never passes;                             
+       57 + * `attachedTestHooks()` names the seams attached, so SYS-AC24
+          + can assert there are none.                                   
+       58   */
+       57 -export async function reverse(                                
+       58 -  tx: MovementTransaction,                                    
+       59 -  settings: MovementSettings,                                 
+       60 -  command: ReverseCommand,                                    
+       61 -  hooks: ReverseHooks = {},                                   
+       62 -): Promise<ReversalResult> {                                  
+       63 -  const id = parseUuid(command.transactionId);                
+       64 -  if (id === undefined) throw new NotFound();                 
+       65 -  const original = await tx.transactions.findTransaction(id); 
+       66 -  if (original === undefined) throw new NotFound();           
+       67 -  // Throws TransactionNotReversible for a reversal, before an
+          -y lock (REV-R07).                                             
+       68 -  const reversal = reversalOf(original);                      
+       59 +export class Reversals {                                      
+       60 +  readonly #skipExistingReversalCheck: SkipExistingReversalChe
+          +ck | undefined;                                               
+       61 +                                                              
+       62 +  constructor(options: ReversalsOptions = {}) {               
+       63 +    this.#skipExistingReversalCheck = options.skipExistingReve
+          +rsalCheck;                                                    
+       64 +  }                                                           
+     … 95 more lines (ctrl+o to expand)
+  ⎿  Updated src/modules/movements/index.ts (+3 -2)
+      23  export { withdraw, type WithdrawCommand } from './application/w
+          ithdraw.js';
+      24  export { transfer, type TransferCommand } from './application/t
+          ransfer.js';
+      25  export {
+      26 -  reverse,                                                     
+      26 +  Reversals,                                                   
+      27 +  type ReversalsOptions,                                       
+      28 +  type ReversalTestHook,                                       
+      29    type ReverseCommand,
+      28 -  type ReverseHooks,                                           
+      30    type SkipExistingReversalCheck,
+      31  } from './application/reverse.js';
+      32  export { getTransaction, type TransactionView } from './applica
+          tion/get-transaction.js';
+
+⏺ Now updating the use-case test to build the component.
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Bash(sed -n 80,98p test/integration/reversals/reverse-use-case.test.ts; sed -n
+      250,290p test/integration/reversals/reverse-use-case.test.ts)
+  ⎿    afterAll(async () => {
+         await closePools();
+       });
+     … +49 lines (ctrl+o to expand)
+
+⏺ Bash(grep -c "SYS-R37" specs/000-overview/spec.md && python3 - <<'EOF'
+      p='test/integration/reversals/reverse-use-case.test.ts'…)
+  ⎿  3
+  ⎿  Updated test/integration/reversals/reverse-use-case.test.ts (+19 -12)
+       8  } from '../../../src/modules/ledger/index.js';
+       9  import {
+      10    deposit,
+      11 -  reverse,                                                     
+      11 +  Reversals,                                                   
+      12    transfer,
+      13    withdraw,
+      14 -  type ReverseHooks,                                           
+      14 +  type ReversalsOptions,                                       
+      15  } from '../../../src/modules/movements/index.js';
+      16  import {
+      17    balanceOf,
+     ...
+      82      await closePools();
+      83    });
+      84  
+      85 -  function reverseTransaction(transactionId: string, hooks?: Re
+         -verseHooks) {                                                  
+      85 +  /** As the production composition root builds it: no test hoo
+         +k. */                                                          
+      86 +  const reversals = new Reversals();                           
+      87 +                                                               
+      88 +  function reverseTransaction(transactionId: string, component:
+         + Reversals = reversals) {                                      
+      89      return movements.run(
+      90        async (tx) =>
+      88 -        await reverse(                                         
+      89 -          tx,                                                  
+      90 -          settings,                                            
+      91 -          { transactionId, reason: REASON, actor: OPERATOR, req
+         -uestId: 'req-reverse' },                                       
+      92 -          hooks,                                               
+      93 -        ),                                                     
+      91 +        await component.reverse(tx, settings, {                
+      92 +          transactionId,                                       
+      93 +          reason: REASON,                                      
+      94 +          actor: OPERATOR,                                     
+      95 +          requestId: 'req-reverse',                            
+      96 +        }),                                                    
+      97      );
+      98    }
+      99  
+     ...
+      250      expect(await balanceOf(a1)).toBe('1000');
+      251    });
+      252  
+     … 24 more lines (ctrl+o to expand)
+
+⏺ Now items 1 and 2 in the lock-wait test.
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Bash(python3 - <<'EOF'
+      p='test/integration/reversals/reverse-lock-wait.test.ts'…)
+  ⎿  Error: Exit code 1
+
+     /Users/matiastorsello/supercool-finances/test/integration/reversals/reverse
+     -lock-wait.test.ts
+       182:51  error  Returning a void expression from an arrow function 
+     shorthand is forbidden. Please add braces to the arrow function  
+     @typescript-eslint/no-confusing-void-expression
+
+     ✖ 1 problem (1 error, 0 warnings)
+       1 error and 0 warnings potentially fixable with the `--fix` option.
+
+⏺ Bash(python3 - <<'EOF'
+      p='test/integration/reversals/reverse-lock-wait.test.ts'…)
+  ⎿       × REV-R20 a reversal and a transfer forced to contend for the sam
+     e accounts never let a balance go below zero 2300ms
+     ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+     … +4 lines (ctrl+o to expand)
+  ⎿  Updated test/integration/reversals/reverse-lock-wait.test.ts (+5 -1)
+      179        }
+      180      } finally {
+      181        await session.close();
+      182 -      await Promise.all(pools.map(async (pool) => await pool.e
+          -nd()));                                                       
+      182 +      await Promise.all(                                      
+      183 +        pools.map(async (pool) => {                           
+      184 +          await pool.end();                                   
+      185 +        }),                                                   
+      186 +      );                                                      
+      187      }
+      188    });
+      189  });
+
+⏺ Found it: PostgreSQL's tuple-lock queuing means the second waiter sees the
+  first waiter as blocker, not the session, which is why waitUntilBlocked
+  stalled until the reversal's 2s timeout. Now checking whether the runtime role
+  has permission to read pg_blocking_pids for that second waiter.
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ I'll write the change directly—each run starts one racer, confirms it blocks
+  via waitUntilBlocked, then starts the second and checks it queues behind the
+  first, alternating order across runs to assert both outcomes.
+
+⏺ Bash(rm /private/tmp/claude-501/-Users-matiastorsello-supercool-finances/397d4
+      81a-35d7-4826-b10a-7962a77bf091/scratchpad/probe.test.ts; sed -n 120,200p
+      test/integrat…)
+  ⎿        createPool({
+             connectionString: requireEnv('TEST_DATABASE_URL'),
+             max: 1,
+     … +67 lines (ctrl+o to expand)
+
+⏺ Bash(python3 - <<'EOF'
+      p='test/integration/reversals/reverse-lock-wait.test.ts'…)  ⎿  Error: Exit code 1
+
+     /Users/matiastorsello/supercool-finances/test/integration/reversals/reverse
+     -lock-wait.test.ts
+       102:7  error  Unnecessary conditional, the types have no overlap  
+     @typescript-eslint/no-unnecessary-condition
+
+     ✖ 1 problem (1 error, 0 warnings)
+
+⏺ Fixing a lint error in the new race test, then rerunning the reversal tests.
+
+⏺ Bash(python3 - <<'EOF'
+      p='test/integration/reversals/reverse-lock-wait.test.ts'…)
+  ⎿   Test Files  3 passed (3)
+           Tests  8 passed (8)
+      Test Files  3 passed (3)
+     … +3 lines (ctrl+o to expand)
+  ⎿  Updated test/integration/reversals/reverse-lock-wait.test.ts (+0 -1)
+       99  /** A call's outcome, so a call started before a failed wait n
+           ever rejects unhandled. */
+      100  async function settle(call: Promise<unknown>): Promise<Promise
+           SettledResult<unknown>> {
+      101    const [outcome] = await Promise.allSettled([call]);
+      102 -  if (outcome === undefined) throw new Error('allSettled retur
+          -ned no outcome');                                             
+      102    return outcome;
+      103  }
+      104  
+
+⏺ The reversal tests pass three runs in a row. Item 4: appending the "Done"
+  lines to the three ADRs.
+
+⏺ Bash(python3 - <<'EOF'
+      import glob…)
+  ⎿  diff --git a/docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md
+      b/docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md
+     index 52adcf0..863ea01 100644
+     … +34 lines (ctrl+o to expand)
+  ⎿  Updated docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md (+1 
+     -0)
+      85  
+      86  - Phase 04-plans names the ports of each module (unit of work, 
+          account lock, repositories, query services, clock, id generator
+          ).
+      87  - Phase 06-domain implements the value objects and aggregates w
+          ith unit tests first.
+      88 +  - Done in phase 06-domain on 2026-10-08.                     
+  ⎿  Updated
+     docs/adr/0008-read-committed-with-ordered-pessimistic-row-locks.md (+1
+     -0)
+      83  
+      84  - Phase 05-schema: the lock-timeout SQL function of SEC-R31.
+      85  - Phase 06-domain: the lock plan as a pure function (MOV-AC15) 
+          and the transaction runner with retry (SYS-AC16).
+      86 +  - Done in phase 06-domain on 2026-10-08; SYS-AC16 itself wait
+         +s for `toProblem` in 08-api.                                   
+      87  - Phase 07-idempotency and 08-api: the ordering of key row inse
+          rt, lock timeout and account locks.
+  ⎿  Updated
+     docs/adr/0021-statement-timeout-function-for-maintenance-scripts.md
+     (+1 -0)
+      80  
+      81  - Phase 05-schema: the function in the migration `app-functions
+          `, with a test of its range, its transaction scope and that `PU
+          BLIC` cannot execute it.
+      82  - Phases 06-domain and 07-idempotency: the reconcile and cleanu
+          p scripts call it with 600000 ms, asserted from their captured 
+          statements.
+      83 +  - Done for the reconcile script in phase 06-domain on 2026-10
+         +-08; the cleanup script follows in 07-idempotency.             
+      84  - Phase 12-infra: re-check the RDS Proxy pinning behaviour toge
+          ther with ADR-0019's follow-up.
+
+⏺ I fixed all four follow-ups. npm run check (149 unit tests), npm run 
+  test:integration (110 tests) and npm run trace pass, including with --require 
+  unit,integration. Item 2 doesn't work exactly as you described it; details
+  below. Nothing is committed.
+
+  1. REV-R19: the test now measures with databaseClockMs(), as the movement
+     version does, and checks the reversal waited at least 200 ms. The under-5 s
+     check is still there.
+  2. REV-R20: each run holds B1's row with openLockSession(). Because test
+     account ids are random, the test makes B1 the lower of the two ids, so the
+     reversal and the transfer both try to lock B1 first.
+     - What differs from your instructions: waitUntilBlocked only works for the
+       first call. PostgreSQL puts a second waiter for the same row behind the
+       first one, so pg_blocking_pids names the first waiter, not the session.
+       Calling waitUntilBlocked on the second call hung until the 2 s lock
+       timeout and failed the test.
+     - What the test does instead: it starts one call and waits with
+       waitUntilBlocked. It then starts the other and waits until that one is
+       queued behind the first, using a small pg_blocking_pids check in the test
+       file. Then it releases the lock.
+     - The outcome: each call runs on its own one-connection pool, so its
+       backend pid is known. The first call always gets B1, so the result of
+       each run is fixed. The order alternates between runs, and the test checks
+       the exact result of each: reversal wins → 5000/0, or transfer wins →
+       4600/400.
+     - I ran the reversal tests three times in a row and they passed each time.
+  3. Reversal component: reverse() is now a Reversals class.
+     - It is built with an optional { skipExistingReversalCheck } and has
+       reverse(tx, settings, command).
+     - attachedTestHooks() returns [], or ['skip-existing-reversal-check'] when
+       the hook is passed.
+     - The tests use one instance built without the hook, and a separate
+       instance with it. The hook test also checks both attachedTestHooks()
+       results and has SYS-R37 added to its name.
+     - src/app.ts doesn't build it yet; the routes and composition root come in
+       08-api.
+  4. ADRs: I added one indented "Done in phase 06-domain on 2026-10-08" line
+     under each follow-up and changed no other text.
+     - ADR-0008 also notes that SYS-AC16 itself waits for toProblem in 08-api.
+     - ADR-0021 marks only the reconcile script as done, because the cleanup
+       script comes in 07-idempotency.
+
+  To close the phase, run /ship. I don't have access to that skill, and
+  AGENTS.md says commits and pushes go through it. It also adds the 06-domain
+  transcript row to docs/ai/README.md.
+
+✻ Cogitated for 4m 20s · done 1:30 PM
+
+❯ /export docs/ai/transcripts/06-domain-part2.txt                               
+  ⎿  Conversation exported to: /Users/matiastorsello/supercool-finances/docs/ai/
+     transcripts/06-domain-part2.txt
+
+❯ /ship close phase 06: reversals domain                                        
+
+⏺ Bash(git branch --show-current)
+  ⎿  phase/06-domain
+
+⏺ Bash(npm run check)
+  ⎿  > supercool-finances@0.1.0 check
+     > npm run typecheck && npm run lint && npm run format:check && npm run
+      test
+     … +51 lines (ctrl+o to expand)
+
+  Listed 1 directory (ctrl+o to expand)
+
+⏺ Bash(npm run infra:up)
+  ⎿  > supercool-finances@0.1.0 infra:up
+     > docker compose up -d --wait postgres redis
+     … +6 lines (ctrl+o to expand)
+
+⏺ Bash(npm run test:integration)
+  ⎿  > supercool-finances@0.1.0 test:integration
+     > vitest run --project integration --reporter=default --reporter=json
+     --outputFile.json=reports/vitest-integration.json
+     … +53 lines (ctrl+o to expand)
+
+⏺ Check and integration tests pass; running the trace gate.
+
+⏺ Bash(npm run trace -- --require unit,integration)
+  ⎿  > supercool-finances@0.1.0 trace
+     > tsx scripts/trace.ts --require unit,integration
+     … +278 lines (ctrl+o to expand)
+
+⏺ Gates pass. Step 3: docs in sync — transcripts and the README index.
+
+  Read 1 file, listed 1 directory (ctrl+o to expand)
+
+⏺ The two 06-domain transcripts have no rows in the index, so I'm adding them.
+
+⏺ Bash(cat >> docs/ai/README.md <<'EOF'
+      | 06 part 1 | 2026-10-08 |
+      [06-domain-part1.txt](transcripts/06-domain-part1.txt) | Domain, part 1:
+      the accounts module, the tr…)
+  ⎿  n-part2.txt](transcripts/06-domain-part2.txt) | Domain, part 2: the re
+     versals domain (`reversalOf`, reversal rules, the `Reversals` use case
+      with its test seam, the 23505 mapping to `AlreadyReversed`), lock-wai
+     … +2 lines (ctrl+o to expand)
+  ⎿  Updated docs/ai/README.md (+2 -0)
+      29  | 03 | 2026-10-08 | [03-adrs.txt](transcripts/03-adrs.txt) | AD
+          Rs: twenty decisions 0001-0020 with the owner's reasoning, alte
+          rnatives and consequences, the ADR index, links to and from eve
+          ry spec, the AWS RDS Proxy pinning source checked, and three au
+          dit rounds and their fixes. |
+      30  | 04 | 2026-10-08 | [04-plans.txt](transcripts/04-plans.txt) | 
+          Plans: plan.md and tasks.md for specs 000-008 with every AC pla
+          ced in a phase and a test file, owner-approved spec fixes, ADR-
+          0021 (statement-timeout function) and ADR-0022 (request timeout
+          : answer first, then roll back), the `yaml` dev dependency, and
+           seven audit rounds and their fixes. |
+      31  | 05 | 2026-10-08 | [05-schema.txt](transcripts/05-schema.txt) 
+          | Schema: the owner and runtime roles, eight SQL migrations (ro
+          le settings, session functions, accounts, ledger with deferred 
+          and append-only triggers, settlement accounts, audit records, i
+          dempotency keys, readiness grant), the Kysely instance with exa
+          ct int8 and numeric strings, test helpers, the database-check A
+          Cs, down migrations proven, and an audit round with six fixes.
+      32 +| 06 part 1 | 2026-10-08 | [06-domain-part1.txt](transcripts/06
+         +-domain-part1.txt) | Domain, part 1: the accounts module, the t
+         +ransaction runner and unit of work, module lint rules, the ledg
+         +er, money movements and reconciliation domain with tests first.
+         + |                                                             
+      33 +| 06 part 2 | 2026-10-08 | [06-domain-part2.txt](transcripts/06
+         +-domain-part2.txt) | Domain, part 2: the reversals domain (`rev
+         +ersalOf`, reversal rules, the `Reversals` use case with its tes
+         +t seam, the 23505 mapping to `AlreadyReversed`), lock-wait and 
+         +racing tests, an audit round with four Low fixes, and ADR follo
+         +w-ups marked done. |                                           
+
+⏺ Bash(npx prettier --check docs/ai/README.md)
+  ⎿  Checking formatting...
+     All matched files use Prettier code style!
+
+⏺ Bash(git add -A)
+  ⎿  (No output)
+
+⏺ Bash(git status --short)
+  ⎿  M  docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md
+     M  docs/adr/0008-read-committed-with-ordered-pessimistic-row-locks.md
+     M  docs/adr/0021-statement-timeout-function-for-maintenance-scripts.md
+     … +21 lines (ctrl+o to expand)
+
+⏺ Nothing sensitive is staged. Committing.
+
+⏺ Bash(git commit -m "feat(reversals): reversals domain and use case" -m
+      "reversalOf, reversal rules, the Reversals use case with the
+      skip-existing-reversal-check hook…)
+  ⎿  [phase/06-domain 6e91577] feat(reversals): reversals domain and use ca
+     se
+      24 files changed, 8414 insertions(+), 18 deletions(-)
+     … +10 lines (ctrl+o to expand)
+
+⏺ Bash(gitleaks git --no-banner --redact --log-opts="origin/main..HEAD")
+  ⎿  1:31PM INF 3 commits scanned.
+     1:31PM INF scanned ~687622 bytes (687.62 KB) in 197ms
+     1:31PM INF no leaks found
+⏺ Bash(git push -u origin HEAD)
+  ⎿  To https://github.com/torsello/supercool-finances.git
+        376dd5d..6e91577  HEAD -> phase/06-domain
+     branch 'phase/06-domain' set up to track 'origin/phase/06-domain'.
+
+⏺ Bash(gh pr view)
+  ⎿  Error: Exit code 1
+     no pull requests found for branch "phase/06-domain"
+
+⏺ Bash(gh pr create --base main --title "Phase 06-domain: accounts, ledger,
+      movements and reversals domain" --body-file - <<'EOF'
+      ## What the phase delivered…)
+  ⎿  https://github.com/torsello/supercool-finances/pull/6
+
+⏺ Phase 06 is committed, pushed and open as a pull request. Not merged.
+
+  - Commit: 6e91577 feat(reversals): reversals domain and use case.
+  - Gates: npm run check, npm run test:integration and npm run trace -- 
+    --require unit,integration pass. That is 149 unit and 110 integration tests,
+    with 0 missing ACs. The gitleaks scan found nothing. There is no
+    infra/terraform, so the checkov step was skipped.
+  - ACs covered: REV-AC03 and REV-AC20.
+  - Pull request: https://github.com/torsello/supercool-finances/pull/6
+  - Extra change: I added the two missing 06-domain rows to docs/ai/README.md,
+    and they went into the same commit.
+
+✻ Cogitated for 1m 13s · done 1:32 PM

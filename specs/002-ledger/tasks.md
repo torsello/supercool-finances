@@ -18,15 +18,15 @@ These tasks run in the cross-spec order of plan 000 section 1, across every `spe
 
 ## 06-domain
 
-- [ ] Test first: LED-AC22 in `test/unit/ledger/money.test.ts`; then `src/modules/ledger/domain/money.ts` and the money errors.
-- [ ] Test first: LED-AC01 in `test/unit/ledger/ledger-transaction.test.ts`; then the builders and `balanceChanges()` of `ledger-transaction.ts`.
-- [ ] Test first: LED-AC02 in `test/unit/ledger/ledger-transaction.test.ts`; then the checks of `LedgerTransaction.create` in the order of plan section 3.
-- [ ] Test first in `test/integration/ledger/ledger-writer.test.ts` (LED-R11, LED-R14, LED-R18): `append` writes the transaction and its entries, changes only customer balances, never updates a settlement row (its `xmin` is unchanged), and gives each entry a `created_at` taken at the insert; then `kysely-ledger.ts`.
-- [ ] Test first in `test/integration/ledger/system-balance.test.ts` (LED-R13, LED-R15): a settlement balance is the `numeric` sum of its entries as a string, correct beyond the `bigint` range in a rolled-back transaction; then `BalanceQueries`.
-- [ ] Test first: LED-AC14 in `test/integration/ledger/reconciliation.test.ts`; then `reconciliation.ts` and `kysely-reconciliation.ts`.
-- [ ] Test first: LED-AC16 in `test/integration/ledger/reconcile-script.test.ts`, on a scratch database, also asserting with the statements captured on the script's connection that it calls `app.set_statement_timeout(600000)` inside its transaction (SEC-R48, ADR-0021); then `npm run reconcile`, `scripts/reconcile.ts` and `src/modules/ledger/adapters/cli/reconcile.ts`.
-- [ ] Add the CI step `npm run reconcile` with `DATABASE_URL` set to `TEST_DATABASE_URL`, after `npm run test:integration`: LED-AC17.
-- [ ] Update the docs: in AGENTS.md, add `npm run reconcile` to the commands table, from 06-domain.
+- [x] Test first: LED-AC22 in `test/unit/ledger/money.test.ts`; then `src/modules/ledger/domain/money.ts` and the money errors.
+- [x] Test first: LED-AC01 in `test/unit/ledger/ledger-transaction.test.ts`; then the builders and `balanceChanges()` of `ledger-transaction.ts`.
+- [x] Test first: LED-AC02 in `test/unit/ledger/ledger-transaction.test.ts`; then the checks of `LedgerTransaction.create` in the order of plan section 3.
+- [x] Test first in `test/integration/ledger/ledger-writer.test.ts` (LED-R11, LED-R14, LED-R18): `append` writes the transaction and its entries, changes only customer balances, never updates a settlement row (its `xmin` is unchanged), and gives each entry a `created_at` taken at the insert; then `kysely-ledger.ts`.
+- [x] Test first in `test/integration/ledger/system-balance.test.ts` (LED-R13, LED-R15): a settlement balance is the `numeric` sum of its entries as a string, correct beyond the `bigint` range in a rolled-back transaction; then `BalanceQueries`.
+- [x] Test first: LED-AC14 in `test/integration/ledger/reconciliation.test.ts`; then `reconciliation.ts` and `kysely-reconciliation.ts`.
+- [x] Test first: LED-AC16 in `test/integration/ledger/reconcile-script.test.ts`, on a scratch database, also asserting with the statements captured on the script's connection that it calls `app.set_statement_timeout(600000)` inside its transaction (SEC-R48, ADR-0021); then `npm run reconcile`, `scripts/reconcile.ts` and `src/modules/ledger/adapters/cli/reconcile.ts`.
+- [x] Add the CI step `npm run reconcile` with `DATABASE_URL` set to `TEST_DATABASE_URL`, after `npm run test:integration`: LED-AC17.
+- [x] Update the docs: in AGENTS.md, add `npm run reconcile` to the commands table, from 06-domain.
 
 ## 07-idempotency
 
