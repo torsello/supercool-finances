@@ -2876,3 +2876,136 @@
   is the commit and pull request through /ship, and the phase transcript.
 
 ✻ Baked for 1m 54s · done 2:06 PM
+
+❯ /export docs/ai/transcripts/07-idempotency.txt                                
+  ⎿  Conversation exported to: /Users/matiastorsello/supercool-finances/docs/ai/
+     transcripts/07-idempotency.txt
+
+❯ /ship close phase 07: idempotency                                             
+
+⏺ Bash(git branch --show-current)
+  ⎿  phase/07-idempotency
+
+⏺ Bash(npm run check)
+  ⎿  > supercool-finances@0.1.0 check
+     > npm run typecheck && npm run lint && npm run format:check && npm run
+      test
+     … +53 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+  Listed 1 directory (ctrl+o to expand)
+
+⏺ Bash(npm run infra:up)
+  ⎿  > supercool-finances@0.1.0 infra:up
+     > docker compose up -d --wait postgres redis
+     … +6 lines (ctrl+o to expand)
+
+⏺ Bash(npm run test:integration)
+  ⎿  > supercool-finances@0.1.0 test:integration
+     > vitest run --project integration --reporter=default --reporter=json
+     --outputFile.json=reports/vitest-integration.json
+     … +67 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ Shipping: unit and integration gates are green; running trace next, then docs
+  checks, commit, scan and push.
+
+⏺ Bash(npm run trace -- --require unit,integration)
+  ⎿  > supercool-finances@0.1.0 trace
+     > tsx scripts/trace.ts --require unit,integration
+     … +280 lines (ctrl+o to expand)
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ The transcript has no row in docs/ai/README.md yet, so I'm adding it.
+
+⏺ Bash(printf '%s\n' '| 07 | 2026-10-08 |
+      [07-idempotency.txt](transcripts/07-idempotency.txt) | Idempotency: the
+      key parser, RFC 8785 fingerprint, stored-outcome tabl…)
+  ⎿  mpotency: the key parser, RFC 8785 fingerprint, stored-outcome table a
+     nd idempotent runner with the shared key-wait budget, the Kysely key s
+     tore, the cleanup command and its `src/cli/` entry point, keyed wiring
+     … +2 lines (ctrl+o to expand)
+  ⎿  Updated docs/ai/README.md (+1 -0)
+      31  | 05 | 2026-10-08 | [05-schema.txt](transcripts/05-schema.txt) 
+          | Schema: the owner and runtime roles, eight SQL migrations (ro
+          le settings, session functions, accounts, ledger with deferred 
+          and append-only triggers, settlement accounts, audit records, i
+          dempotency keys, readiness grant), the Kysely instance with exa
+          ct int8 and numeric strings, test helpers, the database-check A
+          Cs, down migrations proven, and an audit round with six fixes.
+      32  | 06 part 1 | 2026-10-08 | [06-domain-part1.txt](transcripts/06
+          -domain-part1.txt) | Domain, part 1: the accounts module, the t
+          ransaction runner and unit of work, module lint rules, the ledg
+          er, money movements and reconciliation domain with tests first.
+           |
+      33  | 06 part 2 | 2026-10-08 | [06-domain-part2.txt](transcripts/06
+          -domain-part2.txt) | Domain, part 2: the reversals domain (`rev
+          ersalOf`, reversal rules, the `Reversals` use case with its tes
+          t seam, the 23505 mapping to `AlreadyReversed`), lock-wait and 
+          racing tests, an audit round with four Low fixes, and ADR follo
+          w-ups marked done. |
+      34 +| 07 | 2026-10-08 | [07-idempotency.txt](transcripts/07-idempot
+         +ency.txt) | Idempotency: the key parser, RFC 8785 fingerprint, 
+         +stored-outcome table and idempotent runner with the shared key-
+         +wait budget, the Kysely key store, the cleanup command and its 
+         +`src/cli/` entry point, keyed wiring of account creation, movem
+         +ents and reversals, and an audit round with three Low fixes. | 
+
+⏺ Bash(npx prettier --check docs/ai/README.md)
+  ⎿  Checking formatting...
+     All matched files use Prettier code style!
+
+⏺ Bash(git add -A)
+  ⎿  (No output)
+
+⏺ Bash(git status --short)
+  ⎿  M  AGENTS.md
+     M  docs/ai/README.md
+     A  docs/ai/transcripts/07-idempotency.txt
+     … +32 lines (ctrl+o to expand)
+
+⏺ Nothing that must stay out of the commit. Committing.
+
+⏺ Bash(git commit -F - <<'EOF'
+      feat(idempotency): key step, idempotent runner and cleanup command…)
+  ⎿  [phase/07-idempotency cbcf370] feat(idempotency): key step, idempotent
+      runner and cleanup command
+      35 files changed, 5793 insertions(+), 51 deletions(-)
+     … +20 lines (ctrl+o to expand)
+
+⏺ Bash(gitleaks git --no-banner --redact --log-opts="origin/main..HEAD")
+  ⎿  2:07PM INF 1 commits scanned.
+     2:07PM INF scanned ~293245 bytes (293.24 KB) in 231ms
+     2:07PM INF no leaks found
+⏺ Bash(git push -u origin HEAD)
+  ⎿  remote:
+     remote: Create a pull request for 'phase/07-idempotency' on GitHub by
+     visiting:
+     … +7 lines (ctrl+o to expand)
+
+⏺ Bash(gh pr view)
+  ⎿  Error: Exit code 1
+     no pull requests found for branch "phase/07-idempotency"
+
+⏺ Bash(gh pr create --base main --title "Phase 07-idempotency: key step,
+      idempotent runner and cleanup command" --body-file - <<'EOF'
+      ## What the phase delivers…)
+  ⎿  https://github.com/torsello/supercool-finances/pull/7
+
+⏺ Phase 07 is closed. Commit cbcf370, feat(idempotency): key step, idempotent 
+  runner and cleanup command, is pushed to phase/07-idempotency.
+
+  - Gates: all green: npm run check (179 unit tests), npm run test:integration
+    (133 tests), and npm run trace -- --require unit,integration (exit 0).
+    gitleaks found no leaks. Checkov was skipped because there is no
+    infra/terraform.
+  - ACs covered: IDM-AC02, IDM-AC06 and IDM-AC24.
+  - Pull request: https://github.com/torsello/supercool-finances/pull/7. I did
+    not merge it.
+  - Docs: I added the missing 07 row to docs/ai/README.md, so that file is in
+    the commit. The transcript docs/ai/transcripts/07-idempotency.txt was
+    already exported.
+  - Staged: nothing was held back.
+
+✻ Worked for 1m 30s · done 2:08 PM
