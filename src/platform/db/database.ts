@@ -34,6 +34,8 @@ export interface PoolLogger {
 export interface PoolOptions {
   connectionString: string;
   max?: number;
+  /** How long a new connection may take before `connect()` fails; pg waits forever by default. */
+  connectionTimeoutMillis?: number;
   logger: PoolLogger;
 }
 
@@ -54,6 +56,9 @@ export function createPool(options: PoolOptions): pg.Pool {
   const pool = new pg.Pool({
     connectionString: options.connectionString,
     ...(options.max === undefined ? {} : { max: options.max }),
+    ...(options.connectionTimeoutMillis === undefined
+      ? {}
+      : { connectionTimeoutMillis: options.connectionTimeoutMillis }),
     types: exactTypes(),
   });
   pool.on('error', (error) => {

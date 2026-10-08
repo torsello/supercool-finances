@@ -66,6 +66,12 @@ jobs:
 
       - run: npm run test:integration
 
+      # LED-R22: the shared test database must still reconcile after the integration suite.
+      - name: Reconcile the test database
+        run: npm run reconcile
+        env:
+          DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
+
       # After both test runs, so their JSON reports exist; a missing one fails the gate.
       - run: npm run trace -- --require unit,integration
 

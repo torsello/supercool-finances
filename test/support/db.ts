@@ -52,17 +52,21 @@ export interface TestAccount {
   currency: CurrencyCode;
 }
 
-/** Inserts an active customer account with balance 0 as the runtime role, as the service would. */
+/**
+ * Inserts an active customer account with balance 0 as the runtime role, as the service would; on
+ * the shared test database unless another pool, such as a scratch database's, is given.
+ */
 export async function createCustomerAccount(options: {
   currency: CurrencyCode;
   ownerId?: string;
+  pool?: pg.Pool;
 }): Promise<TestAccount> {
   const account = {
     id: randomUUID(),
     ownerId: options.ownerId ?? randomUUID(),
     currency: options.currency,
   };
-  await runtimePool().query(
+  await (options.pool ?? runtimePool()).query(
     `INSERT INTO accounts (id, kind, owner_id, currency, status, balance)
      VALUES ($1, 'customer', $2, $3, 'active', 0)`,
     [account.id, account.ownerId, account.currency],
@@ -101,14 +105,16 @@ export const TEST_OPERATOR_ID = '00000000-0000-4000-8000-0000000000ff';
  * runtime role, in one database transaction, it locks the account, inserts the transaction, +A on
  * the account and −A on the settlement account of its currency, raises the cached balance by A and
  * writes an audit record of action `deposit` by a test operator, so the shared test database still
- * reconciles (LED-R22). `amount` is a string of decimal digits, in minor units.
+ * reconciles (LED-R22). `amount` is a string of decimal digits, in minor units. The deposit goes
+ * to the shared test database unless another pool is given.
  */
 export async function writeDirectDeposit(
   account: { id: string },
   amount: string,
+  pool: pg.Pool = runtimePool(),
 ): Promise<{ transactionId: string }> {
   if (!/^[1-9][0-9]*$/.test(amount)) throw new Error(`Not a positive amount: ${amount}`);
-  const client = await runtimePool().connect();
+  const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const locked = await client.query<{ currency: CurrencyCode }>(

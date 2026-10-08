@@ -82,6 +82,7 @@ Where the specs fix the details, this ADR follows them: every amount accepted by
 
 - Phase 05-schema: tables, constraints and the deferred balance trigger of section 1.3 of spec 002.
 - Phase 06-domain: `Money`, `Currency` and `LedgerTransaction` with unit tests at the limits (LED-AC22).
+  - Done in phase 06-domain on 2026-10-08.
 - Phase 06-domain: extend the lint rule so that `Number()`, `Number.parseInt`, `parseInt` and unary `+` are forbidden in `src/modules/*/domain/**` and `src/modules/*/application/**`, with a test that the rule fires.
   - Done in phase 06-domain on 2026-10-08.
 - ADR-0007 decides how system and customer account balances are stored.
