@@ -15,15 +15,16 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run --project unit",
-    "test:integration": "vitest run --project integration",
+    "test": "vitest run --project unit --reporter=default --reporter=json --outputFile.json=reports/vitest-unit.json",
+    "test:integration": "vitest run --project integration --reporter=default --reporter=json --outputFile.json=reports/vitest-integration.json",
     "test:all": "vitest run",
     "test:coverage": "vitest run --project unit --coverage",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run test",
     "infra:up": "docker compose up -d --wait postgres redis",
     "infra:down": "docker compose down",
     "infra:reset": "docker compose down -v && npm run infra:up",
-    "env:sync": "tsx scripts/env-sync.ts"
+    "env:sync": "tsx scripts/env-sync.ts",
+    "trace": "tsx scripts/trace.ts"
   },
   "dependencies": {
     "@fastify/helmet": "^13.1.1",

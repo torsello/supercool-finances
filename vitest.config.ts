@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config';
+import { TEST_GUARDS } from './vitest.shared.js';
 
 // Local runs read .env; CI passes real environment variables instead and has no .env file.
 try {
@@ -19,12 +20,14 @@ export default defineConfig({
       {
         test: {
           name: 'unit',
+          ...TEST_GUARDS,
           include: ['test/unit/**/*.test.ts', 'src/**/*.test.ts'],
         },
       },
       {
         test: {
           name: 'integration',
+          ...TEST_GUARDS,
           include: ['test/integration/**/*.test.ts'],
           fileParallelism: false,
           testTimeout: 30_000,

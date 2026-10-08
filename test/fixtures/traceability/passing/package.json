@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "scripts": {
+    "zz-check": "true",
+    "zz:prepare": "true",
+    "zz-terraform-validate": "true",
+    "zz-args": "true",
+    "zz-continued": "true"
+  }
+}

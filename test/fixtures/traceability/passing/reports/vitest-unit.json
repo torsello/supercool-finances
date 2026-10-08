@@ -1,0 +1,15 @@
+{
+  "success": true,
+  "testResults": [
+    {
+      "name": "test/unit/alpha.test.ts",
+      "status": "passed",
+      "assertionResults": [
+        { "fullName": "alpha ZZA-AC01 finds the alpha AC", "status": "passed" },
+        { "fullName": "ZZA-AC04 table-driven case 1", "status": "passed" },
+        { "fullName": "ZZA-AC04 table-driven case 2", "status": "passed" },
+        { "fullName": "alpha names no AC", "status": "passed" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+name: CI
+on: push
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    continue-on-error: false
+    steps:
+      - name: Prepare
+        env:
+          DATABASE_URL: postgres://localhost/zz
+        run: npm run zz:prepare
+      - run: npm run zz-check # the check
+        continue-on-error: false
+      - run: npm run zz-args -- --require unit,integration
+      - run: |
+          # A comment and a continued line still make one command.
+          npm run zz-continued \
+            -- --flag
+  terraform:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate
+        if: ${{ success() }}
+        run: npm run zz-terraform-validate

@@ -1,0 +1,47 @@
+{
+  "success": false,
+  "testResults": [
+    {
+      "name": "test/unit/gamma.test.ts",
+      "status": "failed",
+      "assertionResults": [
+        {
+          "fullName": "ZZC-AC05 is proven",
+          "status": "passed"
+        },
+        {
+          "fullName": "ZZC-AC04 is skipped",
+          "status": "skipped"
+        },
+        {
+          "fullName": "ZZC-AC04 is todo",
+          "status": "todo"
+        },
+        {
+          "fullName": "ZZC-AC04 fails",
+          "status": "failed"
+        },
+        {
+          "fullName": "ZZC-AC08 the half that runs",
+          "status": "passed"
+        },
+        {
+          "fullName": "ZZC-AC08 the half that is switched off",
+          "status": "skipped"
+        },
+        {
+          "fullName": "ZZC-AC06 passes, but at the wrong level",
+          "status": "passed"
+        },
+        {
+          "fullName": "ZZE-AC01 names an AC that no spec defines",
+          "status": "passed"
+        },
+        {
+          "fullName": "suite ZZE-AC02 is skipped but names an AC that no spec defines",
+          "status": "skipped"
+        }
+      ]
+    }
+  ]
+}
