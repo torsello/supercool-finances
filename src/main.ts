@@ -1,11 +1,8 @@
 import { buildApp } from './app.js';
+import { loadConfig } from './platform/config/config.js';
 
-const port = Number.parseInt(process.env['PORT'] ?? '3000', 10);
-if (!Number.isInteger(port) || port < 1 || port > 65535) {
-  throw new Error(
-    `PORT must be an integer between 1 and 65535, got "${process.env['PORT'] ?? ''}"`,
-  );
-}
-
-const app = buildApp({ logger: { level: process.env['LOG_LEVEL'] ?? 'info' } });
-await app.listen({ port, host: '0.0.0.0' });
+// An invalid configuration throws its ConfigError here, naming every invalid variable and never a
+// value, before the app is built or anything connects (SEC-R39, AUT-R18).
+const config = loadConfig(process.env);
+const app = buildApp(config);
+await app.listen({ port: config.port, host: '0.0.0.0' });

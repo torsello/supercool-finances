@@ -1,8 +1,20 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { buildApp } from '../../src/app.js';
+import { loadConfig } from '../../src/platform/config/config.js';
+import { K } from '../support/tokens.js';
 
 describe('GET /health/live', () => {
-  const app = buildApp();
+  // The pool connects lazily, so this app never reaches the database.
+  const app = buildApp(
+    loadConfig({
+      DATABASE_URL: 'postgres://scf_app:unused@127.0.0.1:1/unused',
+      JWT_SECRET: K,
+      JWT_ISSUER: 'scf-test',
+      JWT_AUDIENCE: 'scf-api',
+      CURSOR_SECRET: 'test-only-cursor-secret-for-unit-and-integration',
+      LOG_LEVEL: 'fatal',
+    }),
+  );
 
   afterAll(async () => {
     await app.close();

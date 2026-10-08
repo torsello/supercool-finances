@@ -36,7 +36,7 @@ No task for this spec.
 
 These tasks run in the cross-spec order of plan 000 section 1 for 08-api: authentication, error handler and pipeline, account routes, idempotency wiring, movement and reversal routes, then the ACs that need them.
 
-- [ ] Test first: LED-AC20 in `test/unit/platform/config.test.ts`; then `MAX_AMOUNT_MINOR` in `src/platform/config/config.ts`.
+- [x] Test first: LED-AC20 in `test/unit/platform/config.test.ts`; then `MAX_AMOUNT_MINOR` in `src/platform/config/config.ts`.
 - [ ] Test first in `test/unit/movements/movement-schemas.test.ts` (LED-R23, LED-R24): the movement amount schema accepts the configured maximum and refuses one more with one `errors` entry for `/amount`; then the refinement in `src/modules/movements/adapters/http/schemas.ts`.
 - [ ] Test first: LED-AC18 and LED-AC19 in `test/integration/ledger/amount-limits.test.ts`.
 - [ ] Test first: LED-AC07 in `test/integration/ledger/settlement-flows.test.ts`.

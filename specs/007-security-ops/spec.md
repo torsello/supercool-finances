@@ -41,25 +41,26 @@ The worst case SYS-R35 sums is bounded with these defaults: pool acquire 2000 ms
 
 Every setting comes from an environment variable and is validated at startup (SEC-R39). Integer values are strings of decimal digits without sign or leading zero, as in IDM-R23. Variables of other specs keep the rules of those specs: `ACCOUNT_LOCK_TIMEOUT_MS` (spec 003), `IDEMPOTENCY_WAIT_TIMEOUT_MS` and `IDEMPOTENCY_KEY_TTL_SECONDS` (spec 005), `MAX_AMOUNT_MINOR` (spec 002), `JWT_SECRET`, `JWT_ISSUER` and `JWT_AUDIENCE` (spec 006). This spec adds:
 
-| Variable                     | Rule                                                                                                        | Default        |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------- | -------------- |
-| `NODE_ENV`                   | `development`, `test` or `production`                                                                       | `development`  |
-| `PORT`                       | integer from 1 to 65535                                                                                     | 3000           |
-| `METRICS_PORT`               | integer from 1 to 65535, different from `PORT`                                                              | 9464           |
-| `LOG_LEVEL`                  | `fatal`, `error`, `warn`, `info`, `debug` or `trace`                                                        | `info`         |
-| `DATABASE_URL`               | a `postgres://` or `postgresql://` URL without an `options` parameter                                       | none, required |
-| `REDIS_URL`                  | a `redis://` or `rediss://` URL                                                                             | none, required |
-| `CURSOR_SECRET`              | at least 32 bytes in UTF-8, different from `JWT_SECRET` (section 1.5 of spec 001)                           | none, required |
-| `DB_POOL_MAX`                | integer from 1 to 100                                                                                       | 10             |
-| `DB_POOL_ACQUIRE_TIMEOUT_MS` | integer from 1 to 60000                                                                                     | 2000           |
-| `REDIS_COMMAND_TIMEOUT_MS`   | integer from 1 to 5000                                                                                      | 100            |
-| `REQUEST_TIMEOUT_MS`         | integer from 1 to 120000, greater than the sum of section 1.1 (SEC-R35)                                     | 25000          |
-| `SHUTDOWN_DRAIN_DELAY_MS`    | integer from 0 to 60000                                                                                     | 2000           |
-| `SHUTDOWN_TIMEOUT_MS`        | integer from 1 to 120000, not less than `REQUEST_TIMEOUT_MS`                                                | 30000          |
-| `RATE_LIMIT_USER_MAX`        | integer from 1 to 1000000                                                                                   | 300            |
-| `RATE_LIMIT_USER_WINDOW_S`   | integer from 1 to 3600                                                                                      | 10             |
-| `TRUSTED_PROXY_CIDRS`        | comma-separated IPv4 or IPv6 CIDR blocks, or empty                                                          | empty          |
-| `CORS_ORIGINS`               | comma-separated origins (`https://host[:port]`, or `http://` when `NODE_ENV` is not `production`), or empty | empty          |
+| Variable                     | Rule                                                                                                                                      | Default        |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| `NODE_ENV`                   | `development`, `test` or `production`                                                                                                     | `development`  |
+| `PORT`                       | integer from 1 to 65535                                                                                                                   | 3000           |
+| `METRICS_PORT`               | integer from 1 to 65535, different from `PORT`                                                                                            | 9464           |
+| `LOG_LEVEL`                  | `fatal`, `error`, `warn`, `info`, `debug` or `trace`                                                                                      | `info`         |
+| `DATABASE_URL`               | a `postgres://` or `postgresql://` URL whose only query parameters are `sslmode`, `sslrootcert`, `application_name` and `connect_timeout` | none, required |
+| `PGOPTIONS`                  | unset: `pg` would send it as the connection's `options` (SEC-R29, SEC-R30)                                                                | unset          |
+| `REDIS_URL`                  | a `redis://` or `rediss://` URL                                                                                                           | none, required |
+| `CURSOR_SECRET`              | at least 32 bytes in UTF-8, different from `JWT_SECRET` (section 1.5 of spec 001)                                                         | none, required |
+| `DB_POOL_MAX`                | integer from 1 to 100                                                                                                                     | 10             |
+| `DB_POOL_ACQUIRE_TIMEOUT_MS` | integer from 1 to 60000                                                                                                                   | 2000           |
+| `REDIS_COMMAND_TIMEOUT_MS`   | integer from 1 to 5000                                                                                                                    | 100            |
+| `REQUEST_TIMEOUT_MS`         | integer from 1 to 120000, greater than the sum of section 1.1 (SEC-R35)                                                                   | 25000          |
+| `SHUTDOWN_DRAIN_DELAY_MS`    | integer from 0 to 60000                                                                                                                   | 2000           |
+| `SHUTDOWN_TIMEOUT_MS`        | integer from 1 to 120000, not less than `REQUEST_TIMEOUT_MS`                                                                              | 30000          |
+| `RATE_LIMIT_USER_MAX`        | integer from 1 to 1000000                                                                                                                 | 300            |
+| `RATE_LIMIT_USER_WINDOW_S`   | integer from 1 to 3600                                                                                                                    | 10             |
+| `TRUSTED_PROXY_CIDRS`        | comma-separated IPv4 or IPv6 CIDR blocks, or empty                                                                                        | empty          |
+| `CORS_ORIGINS`               | comma-separated origins (`https://host[:port]`, or `http://` when `NODE_ENV` is not `production`), or empty                               | empty          |
 
 The load balancer reads its own variables: `RATE_LIMIT_IP_RPS` (default 500) and `RATE_LIMIT_IP_BURST` (default 1000). `METRICS_PORT` defaults to 9464, the port Prometheus exporters conventionally use. The ranges are wide enough for tests and production and narrow enough to catch typos, such as a pool of 1000 or a timeout of hours.
 
@@ -422,7 +423,7 @@ Unless stated otherwise: customer user C1 owns account A1 (EUR) and customer use
 - **Level:** unit
 - **Covers:** SEC-R39, SEC-R40
 - **Given** the configuration loader and an otherwise valid environment
-- **When** it loads the defaults; then, one at a time, `PORT` "0" and "65536", `METRICS_PORT` equal to `PORT`, `LOG_LEVEL` "verbose", `NODE_ENV` "staging", `DATABASE_URL` unset and "mysql://x", `DATABASE_URL` with `?options=-c%20statement_timeout%3D0`, `REDIS_URL` "http://x", `CURSOR_SECRET` of 31 bytes and equal to `JWT_SECRET`, `DB_POOL_MAX` "0" and "101", `RATE_LIMIT_USER_MAX` "0", `RATE_LIMIT_USER_WINDOW_S` "3601", `TRUSTED_PROXY_CIDRS` "10.0.0.0/33", `CORS_ORIGINS` "*" and, with `NODE_ENV` "production", "http://app.example", `REPLICA_ID` "", 65 × "a", "api 1" and "api/1", and `MIGRATION_DATABASE_URL` "mysql://x"; then `REPLICA_ID` "api-1" and `MIGRATION_DATABASE_URL` unset; and finally `PORT` "0" and `DB_POOL_MAX` "abc" together
+- **When** it loads the defaults; then, one at a time, `PORT` "0" and "65536", `METRICS_PORT` equal to `PORT`, `LOG_LEVEL` "verbose", `NODE_ENV` "staging", `DATABASE_URL` unset and "mysql://x", `DATABASE_URL` with `?options=-c%20statement_timeout%3D0`, `DATABASE_URL` with `?statement_timeout=0`, `PGOPTIONS` set, `REDIS_URL` "http://x", `CURSOR_SECRET` of 31 bytes and equal to `JWT_SECRET`, `DB_POOL_MAX` "0" and "101", `RATE_LIMIT_USER_MAX` "0", `RATE_LIMIT_USER_WINDOW_S` "3601", `TRUSTED_PROXY_CIDRS` "10.0.0.0/33", `CORS_ORIGINS` "*" and, with `NODE_ENV` "production", "http://app.example", `REPLICA_ID` "", 65 × "a", "api 1" and "api/1", and `MIGRATION_DATABASE_URL` "mysql://x"; then `REPLICA_ID` "api-1" and `MIGRATION_DATABASE_URL` unset; and finally `PORT` "0" and `DB_POOL_MAX` "abc" together
 - **Then** the defaults load with the values of section 1.2; the load with `REPLICA_ID` "api-1" and no `MIGRATION_DATABASE_URL` succeeds; each other load fails with a configuration error naming the variable and its rule; the last names both `PORT` and `DB_POOL_MAX` in one error; and no error contains the value of `DATABASE_URL`, `REDIS_URL`, `CURSOR_SECRET` or `JWT_SECRET`
 
 ### SEC-AC31 · Invalid configuration stops the process before it listens
