@@ -3970,3 +3970,130 @@
   What's left is to close the phase with /ship.
 
 ✻ Cooked for 5m 26s · done 11:28 AM
+
+❯ /export docs/ai/transcripts/05-schema.txt                                       ⎿  Conversation exported to:
+     /Users/matiastorsello/supercool-finances/docs/ai/transcripts/05-schema.txt
+
+❯ /ship close phase 05: database schema and constraints                         
+
+⏺ Bash(git branch --show-current)
+  ⎿  phase/05-schema
+
+⏺ Bash(npm run check)
+  ⎿  > supercool-finances@0.1.0 check
+     > npm run typecheck && npm run lint && npm run format:check && npm run
+      test
+     … +35 lines (ctrl+o to expand)
+  ⎿  (timeout 5m)
+
+⏺ Bash(npm run infra:up)
+  ⎿  > supercool-finances@0.1.0 infra:up
+     > docker compose up -d --wait postgres redis
+     … +6 lines (ctrl+o to expand)
+
+⏺ Bash(npm run test:integration)
+  ⎿  > supercool-finances@0.1.0 test:integration
+     > vitest run --project integration --reporter=default --reporter=json
+     --outputFile.json=reports/vitest-integration.json
+     … +27 lines (ctrl+o to expand)
+  ⎿  (timeout 5m)
+
+⏺ Bash(npm run trace -- --require unit,integration)
+  ⎿  > supercool-finances@0.1.0 trace
+     > tsx scripts/trace.ts --require unit,integration
+     … +273 lines (ctrl+o to expand)
+
+⏺ All three gates pass. Now I'm checking that docs/ai/README.md lists the new
+  transcript.
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ The row is missing, so I'm adding it.
+
+⏺ Bash(printf '%s\n' '| 05 | 2026-10-08 |
+      [05-schema.txt](transcripts/05-schema.txt) | Schema: the owner and runtime
+      roles, eight SQL migrations (role settings, sessio…)
+  ⎿  Updated docs/ai/README.md (+1 -0)
+      28  | 02 part 5 | 2026-10-07 | [02-specs-part5.txt](transcripts/02-
+          specs-part5.txt) | Specs, part 5: cross-spec review of specs 00
+          0-008, the owner's answers to every open question folded into t
+          he specs as rules, eight overview ACs retired, all specs set to
+           Approved, an audit round and its fixes, including a traceabili
+          ty gate that accepts a CI script only as the whole command of a
+           step, and `/ship` closing the phase. |
+      29  | 03 | 2026-10-08 | [03-adrs.txt](transcripts/03-adrs.txt) | AD
+          Rs: twenty decisions 0001-0020 with the owner's reasoning, alte
+          rnatives and consequences, the ADR index, links to and from eve
+          ry spec, the AWS RDS Proxy pinning source checked, and three au
+          dit rounds and their fixes. |
+      30  | 04 | 2026-10-08 | [04-plans.txt](transcripts/04-plans.txt) | 
+          Plans: plan.md and tasks.md for specs 000-008 with every AC pla
+          ced in a phase and a test file, owner-approved spec fixes, ADR-
+          0021 (statement-timeout function) and ADR-0022 (request timeout
+          : answer first, then roll back), the `yaml` dev dependency, and
+           seven audit rounds and their fixes. |
+      31 +| 05 | 2026-10-08 | [05-schema.txt](transcripts/05-schema.txt) 
+         +| Schema: the owner and runtime roles, eight SQL migrations (ro
+         +le settings, session functions, accounts, ledger with deferred 
+         +and append-only triggers, settlement accounts, audit records, i
+         +dempotency keys, readiness grant), the Kysely instance with exa
+         +ct int8 and numeric strings, test helpers, the database-check A
+         +Cs, down migrations proven, and an audit round with six fixes. 
+
+⏺ Bash(npx prettier --check docs/ai/README.md)
+  ⎿  Checking formatting...
+     All matched files use Prettier code style!
+
+⏺ Bash(git add -A)
+  ⎿  (No output)
+
+⏺ Bash(git status --short)
+  ⎿  M  .env.example
+     M  .github/workflows/ci.yml
+     M  AGENTS.md
+     … +52 lines (ctrl+o to expand)
+
+⏺ Nothing sensitive is staged. Committing.
+
+⏺ Bash(git commit -F - <<'EOF'
+      feat(schema): roles, migrations and database checks…)
+  ⎿  [phase/05-schema 6614fb0] feat(schema): roles, migrations and database
+      checks
+      55 files changed, 6793 insertions(+), 46 deletions(-)
+     … +33 lines (ctrl+o to expand)
+
+⏺ Bash(gitleaks git --no-banner --redact --log-opts="origin/main..HEAD")
+  ⎿  11:30AM INF 1 commits scanned.
+     11:30AM INF scanned ~366050 bytes (366.05 KB) in 159ms
+     11:30AM INF no leaks found
+
+⏺ Bash(git push -u origin HEAD)
+  ⎿  remote:
+     remote: Create a pull request for 'phase/05-schema' on GitHub by visit
+     ing:
+     … +6 lines (ctrl+o to expand)
+
+⏺ Bash(gh pr view)
+  ⎿  Error: Exit code 1
+     no pull requests found for branch "phase/05-schema"
+
+⏺ Bash(gh pr create --base main --title "Phase 05-schema: roles, migrations and
+      database checks" --body-file - <<'EOF'
+      ## What the phase delivered…)
+  ⎿  https://github.com/torsello/supercool-finances/pull/5
+
+⏺ Phase 05-schema is committed as 6614fb0 (feat(schema): roles, migrations and 
+  database checks) and pushed. PR #5 is open:
+  https://github.com/torsello/supercool-finances/pull/5
+
+  - Gates: npm run check passed with 37 unit tests. npm run test:integration
+    passed with 49 tests in 17 files. npm run trace -- --require 
+    unit,integration exited 0 with 9 ACs covered and none missing. The secret
+    scan found nothing.
+  - ACs covered: LED-AC03, 04, 05, 06, 08, 11 and 12, IDM-AC20 and SEC-AC37.
+  - Added during the ship: the 05 row in docs/ai/README.md, because the
+    transcript had no entry yet.
+  - Skipped: the Terraform scan, since infra/terraform doesn't exist yet.
+  - Next: CI must be green before you merge the PR.
+
+✻ Worked for 1m 33s · done 11:30 AM
