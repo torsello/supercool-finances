@@ -6,10 +6,20 @@
 
 A balance service for SuperCool Finances. It provides customer accounts in five currencies, a double-entry ledger, deposits, withdrawals, transfers and reversals, behind a versioned HTTP API. It is a modular monolith in TypeScript on Fastify. PostgreSQL is its only source of truth and Redis is used for rate limiting. It runs as several replicas behind a load balancer and stays correct under concurrent and repeated requests. Every behaviour is specified before it is built, and every acceptance criterion is proven by a test that names it. It was built for the take-home challenge in [docs/challenge.md](docs/challenge.md).
 
+## Why a modular monolith
+
+The challenge advises a microservice; this service is one deployable with strict modules instead. Money has one consistency boundary: a transfer debits one account, credits another and writes the ledger entries, the idempotency key and the audit record, and in one deployable all of that is a single ACID transaction in PostgreSQL, with no saga, outbox or compensation for a half-done movement. It still scales horizontally, as identical stateless replicas whose only shared state is in PostgreSQL. Modules reach each other only through their ports and `index.ts`, enforced by ESLint, so a module can be split out later. A split would be justified when a module needs its own deploys or scaling, or the one database becomes the write bottleneck, and the follow-up of ADR-0002 requires a new ADR first, saying how the split module's writes stay atomic with the ledger. The options are in [ADR-0002](docs/adr/0002-modular-monolith.md) and the modules in [docs/architecture.md](docs/architecture.md).
+
+## Thinking process and trade-offs
+
+I started from what can go wrong with customer money, and each risk set a decision: concurrent requests (ordered row locks in PostgreSQL, never in a process), retries (an idempotency key that commits with the movement), precision (integer minor units, never floats), auditability (an append-only double-entry ledger) and access (a role check on every route, and 404 for another customer's resources). Each decision names the alternative it rejected in [Design decisions](#design-decisions). I chose TypeScript because it is the language I know best, so I catch subtle mistakes in the code the AI writes faster, and its strict typing keeps money as `bigint`. My thinking process is in [docs/ai/00-planning.md](docs/ai/00-planning.md): what makes the problem hard, the decisions, what I rejected and where I steered.
+
 ## Contents
 
 The full documentation is indexed in [docs/README.md](docs/README.md).
 
+- [Why a modular monolith](#why-a-modular-monolith)
+- [Thinking process and trade-offs](#thinking-process-and-trade-offs)
 - [Reviewer's guide](#reviewers-guide)
 - [Highlights](#highlights)
 - [Quickstart](#quickstart)
@@ -43,7 +53,7 @@ A 15-minute path through the repository.
    | Safe concurrency             | `MOV-AC14` in [test/integration/movements/concurrency.test.ts](test/integration/movements/concurrency.test.ts): crossed and circular transfers                                                                  |
    | Full audit trail             | `MOV-AC16` in [test/integration/movements/audit.test.ts](test/integration/movements/audit.test.ts) and `LED-AC11` in [test/integration/ledger/append-only.test.ts](test/integration/ledger/append-only.test.ts) |
 
-3. **Read three ADRs** (5 min): [ADR-0002 Modular monolith](docs/adr/0002-modular-monolith.md), [ADR-0008 Concurrency control](docs/adr/0008-read-committed-with-ordered-pessimistic-row-locks.md) and [ADR-0009 Idempotency](docs/adr/0009-idempotency-inside-the-movements-transaction.md).
+3. **Read the reasoning** (5 min): [Thinking process and trade-offs](#thinking-process-and-trade-offs), then three ADRs: [ADR-0002 Modular monolith](docs/adr/0002-modular-monolith.md), [ADR-0008 Concurrency control](docs/adr/0008-read-committed-with-ordered-pessimistic-row-locks.md) and [ADR-0009 Idempotency](docs/adr/0009-idempotency-inside-the-movements-transaction.md).
 4. **Skim the proof** (2 min): [docs/traceability.md](docs/traceability.md) lists every acceptance criterion with the test that proves it. CI regenerates it from the test reports and fails when the committed copy is stale.
 5. **See how AI was used** (1 min): [docs/ai/](docs/ai/README.md) has every session transcript. [docs/ai/00-planning.md](docs/ai/00-planning.md) holds my planning and key decisions, and the "Open questions" tables of the [specs](specs/README.md) record each decision I made, with its date.
 
@@ -138,6 +148,14 @@ Set the variables the requests below use. `make demo-env` runs the seed again, w
 
 ```sh
 eval "$(make demo-env)"
+```
+
+Without `make`, the same two steps run in the `tools` service:
+
+```sh
+docker compose build --quiet tools
+docker compose run --rm tools npm run --silent seed
+eval "$(docker compose run --rm tools npm run --silent demo-env)"
 ```
 
 **Deposit** 100.00 EUR into A (operators deposit):
@@ -548,7 +566,7 @@ Every setting is an environment variable, read and validated once at startup by 
 | e2e         | The Compose stack through nginx: both replicas, the authorization matrix, replica loss, rate limits, the seed, observability.  | `npm run test:e2e` (stop your own stack first) |
 | Load        | 200 movements per second for 60 s over 1000 account pairs, then a reconciliation.                                              | `npm run load` against a running stack         |
 
-With Docker only, `make test` runs the unit and integration suites and the trace gate in the tools image.
+The Quickstart and every `make` target but `e2e` and `load` need only Docker: `make test` runs the unit and integration suites and the trace gate in the tools image. Node 24 on the host is needed for `npm test`, `npm run test:integration` (with `npm run infra:up`), `npm run test:e2e` and `npm run load`, which drive Docker from the host.
 
 `npm run test:e2e` and `npm run load` both rewrite the tracked [docs/performance.md](docs/performance.md); discard that change unless you mean to commit a new result.
 
@@ -559,6 +577,8 @@ Latest load test, from [docs/performance.md](docs/performance.md) (local run, Ap
 | Requests      | Throughput | p50    | p95    | p99     | Errors | Ledger     |
 | ------------- | ---------- | ------ | ------ | ------- | ------ | ---------- |
 | 12000 in 60 s | 200/s      | 3.9 ms | 6.8 ms | 15.1 ms | 0      | reconciles |
+
+These numbers are from a local run. CI's `e2e` job runs the load test at 100 requests per second and reports the p99 without enforcing it.
 
 ## CI and quality gates
 
@@ -657,6 +677,8 @@ flowchart TB
 ```
 
 Migrations run as a one-off task before each rollout ([ADR-0020](docs/adr/0020-expand-then-contract-migrations.md)), and the idempotency cleanup runs every hour from EventBridge Scheduler. The estimated cost is about 350 USD per month in eu-west-1. [docs/deployment/aws.md](docs/deployment/aws.md) covers every component, the first deployment and each later one, failure modes and the cost estimate.
+
+By choice, the Terraform has never been planned or applied against a real AWS account; CI validates and scans it on every change (`npm run infra:validate`). There is deliberately no live demo either: the Compose stack of the [Quickstart](#quickstart) is the demo.
 
 ## Design decisions
 
@@ -764,7 +786,7 @@ The authentication is simulated, there are no payment rails or currency conversi
 
 ## How this was built
 
-I built this service with AI, under a spec-first process. I set the scope and the rules, decided the architecture and approved every change to a spec. Claude Code implemented each phase from the specs, ADRs and plans in this repository, and an independent review agent audited every phase before it was merged. Every session's prompts and responses are in [docs/ai/](docs/ai/README.md), which also explains what the AI did and what I decided.
+I built this service with AI, under a spec-first process. I set the scope and the rules, decided the architecture and approved every change to a spec. Claude Code implemented each phase from the specs, ADRs and plans in this repository, and an independent review agent audited every phase before it was merged. docs/ai/ holds every Claude Code session in full and a summary of the separate chat I used to plan, draft prompts and review results, and explains what the AI did and what I decided.
 
 ## Troubleshooting
 

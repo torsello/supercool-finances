@@ -140,7 +140,7 @@ infra/policies/               custom checkov policies run by npm run infra:valid
 
 Each phase is a separate session, named in transcripts and commits:
 
-`00-setup`, `01-bootstrap`, `02-specs`, `03-adrs`, `04-plans`, `05-schema`, `06-domain`, `07-idempotency`, `08-api`, `09-hardening`, `10-runtime`, `11-e2e`, `12-infra`, `12b-observability`, `13-final-review`, `14-docs`, `15-demo`.
+`00-setup`, `01-bootstrap`, `02-specs`, `03-adrs`, `04-plans`, `05-schema`, `06-domain`, `07-idempotency`, `08-api`, `09-hardening`, `10-runtime`, `11-e2e`, `12-infra`, `12b-observability`, `13-final-review`, `14-docs`, `15b-review`. `15-demo` was dropped.
 
 `specs/README.md` and `specs/000-overview/spec.md` are created in `02-specs`.
 

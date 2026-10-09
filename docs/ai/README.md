@@ -21,7 +21,7 @@ The challenge asks for every prompt used with an AI along with every response. T
 **What the AI did.**
 - Claude Code wrote the code, the tests, the Terraform, the CI pipeline and the documentation, following the specs.
 - The /audit agent reviewed each phase against the specs and ADRs; I decided which findings were fixed before shipping.
-- A separate Claude chat helped me plan the phases, draft the prompts I gave Claude Code (all of them are in the transcripts), and review each result and each audit before I approved it.
+- A separate Claude chat helped me plan the phases, draft the prompts I gave Claude Code (all of them are in the transcripts), and review each result and each audit before I approved it. It is summarised in advisor-chat.md; the conversation itself is not exported.
 
 **What I decided.** The main decisions:
 - PostgreSQL as the only source of truth, although the challenge allowed in-memory storage: money needs transactions, row locks and constraints shared by several replicas ([ADR-0005](../adr/0005-postgresql-as-the-only-source-of-truth.md)).
@@ -33,11 +33,28 @@ The challenge asks for every prompt used with an AI along with every response. T
 
 **How I checked.** Beyond the gates and the audits, I exercised the running stack by hand (Swagger UI, curl scenarios, Grafana) and reviewed every result with the advisor chat before approving it. When CI failed, I asked for the cause before the fix: for example, the load test's 503s on a two-CPU CI runner came from capacity, so CI runs it at 100 requests per second while the local benchmark stays at 200.
 
+## What the exports contain
+
+Each transcript is Claude Code's `/export` of one session. That export collapses long tool outputs into "… +N lines", and shows each sub-agent, the `/audit` reviewer and the parallel reviewers, only through its final report.
+
+A few values were replaced with `<redacted>` after gitleaks flagged them before a push. All were false positives, and no real secret was ever committed:
+
+| Transcript | Line | What it hid | Why it was not a secret |
+|---|---|---|---|
+| `10-runtime.txt` | 1154 | `OTHER_JWT_SECRET` | A fabricated 48-byte test constant of `test/unit/deployment/demo-secrets.test.ts`. |
+| `10-runtime.txt` | 1156 | `OTHER_CURSOR_SECRET` | A fabricated 48-byte test constant of the same file. |
+| `10-runtime.txt` | 4067, 6398 | `OPENAPI_EXAMPLE_KEY` | The example `Idempotency-Key` of `docs/api/openapi.yaml`, copied into `test/integration/deployment/gitleaks.test.ts`. |
+| `12-infra-part1.txt` | 166 | An `auth_token` | The placeholder of an example in the AWS provider's documentation, fetched with curl; it is still visible in the diff of the redaction later in that transcript and in `12-infra-part2.txt`. |
+| `14-docs-part1.txt` | 4744 | The value of an `Idempotency-Key` header | An example key of the withdrawal request in the API guide, `docs/api/README.md`. |
+
+Every other `<redacted>` in the transcripts is the rule itself being quoted, not a replaced value.
+
 ## Sessions
 
 | # | Date | Transcript | Summary |
 |---|---|---|---|
 | pre | 2026-10-07 | [00-planning.md](00-planning.md) | Summary of the planning chat before the repository: risks, key decisions and dry runs of the setup prompts. |
+| advisor | 2026-10-07 to 2026-10-09 | [advisor-chat.md](advisor-chat.md) | Summary of the advisor chat used alongside every phase: drafting prompts, reviewing results and audits, and the decisions taken there. |
 | 00 | 2026-10-07 | [00-setup.txt](transcripts/00-setup.txt) | Repository setup: problem statement, AGENTS.md, CLAUDE.md, Claude Code permissions, the spec, adr, audit and ship skills, and this log. |
 | 01 | 2026-10-07 | [01-bootstrap.txt](transcripts/01-bootstrap.txt) | Bootstrap: Node 24 and strict TypeScript toolchain, Fastify walking skeleton, Postgres and Redis in Docker Compose, env:sync, GitHub Actions CI with a secret scan, the phase branch and pull request workflow, and four audit rounds. |
 | 02 part 1 | 2026-10-07 | [02-specs-part1.txt](transcripts/02-specs-part1.txt) | Specs, part 1: the spec scaffolding and the traceability gate (`npm run trace`), specs 000-overview and 001-accounts, four audit rounds and their fixes. |
@@ -64,3 +81,4 @@ The challenge asks for every prompt used with an AI along with every response. T
 | 13 part 2 | 2026-10-09 | [13-final-review-part2.txt](transcripts/13-final-review-part2.txt) | Final review, part 2: a check of all 238 ACs against their code and tests by six parallel reviewers, the weak assertions and unset Givens they found fixed (SYS, ACC, LED, REV, IDM, SEC and DEP ACs), the DEP-AC26 checkov policies tightened and mutation-tested, spec 007 run with its default rate limit, the owner-approved rewordings of sections 1.6 and 1.9 of spec 007, every spec set to `Implemented`, and `docs/traceability.md` committed with a freshness check in the CI job `traceability`. |
 | 14 part 1 | 2026-10-09 | [14-docs-part1.txt](transcripts/14-docs-part1.txt) | Docs, part 1: the README rewritten as the project's front page with diagrams and a Quickstart run against the stack, the architecture, API guide (with `requests.http` and a Postman collection), observability, security, development and limitations docs and the CHANGELOG, `make demo-env`, `npm run docs:check` and its CI job, a lost database connection answered 503 instead of 500 (SEC-AC48, SEC-AC49), the owner-approved DEP-AC36 to DEP-AC38, and `/ship`. |
 | 14 part 2 | 2026-10-09 | [14-docs-part2.txt](transcripts/14-docs-part2.txt) | Docs, part 2: the twelve runbooks with one structure and the alerts without an alarm in `docs/observability.md`, a review of the README and every doc against the code by four parallel reviewers and their fixes, the API guide's outputs regenerated from one run, the owner-approved update notes on ADR-0013, 0014, 0016 and 0018, the three findings of the `/audit` (the 503 after a lost connection in the OpenAPI document, the `docs:check` anchor crash, UUID-only ids in `demo-env`), the owner's texts in the README and this log, and `/ship` closing the phase. |
+| 15b | 2026-10-09 | [15b-review.txt](transcripts/15b-review.txt) | Review against the challenge: a requirement-by-requirement table with the gaps, then the README sections on the modular monolith and the thinking process, the advisor chat summary, what the exports contain and the redactions, and the phase list. |
