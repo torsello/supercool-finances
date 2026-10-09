@@ -74,4 +74,5 @@ The details are those of spec 006: `alg` exactly `HS256`, never a key named or e
 ### Follow-ups
 
 - Phase 08-api: the verifier and the token script.
+  - Done in phase 08-api on 2026-10-08; every cell of the authorization matrix proven on both replicas by AUT-AC16 in phase 11-e2e on 2026-10-09.
 - When a provider is chosen: a new ADR for the provider, JWKS caching and the (issuer, subject) mapping table, superseding the HS256 part of this one.

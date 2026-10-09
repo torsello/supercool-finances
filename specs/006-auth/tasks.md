@@ -46,8 +46,8 @@ No task for this spec.
 
 ## 11-e2e
 
-- [ ] Test first: AUT-AC16 in `test/e2e/authorization-matrix.test.ts`.
-- [ ] Update the docs: the OpenAPI bearer security scheme on every `/v1` route and the 401 and 403 responses; the README section on authentication and on minting tokens with `npm run token`; and the follow-ups closed in ADR-0012.
+- [x] Test first: AUT-AC16 in `test/e2e/authorization-matrix.test.ts`.
+- [x] Update the docs: the OpenAPI bearer security scheme on every `/v1` route and the 401 and 403 responses; the README section on authentication and on minting tokens with `npm run token`; and the follow-ups closed in ADR-0012.
 
 ## 12-infra
 
