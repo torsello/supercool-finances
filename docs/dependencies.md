@@ -1,6 +1,6 @@
 # Dependencies
 
-The approved dependencies: why each one is there and the phase that first uses it. A dependency is added to `package.json` in the phase that first uses it, so this list can name packages that are approved but not installed yet. The owner approved the initial set in the bootstrap prompt of phase `01-bootstrap`, and later additions on the dates noted beside them.
+The approved dependencies: why each one is there and the phase that first uses it. A dependency is added to `package.json` in the phase that first uses it; every package below is installed. The owner approved the initial set in the bootstrap prompt of phase `01-bootstrap`, and later additions on the dates noted beside them.
 
 A new dependency needs an ADR or the owner's approval recorded here (AGENTS.md ยง2). Versions live in `package.json` and `package-lock.json`, not here.
 
@@ -32,29 +32,30 @@ A new dependency needs an ADR or the owner's approval recorded here (AGENTS.md ย
 | `typescript`             | Compiler and type checker (strict).                                                                           | 01-bootstrap  |
 | `@types/node`            | Node 24 type definitions.                                                                                     | 01-bootstrap  |
 | `@types/pg`              | `pg` type definitions.                                                                                        | 01-bootstrap  |
-| `tsx`                    | Runs TypeScript directly: `npm run dev` and `npm run env:sync`.                                               | 01-bootstrap  |
-| `vitest`                 | Unit and integration test runner.                                                                             | 01-bootstrap  |
+| `tsx`                    | Runs TypeScript directly: `npm run dev` and every script under `scripts/` and `src/cli/`.                     | 01-bootstrap  |
+| `vitest`                 | Unit, integration and e2e test runner.                                                                        | 01-bootstrap  |
 | `@vitest/coverage-v8`    | Coverage for `npm run test:coverage`.                                                                         | 01-bootstrap  |
 | `eslint`                 | Linter.                                                                                                       | 01-bootstrap  |
 | `@eslint/js`             | ESLint recommended rules.                                                                                     | 01-bootstrap  |
 | `typescript-eslint`      | Type-checked lint rules (`strictTypeChecked`, `no-floating-promises`).                                        | 01-bootstrap  |
 | `eslint-config-prettier` | Turns off lint rules that conflict with Prettier.                                                             | 01-bootstrap  |
 | `prettier`               | Formatter.                                                                                                    | 01-bootstrap  |
-| `pino-pretty`            | Readable local logs.                                                                                          | 08-api        |
-| `@redocly/cli`           | OpenAPI linting and bundling.                                                                                 | 08-api        |
+| `@redocly/cli`           | OpenAPI linting (`npm run openapi:lint`).                                                                     | 08-api        |
 | `yaml`                   | Parses `compose.yaml` in the deployment unit tests (plan 007 section 8). Approved by the owner on 2026-10-08. | 10-runtime    |
 
 ## CI tools
 
-Tools CI runs outside `package.json`, each pinned by version and digest or checksum. Terraform, tflint and checkov run through `npm run infra:validate` (ADR-0015), and gitleaks in the job `secret-scan` (spec 008, DEP-R36).
+Tools CI runs outside `package.json`, each pinned by version and digest or checksum. Terraform, tflint and checkov run through `npm run infra:validate` (ADR-0015), gitleaks in the job `secret-scan` (spec 008, DEP-R36), the Mermaid CLI through `npm run docs:check` (DEP-R47), and newman through the e2e suite (DEP-R49). Terraform, tflint, checkov and gitleaks are covered by ADR-0015 and spec 008 and are not repeated below.
 
-| Tool    | Purpose                                                                                                                                                                                                                                                                    | First used in |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
-| `trivy` | The job `security` of `.github/workflows/ci.yml`: `trivy fs`, `trivy config` and `trivy image` of the runtime stage, failing on HIGH and CRITICAL, from the `aquasec/trivy` image pinned by version and digest. Approved by the owner on 2026-10-09 (plan 000 section 11). | 12-infra      |
+| Tool          | Purpose                                                                                                                                                                                                                                                                                                      | First used in |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------- |
+| `trivy`       | The job `security` of `.github/workflows/ci.yml`: `trivy fs`, `trivy config` and `trivy image` of the runtime stage, failing on HIGH and CRITICAL, from the `aquasec/trivy` image pinned by version and digest. Approved by the owner on 2026-10-09 (plan 000 section 11).                                   | 12-infra      |
+| `mermaid-cli` | `npm run docs:check` and the job `docs` of `.github/workflows/ci.yml`: renders every `mermaid` block of the Markdown files tracked by git, from the `minlag/mermaid-cli` image pinned by version and digest, fed on standard input (section 1.10 of spec 008, DEP-R47). Approved by the owner on 2026-10-09. | 14-docs       |
+| `newman`      | Runs the Postman collection of `docs/api/postman/` in the e2e test of DEP-AC38, through `npx --yes newman@6.2.3`, an exact version, so nothing is added to `package.json` (section 1.11 of spec 008, DEP-R49). Approved by the owner on 2026-10-09.                                                          | 14-docs       |
 
 ## Container images
 
-Images the repository runs besides those of table 1.1 of spec 008 (PostgreSQL, Redis, nginx and the Node base image), each pinned by version and digest (DEP-R22) and updated by Dependabot.
+Images the repository runs besides PostgreSQL, Redis, nginx and the Node base image, each pinned by version and digest (DEP-R22) and updated by Dependabot. Terraform, tflint and checkov run from images pinned in `scripts/infra-validate.sh` (ADR-0015), and trivy and the Mermaid CLI are listed under CI tools.
 
 | Image             | Purpose                                                                                                                                                                      | First used in     |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |

@@ -5,7 +5,7 @@ disable-model-invocation: true
 model: sonnet
 effort: low
 argument-hint: "[what this checkpoint delivers]"
-allowed-tools: Bash(npm run *) Bash(docker compose *) Bash(git add *) Bash(git commit *) Bash(git status *) Bash(git diff *) Bash(git log *) Bash(git restore --staged *) Bash(gitleaks *) Bash(checkov *) Bash(gh pr create *) Bash(gh pr view *)
+allowed-tools: Bash(npm run *) Bash(docker compose *) Bash(git add *) Bash(git commit *) Bash(git status *) Bash(git diff *) Bash(git log *) Bash(git restore --staged *) Bash(git reset --soft HEAD~1) Bash(gitleaks *) Bash(gh pr create *) Bash(gh pr view *)
 ---
 
 Create a checkpoint for: $ARGUMENTS
@@ -29,7 +29,7 @@ If the current branch is `main`, stop and ask the user to create the phase branc
 1. `npm run check`
 2. If `compose.yaml` exists: `npm run infra:up`, then `npm run test:integration`.
 3. `npm run trace -- --require unit,integration`, the same gate as CI. It reads the JSON reports that steps 1 and 2 just wrote.
-4. If `infra/terraform` exists: `checkov -d infra/terraform --quiet --compact`. Any finding without a skip comment that references an ADR counts as a failed gate.
+4. If `infra/terraform` exists: `npm run infra:validate`, the same check as CI: `terraform fmt -check`, `terraform validate`, tflint and checkov with the custom policies of `infra/policies/`, each from an image pinned by digest. Any finding counts as a failed gate.
 
 ## Step 3: docs in sync
 
@@ -47,7 +47,7 @@ Run `git add -A`, then read `git status --short`. Unstage with `git restore --st
 
 - Subject: `type(scope): summary`, under 72 characters. Types: `feat`, `fix`, `test`, `docs`, `refactor`, `chore`, `ci`, `build`.
 - Body: what changed and why in two to five lines, then `Covers: <AC IDs>` when applicable and `Phase: <NN-name>`.
-- The last line, after a blank line, is exactly one `Co-authored-by: Claude <noreply@anthropic.com>` trailer (the attribution in `.claude/settings.json`), so GitHub shows Claude as co-author.
+- After a blank line, the trailer block: one `Co-authored-by: Claude <noreply@anthropic.com>` line (the attribution in `.claude/settings.json`), so GitHub shows Claude as co-author, followed by the trailer lines Claude Code adds for the session, such as `Claude-Session: <url>`. Write nothing after them.
 
 ## Step 6: secret scan of the branch
 

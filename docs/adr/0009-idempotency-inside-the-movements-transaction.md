@@ -110,3 +110,4 @@ Details fixed by spec 005 that this ADR follows:
 - Phase 07-idempotency: the key step, fingerprint, savepoint and stored responses.
   - Done in phase 07-idempotency on 2026-10-08; proven across replicas by IDM-AC10 to IDM-AC13 in phase 09-hardening on 2026-10-08.
 - Phase 12-infra: the hourly cleanup schedule (DEP-R37).
+  - Done in phase 12-infra on 2026-10-09: an EventBridge Scheduler schedule `rate(1 hour)` runs the cleanup task, checked by DEP-AC26 in `npm run infra:validate`.

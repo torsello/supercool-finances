@@ -55,6 +55,36 @@ export function isProxyBorrowTimeout(error: unknown): boolean {
   return sqlstateOf(error) === PROXY_BORROW_TIMEOUT;
 }
 
+/** `pg`'s errors for a statement whose connection closed, or that a broken client refused. */
+const CONNECTION_LOST_MESSAGES = new Set([
+  'Connection terminated unexpectedly',
+  'Connection terminated',
+  'Client has encountered a connection error and is not queryable',
+]);
+
+/** The socket errors Node raises when the connection to the server breaks. */
+const CONNECTION_LOST_CODES = new Set(['ECONNRESET', 'EPIPE', 'ETIMEDOUT']);
+
+/**
+ * SQLSTATEs of a session the server ended: 57P01 (terminated by an administrator or a shutdown),
+ * 57P02 (crash shutdown), 57P03 (the server cannot accept connections now).
+ */
+const SESSION_ENDED = new Set(['57P01', '57P02', '57P03']);
+
+/**
+ * Whether a statement failed because its database connection was lost (SEC-R57): `pg`'s own
+ * connection error, which is not a `DatabaseError`, a socket error, or a session the server ended.
+ */
+export function isConnectionLoss(error: unknown): boolean {
+  if (error instanceof pg.DatabaseError) return SESSION_ENDED.has(error.code ?? '');
+  if (!(error instanceof Error)) return false;
+  const code = (error as NodeJS.ErrnoException).code;
+  return (
+    CONNECTION_LOST_MESSAGES.has(error.message) ||
+    (code !== undefined && CONNECTION_LOST_CODES.has(code))
+  );
+}
+
 /** A deadlock or serialization failure, which the runner retries for movements (SYS-R18). */
 export function isRetryable(error: unknown): boolean {
   return error instanceof pg.DatabaseError && RETRYABLE.has(error.code ?? '');

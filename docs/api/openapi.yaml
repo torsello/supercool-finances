@@ -47,18 +47,20 @@ info:
 
     **Errors.** Every error answer is `application/problem+json` (RFC 9457) with
     `type`, `title`, `status`, `detail` and `requestId`, and `errors` for a
-    validation error; `title` and `detail` are fixed per type, and no body holds
-    a stack trace, SQL or an underlying error's message. Checks run in this
-    order and the first failure answers: route (404), authentication (401),
-    per-user rate limit (429), role (403), media type (415), body size (413),
-    malformed request (400), idempotency (a stored response, 422 or 409),
+    validation error; `title` is fixed per type, and so is `detail` except for
+    400 `malformed-request`, whose `detail` names the part at fault (the body,
+    the `Idempotency-Key`, the cursor or the request), so match on `type`; no
+    body holds a stack trace, SQL or an underlying error's message. Checks run
+    in this order and the first failure answers: route (404), authentication
+    (401), per-user rate limit (429), role (403), media type (415), body size
+    (413), malformed request (400), idempotency (a stored response, 422 or 409),
     validation (422), lookup (404), business rules (409, 422). A stored answer
     is replayed with `Idempotent-Replayed: true`; one not stored committed
     nothing, so a retry with the same key runs the request again, except a 503
-    at the request timeout after the `COMMIT` was sent and a gateway error (502,
-    503 or 504 from the load balancer), whose outcome a retry with the same key
-    reveals: the stored response if the movement committed, a new run otherwise.
-    The types:
+    at the request timeout after the `COMMIT` was sent, a 503 for a database
+    connection lost during `COMMIT` and a gateway error (502, 503 or 504 from
+    the load balancer), whose outcome a retry with the same key reveals: the
+    stored response if the movement committed, a new run otherwise. The types:
 
 
     | Type | Status | Title | When | Stored for replay |
@@ -168,15 +170,17 @@ info:
     condition of a replica, with `Retry-After: 1`: no database connection free
     within `DB_POOL_ACQUIRE_TIMEOUT_MS`, or in AWS none free at RDS Proxy within
     its 5 s borrow timeout, an account lock not acquired in time, a deadlock or
-    serialization failure still present after 3 attempts, a statement timeout,
-    the request timeout `REQUEST_TIMEOUT_MS` (25 s by default) reached, or the
-    replica shutting down. Nothing is stored, and the transaction rolls back;
-    only when the request timeout comes after the `COMMIT` was sent does that
-    commit finish, with an outcome unknown to the client. Retry after
-    `Retry-After`, with the same `Idempotency-Key` for a POST, which then gets
-    the stored response if the movement committed. | no, except at the request
-    timeout after the `COMMIT` was sent: if it committed, a retry with the same
-    key gets the stored response |
+    serialization failure still present after 3 attempts, a statement timeout, a
+    database connection lost while a statement ran (SEC-R57), the request
+    timeout `REQUEST_TIMEOUT_MS` (25 s by default) reached, or the replica
+    shutting down. Nothing is stored, and the transaction rolls back; only at
+    the request timeout after the `COMMIT` was sent, or for a connection lost
+    during `COMMIT`, may the commit have succeeded, with an outcome unknown to
+    the client. Retry after `Retry-After`, with the same `Idempotency-Key` for a
+    POST, which then gets the stored response if the movement committed. | no,
+    except at the request timeout after the `COMMIT` was sent, or a connection
+    lost during `COMMIT`: if it committed, a retry with the same key gets the
+    stored response |
 
     | `/problems/internal-error` | 500 | Internal Error | A defect. The body
     never holds internals; report the `requestId`. | no |
@@ -709,13 +713,14 @@ paths:
             `DB_POOL_ACQUIRE_TIMEOUT_MS`, or in AWS none free at RDS Proxy
             within its 5 s borrow timeout, an account lock not acquired in time,
             a deadlock or serialization failure still present after 3 attempts,
-            a statement timeout, the request timeout `REQUEST_TIMEOUT_MS` (25 s
-            by default) reached, or the replica shutting down. Nothing is
-            stored, and the transaction rolls back; only when the request
-            timeout comes after the `COMMIT` was sent does that commit finish,
-            with an outcome unknown to the client. Retry after `Retry-After`,
-            with the same `Idempotency-Key` for a POST, which then gets the
-            stored response if the movement committed.
+            a statement timeout, a database connection lost while a statement
+            ran (SEC-R57), the request timeout `REQUEST_TIMEOUT_MS` (25 s by
+            default) reached, or the replica shutting down. Nothing is stored,
+            and the transaction rolls back; only at the request timeout after
+            the `COMMIT` was sent, or for a connection lost during `COMMIT`, may
+            the commit have succeeded, with an outcome unknown to the client.
+            Retry after `Retry-After`, with the same `Idempotency-Key` for a
+            POST, which then gets the stored response if the movement committed.
             `/problems/upstream-unavailable`: Answered by the load balancer, not
             by a replica: no replica answered, one sent a broken response, or
             none answered in time. Locally nginx answers it as problem details;
@@ -1058,13 +1063,14 @@ paths:
             `DB_POOL_ACQUIRE_TIMEOUT_MS`, or in AWS none free at RDS Proxy
             within its 5 s borrow timeout, an account lock not acquired in time,
             a deadlock or serialization failure still present after 3 attempts,
-            a statement timeout, the request timeout `REQUEST_TIMEOUT_MS` (25 s
-            by default) reached, or the replica shutting down. Nothing is
-            stored, and the transaction rolls back; only when the request
-            timeout comes after the `COMMIT` was sent does that commit finish,
-            with an outcome unknown to the client. Retry after `Retry-After`,
-            with the same `Idempotency-Key` for a POST, which then gets the
-            stored response if the movement committed.
+            a statement timeout, a database connection lost while a statement
+            ran (SEC-R57), the request timeout `REQUEST_TIMEOUT_MS` (25 s by
+            default) reached, or the replica shutting down. Nothing is stored,
+            and the transaction rolls back; only at the request timeout after
+            the `COMMIT` was sent, or for a connection lost during `COMMIT`, may
+            the commit have succeeded, with an outcome unknown to the client.
+            Retry after `Retry-After`, with the same `Idempotency-Key` for a
+            POST, which then gets the stored response if the movement committed.
             `/problems/upstream-unavailable`: Answered by the load balancer, not
             by a replica: no replica answered, one sent a broken response, or
             none answered in time. Locally nginx answers it as problem details;
@@ -1399,13 +1405,14 @@ paths:
             `DB_POOL_ACQUIRE_TIMEOUT_MS`, or in AWS none free at RDS Proxy
             within its 5 s borrow timeout, an account lock not acquired in time,
             a deadlock or serialization failure still present after 3 attempts,
-            a statement timeout, the request timeout `REQUEST_TIMEOUT_MS` (25 s
-            by default) reached, or the replica shutting down. Nothing is
-            stored, and the transaction rolls back; only when the request
-            timeout comes after the `COMMIT` was sent does that commit finish,
-            with an outcome unknown to the client. Retry after `Retry-After`,
-            with the same `Idempotency-Key` for a POST, which then gets the
-            stored response if the movement committed.
+            a statement timeout, a database connection lost while a statement
+            ran (SEC-R57), the request timeout `REQUEST_TIMEOUT_MS` (25 s by
+            default) reached, or the replica shutting down. Nothing is stored,
+            and the transaction rolls back; only at the request timeout after
+            the `COMMIT` was sent, or for a connection lost during `COMMIT`, may
+            the commit have succeeded, with an outcome unknown to the client.
+            Retry after `Retry-After`, with the same `Idempotency-Key` for a
+            POST, which then gets the stored response if the movement committed.
             `/problems/upstream-unavailable`: Answered by the load balancer, not
             by a replica: no replica answered, one sent a broken response, or
             none answered in time. Locally nginx answers it as problem details;
@@ -1761,13 +1768,14 @@ paths:
             `DB_POOL_ACQUIRE_TIMEOUT_MS`, or in AWS none free at RDS Proxy
             within its 5 s borrow timeout, an account lock not acquired in time,
             a deadlock or serialization failure still present after 3 attempts,
-            a statement timeout, the request timeout `REQUEST_TIMEOUT_MS` (25 s
-            by default) reached, or the replica shutting down. Nothing is
-            stored, and the transaction rolls back; only when the request
-            timeout comes after the `COMMIT` was sent does that commit finish,
-            with an outcome unknown to the client. Retry after `Retry-After`,
-            with the same `Idempotency-Key` for a POST, which then gets the
-            stored response if the movement committed.
+            a statement timeout, a database connection lost while a statement
+            ran (SEC-R57), the request timeout `REQUEST_TIMEOUT_MS` (25 s by
+            default) reached, or the replica shutting down. Nothing is stored,
+            and the transaction rolls back; only at the request timeout after
+            the `COMMIT` was sent, or for a connection lost during `COMMIT`, may
+            the commit have succeeded, with an outcome unknown to the client.
+            Retry after `Retry-After`, with the same `Idempotency-Key` for a
+            POST, which then gets the stored response if the movement committed.
             `/problems/upstream-unavailable`: Answered by the load balancer, not
             by a replica: no replica answered, one sent a broken response, or
             none answered in time. Locally nginx answers it as problem details;
@@ -2195,13 +2203,14 @@ paths:
             `DB_POOL_ACQUIRE_TIMEOUT_MS`, or in AWS none free at RDS Proxy
             within its 5 s borrow timeout, an account lock not acquired in time,
             a deadlock or serialization failure still present after 3 attempts,
-            a statement timeout, the request timeout `REQUEST_TIMEOUT_MS` (25 s
-            by default) reached, or the replica shutting down. Nothing is
-            stored, and the transaction rolls back; only when the request
-            timeout comes after the `COMMIT` was sent does that commit finish,
-            with an outcome unknown to the client. Retry after `Retry-After`,
-            with the same `Idempotency-Key` for a POST, which then gets the
-            stored response if the movement committed.
+            a statement timeout, a database connection lost while a statement
+            ran (SEC-R57), the request timeout `REQUEST_TIMEOUT_MS` (25 s by
+            default) reached, or the replica shutting down. Nothing is stored,
+            and the transaction rolls back; only at the request timeout after
+            the `COMMIT` was sent, or for a connection lost during `COMMIT`, may
+            the commit have succeeded, with an outcome unknown to the client.
+            Retry after `Retry-After`, with the same `Idempotency-Key` for a
+            POST, which then gets the stored response if the movement committed.
             `/problems/upstream-unavailable`: Answered by the load balancer, not
             by a replica: no replica answered, one sent a broken response, or
             none answered in time. Locally nginx answers it as problem details;
@@ -2629,13 +2638,14 @@ paths:
             `DB_POOL_ACQUIRE_TIMEOUT_MS`, or in AWS none free at RDS Proxy
             within its 5 s borrow timeout, an account lock not acquired in time,
             a deadlock or serialization failure still present after 3 attempts,
-            a statement timeout, the request timeout `REQUEST_TIMEOUT_MS` (25 s
-            by default) reached, or the replica shutting down. Nothing is
-            stored, and the transaction rolls back; only when the request
-            timeout comes after the `COMMIT` was sent does that commit finish,
-            with an outcome unknown to the client. Retry after `Retry-After`,
-            with the same `Idempotency-Key` for a POST, which then gets the
-            stored response if the movement committed.
+            a statement timeout, a database connection lost while a statement
+            ran (SEC-R57), the request timeout `REQUEST_TIMEOUT_MS` (25 s by
+            default) reached, or the replica shutting down. Nothing is stored,
+            and the transaction rolls back; only at the request timeout after
+            the `COMMIT` was sent, or for a connection lost during `COMMIT`, may
+            the commit have succeeded, with an outcome unknown to the client.
+            Retry after `Retry-After`, with the same `Idempotency-Key` for a
+            POST, which then gets the stored response if the movement committed.
             `/problems/upstream-unavailable`: Answered by the load balancer, not
             by a replica: no replica answered, one sent a broken response, or
             none answered in time. Locally nginx answers it as problem details;
@@ -3063,13 +3073,14 @@ paths:
             `DB_POOL_ACQUIRE_TIMEOUT_MS`, or in AWS none free at RDS Proxy
             within its 5 s borrow timeout, an account lock not acquired in time,
             a deadlock or serialization failure still present after 3 attempts,
-            a statement timeout, the request timeout `REQUEST_TIMEOUT_MS` (25 s
-            by default) reached, or the replica shutting down. Nothing is
-            stored, and the transaction rolls back; only when the request
-            timeout comes after the `COMMIT` was sent does that commit finish,
-            with an outcome unknown to the client. Retry after `Retry-After`,
-            with the same `Idempotency-Key` for a POST, which then gets the
-            stored response if the movement committed.
+            a statement timeout, a database connection lost while a statement
+            ran (SEC-R57), the request timeout `REQUEST_TIMEOUT_MS` (25 s by
+            default) reached, or the replica shutting down. Nothing is stored,
+            and the transaction rolls back; only at the request timeout after
+            the `COMMIT` was sent, or for a connection lost during `COMMIT`, may
+            the commit have succeeded, with an outcome unknown to the client.
+            Retry after `Retry-After`, with the same `Idempotency-Key` for a
+            POST, which then gets the stored response if the movement committed.
             `/problems/upstream-unavailable`: Answered by the load balancer, not
             by a replica: no replica answered, one sent a broken response, or
             none answered in time. Locally nginx answers it as problem details;
@@ -3570,13 +3581,14 @@ paths:
             `DB_POOL_ACQUIRE_TIMEOUT_MS`, or in AWS none free at RDS Proxy
             within its 5 s borrow timeout, an account lock not acquired in time,
             a deadlock or serialization failure still present after 3 attempts,
-            a statement timeout, the request timeout `REQUEST_TIMEOUT_MS` (25 s
-            by default) reached, or the replica shutting down. Nothing is
-            stored, and the transaction rolls back; only when the request
-            timeout comes after the `COMMIT` was sent does that commit finish,
-            with an outcome unknown to the client. Retry after `Retry-After`,
-            with the same `Idempotency-Key` for a POST, which then gets the
-            stored response if the movement committed.
+            a statement timeout, a database connection lost while a statement
+            ran (SEC-R57), the request timeout `REQUEST_TIMEOUT_MS` (25 s by
+            default) reached, or the replica shutting down. Nothing is stored,
+            and the transaction rolls back; only at the request timeout after
+            the `COMMIT` was sent, or for a connection lost during `COMMIT`, may
+            the commit have succeeded, with an outcome unknown to the client.
+            Retry after `Retry-After`, with the same `Idempotency-Key` for a
+            POST, which then gets the stored response if the movement committed.
             `/problems/upstream-unavailable`: Answered by the load balancer, not
             by a replica: no replica answered, one sent a broken response, or
             none answered in time. Locally nginx answers it as problem details;
@@ -4088,13 +4100,14 @@ paths:
             `DB_POOL_ACQUIRE_TIMEOUT_MS`, or in AWS none free at RDS Proxy
             within its 5 s borrow timeout, an account lock not acquired in time,
             a deadlock or serialization failure still present after 3 attempts,
-            a statement timeout, the request timeout `REQUEST_TIMEOUT_MS` (25 s
-            by default) reached, or the replica shutting down. Nothing is
-            stored, and the transaction rolls back; only when the request
-            timeout comes after the `COMMIT` was sent does that commit finish,
-            with an outcome unknown to the client. Retry after `Retry-After`,
-            with the same `Idempotency-Key` for a POST, which then gets the
-            stored response if the movement committed.
+            a statement timeout, a database connection lost while a statement
+            ran (SEC-R57), the request timeout `REQUEST_TIMEOUT_MS` (25 s by
+            default) reached, or the replica shutting down. Nothing is stored,
+            and the transaction rolls back; only at the request timeout after
+            the `COMMIT` was sent, or for a connection lost during `COMMIT`, may
+            the commit have succeeded, with an outcome unknown to the client.
+            Retry after `Retry-After`, with the same `Idempotency-Key` for a
+            POST, which then gets the stored response if the movement committed.
             `/problems/upstream-unavailable`: Answered by the load balancer, not
             by a replica: no replica answered, one sent a broken response, or
             none answered in time. Locally nginx answers it as problem details;
@@ -4632,13 +4645,14 @@ paths:
             `DB_POOL_ACQUIRE_TIMEOUT_MS`, or in AWS none free at RDS Proxy
             within its 5 s borrow timeout, an account lock not acquired in time,
             a deadlock or serialization failure still present after 3 attempts,
-            a statement timeout, the request timeout `REQUEST_TIMEOUT_MS` (25 s
-            by default) reached, or the replica shutting down. Nothing is
-            stored, and the transaction rolls back; only when the request
-            timeout comes after the `COMMIT` was sent does that commit finish,
-            with an outcome unknown to the client. Retry after `Retry-After`,
-            with the same `Idempotency-Key` for a POST, which then gets the
-            stored response if the movement committed.
+            a statement timeout, a database connection lost while a statement
+            ran (SEC-R57), the request timeout `REQUEST_TIMEOUT_MS` (25 s by
+            default) reached, or the replica shutting down. Nothing is stored,
+            and the transaction rolls back; only at the request timeout after
+            the `COMMIT` was sent, or for a connection lost during `COMMIT`, may
+            the commit have succeeded, with an outcome unknown to the client.
+            Retry after `Retry-After`, with the same `Idempotency-Key` for a
+            POST, which then gets the stored response if the movement committed.
             `/problems/upstream-unavailable`: Answered by the load balancer, not
             by a replica: no replica answered, one sent a broken response, or
             none answered in time. Locally nginx answers it as problem details;
@@ -4958,13 +4972,14 @@ paths:
             `DB_POOL_ACQUIRE_TIMEOUT_MS`, or in AWS none free at RDS Proxy
             within its 5 s borrow timeout, an account lock not acquired in time,
             a deadlock or serialization failure still present after 3 attempts,
-            a statement timeout, the request timeout `REQUEST_TIMEOUT_MS` (25 s
-            by default) reached, or the replica shutting down. Nothing is
-            stored, and the transaction rolls back; only when the request
-            timeout comes after the `COMMIT` was sent does that commit finish,
-            with an outcome unknown to the client. Retry after `Retry-After`,
-            with the same `Idempotency-Key` for a POST, which then gets the
-            stored response if the movement committed.
+            a statement timeout, a database connection lost while a statement
+            ran (SEC-R57), the request timeout `REQUEST_TIMEOUT_MS` (25 s by
+            default) reached, or the replica shutting down. Nothing is stored,
+            and the transaction rolls back; only at the request timeout after
+            the `COMMIT` was sent, or for a connection lost during `COMMIT`, may
+            the commit have succeeded, with an outcome unknown to the client.
+            Retry after `Retry-After`, with the same `Idempotency-Key` for a
+            POST, which then gets the stored response if the movement committed.
             `/problems/upstream-unavailable`: Answered by the load balancer, not
             by a replica: no replica answered, one sent a broken response, or
             none answered in time. Locally nginx answers it as problem details;
@@ -5478,13 +5493,14 @@ paths:
             `DB_POOL_ACQUIRE_TIMEOUT_MS`, or in AWS none free at RDS Proxy
             within its 5 s borrow timeout, an account lock not acquired in time,
             a deadlock or serialization failure still present after 3 attempts,
-            a statement timeout, the request timeout `REQUEST_TIMEOUT_MS` (25 s
-            by default) reached, or the replica shutting down. Nothing is
-            stored, and the transaction rolls back; only when the request
-            timeout comes after the `COMMIT` was sent does that commit finish,
-            with an outcome unknown to the client. Retry after `Retry-After`,
-            with the same `Idempotency-Key` for a POST, which then gets the
-            stored response if the movement committed.
+            a statement timeout, a database connection lost while a statement
+            ran (SEC-R57), the request timeout `REQUEST_TIMEOUT_MS` (25 s by
+            default) reached, or the replica shutting down. Nothing is stored,
+            and the transaction rolls back; only at the request timeout after
+            the `COMMIT` was sent, or for a connection lost during `COMMIT`, may
+            the commit have succeeded, with an outcome unknown to the client.
+            Retry after `Retry-After`, with the same `Idempotency-Key` for a
+            POST, which then gets the stored response if the movement committed.
             `/problems/upstream-unavailable`: Answered by the load balancer, not
             by a replica: no replica answered, one sent a broken response, or
             none answered in time. Locally nginx answers it as problem details;

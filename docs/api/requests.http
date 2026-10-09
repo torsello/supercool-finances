@@ -1,0 +1,165 @@
+# SuperCool Finances: every endpoint as a ready-to-run request.
+# Works with the VS Code REST Client and the JetBrains HTTP Client. The guide is docs/api/README.md.
+#
+# 1. Start the stack and seed it:  docker compose up --build --wait && make seed
+# 2. Print the variables:           make demo-env
+#    and paste TOKEN, OPERATOR_TOKEN, A and B into @token, @operatorToken, @accountA and @accountB.
+#    Tokens are valid for 15 minutes.
+# 3. Paste the ids that later requests need from earlier responses: @accountC from "Open an
+#    account", @depositId from "Deposit", @transferId from "Transfer", @reversalId from "Reverse".
+#
+# Idempotency keys are fixed, so sending a request twice replays it (Idempotent-Replayed: true).
+# Change the key to start a new operation.
+
+@baseUrl = http://localhost:8080
+@token = paste-TOKEN-here
+@operatorToken = paste-OPERATOR_TOKEN-here
+@accountA = paste-A-here
+@accountB = paste-B-here
+@accountC = paste-the-id-of-the-opened-account-here
+@depositId = paste-the-id-of-the-deposit-here
+@transferId = paste-the-id-of-the-transfer-here
+@reversalId = paste-the-id-of-the-reversal-here
+
+### Liveness: the process runs (no token)
+GET {{baseUrl}}/health/live
+
+### Readiness: the database answers and every migration is applied (no token)
+GET {{baseUrl}}/health/ready
+
+### OpenAPI document (no token)
+GET {{baseUrl}}/docs/json
+
+### Open an account (customer; Idempotency-Key optional)
+POST {{baseUrl}}/v1/accounts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+Idempotency-Key: http-open-cop-1
+
+{"currency": "COP"}
+
+### List your accounts, newest first (customer)
+GET {{baseUrl}}/v1/accounts?limit=2
+Authorization: Bearer {{token}}
+
+### Read an account (customer: own accounts)
+GET {{baseUrl}}/v1/accounts/{{accountA}}
+Authorization: Bearer {{token}}
+
+### Read an account (operator: any customer account, with ownerId)
+GET {{baseUrl}}/v1/accounts/{{accountA}}
+Authorization: Bearer {{operatorToken}}
+
+### Deposit 50.00 EUR (operator; Idempotency-Key required)
+POST {{baseUrl}}/v1/accounts/{{accountA}}/deposits
+Authorization: Bearer {{operatorToken}}
+Content-Type: application/json
+Idempotency-Key: http-deposit-1
+
+{"amount": "5000", "currency": "EUR"}
+
+### Withdraw 20.00 EUR (customer, own account; Idempotency-Key required)
+POST {{baseUrl}}/v1/accounts/{{accountA}}/withdrawals
+Authorization: Bearer {{token}}
+Content-Type: application/json
+Idempotency-Key: http-withdrawal-1
+
+{"amount": "2000", "currency": "EUR"}
+
+### Transfer 10.50 EUR from A to B (customer, own source; Idempotency-Key required)
+POST {{baseUrl}}/v1/accounts/{{accountA}}/transfers
+Authorization: Bearer {{token}}
+Content-Type: application/json
+Idempotency-Key: http-transfer-1
+
+{"destinationAccountId": "{{accountB}}", "amount": "1050", "currency": "EUR"}
+
+### Read an account's history, newest first (customer or operator)
+GET {{baseUrl}}/v1/accounts/{{accountA}}/entries?limit=5
+Authorization: Bearer {{token}}
+
+### Read a transaction (customer: only the entries of their own accounts)
+GET {{baseUrl}}/v1/transactions/{{transferId}}
+Authorization: Bearer {{token}}
+
+### Read a transaction (operator: every entry, settlement accounts included)
+GET {{baseUrl}}/v1/transactions/{{depositId}}
+Authorization: Bearer {{operatorToken}}
+
+### Reverse the deposit (operator; Idempotency-Key required)
+POST {{baseUrl}}/v1/transactions/{{depositId}}/reversals
+Authorization: Bearer {{operatorToken}}
+Content-Type: application/json
+Idempotency-Key: http-reversal-1
+
+{"reason": "Deposit credited to the wrong account"}
+
+### Read the reversal (operator)
+GET {{baseUrl}}/v1/transactions/{{reversalId}}
+Authorization: Bearer {{operatorToken}}
+
+### Freeze an account (operator; no body, no Idempotency-Key)
+POST {{baseUrl}}/v1/accounts/{{accountC}}/freeze
+Authorization: Bearer {{operatorToken}}
+
+### Unfreeze it (operator)
+POST {{baseUrl}}/v1/accounts/{{accountC}}/unfreeze
+Authorization: Bearer {{operatorToken}}
+
+### Close it: only with balance "0", and final (operator)
+POST {{baseUrl}}/v1/accounts/{{accountC}}/close
+Authorization: Bearer {{operatorToken}}
+
+### Error: no token, 401 /problems/unauthenticated
+GET {{baseUrl}}/v1/accounts
+
+### Error: a customer deposits, 403 /problems/forbidden
+POST {{baseUrl}}/v1/accounts/{{accountA}}/deposits
+Authorization: Bearer {{token}}
+Content-Type: application/json
+Idempotency-Key: http-forbidden-1
+
+{"amount": "100", "currency": "EUR"}
+
+### Error: another customer's account, 404 /problems/not-found
+GET {{baseUrl}}/v1/accounts/{{accountB}}
+Authorization: Bearer {{token}}
+
+### Error: no Idempotency-Key on a movement, 400 /problems/malformed-request
+POST {{baseUrl}}/v1/accounts/{{accountA}}/withdrawals
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"amount": "100", "currency": "EUR"}
+
+### Error: an amount that is not minor units, 422 /problems/validation-error
+POST {{baseUrl}}/v1/accounts/{{accountA}}/withdrawals
+Authorization: Bearer {{token}}
+Content-Type: application/json
+Idempotency-Key: http-validation-1
+
+{"amount": "10.50", "currency": "EUR"}
+
+### Error: the transfer's key with another body, 422 /problems/idempotency-key-reused
+POST {{baseUrl}}/v1/accounts/{{accountA}}/transfers
+Authorization: Bearer {{token}}
+Content-Type: application/json
+Idempotency-Key: http-transfer-1
+
+{"destinationAccountId": "{{accountB}}", "amount": "2000", "currency": "EUR"}
+
+### Error: more than the balance, 422 /problems/insufficient-funds
+POST {{baseUrl}}/v1/accounts/{{accountA}}/withdrawals
+Authorization: Bearer {{token}}
+Content-Type: application/json
+Idempotency-Key: http-insufficient-1
+
+{"amount": "99999999", "currency": "EUR"}
+
+### Error: the deposit reversed again, 409 /problems/already-reversed
+POST {{baseUrl}}/v1/transactions/{{depositId}}/reversals
+Authorization: Bearer {{operatorToken}}
+Content-Type: application/json
+Idempotency-Key: http-reversal-2
+
+{"reason": "Second attempt"}

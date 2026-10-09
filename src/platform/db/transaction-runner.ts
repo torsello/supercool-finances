@@ -5,9 +5,15 @@ import {
   type RequestDeadline,
   type RunScope,
 } from '../http/request-timeout.js';
-import { AccountLockTimeout, IdempotencyWaitTimeout, RetriesExhausted } from './errors.js';
+import {
+  AccountLockTimeout,
+  ConnectionLost,
+  IdempotencyWaitTimeout,
+  RetriesExhausted,
+} from './errors.js';
 import {
   classifyDatabaseError,
+  isConnectionLoss,
   isProxyBorrowTimeout,
   isRetryable,
   sqlstateOf,
@@ -165,10 +171,11 @@ export class TransactionRunner<Client extends RunnerClient> {
       client.release();
       throw new RequestTimeout();
     }
-    const connection: { broken?: Error } = {};
+    const connection: Connection = {};
     // pg-pool listens only on idle clients: while this run holds the client, a lost connection is
     // recorded here, so the client is destroyed on release and the process keeps running.
     const onError = (error: Error) => {
+      connection.lost ??= error;
       connection.broken ??= error;
     };
     client.on('error', onError);
@@ -206,7 +213,7 @@ export class TransactionRunner<Client extends RunnerClient> {
 
   async #attempts<T>(
     client: Client,
-    connection: { broken?: Error },
+    connection: Connection,
     work: (client: Client) => Promise<T>,
     retry: RetryPolicy,
     deadline: RequestDeadline | undefined,
@@ -230,6 +237,15 @@ export class TransactionRunner<Client extends RunnerClient> {
         connection.broken ??= unaccounted(client);
         return result;
       } catch (error) {
+        // A lost connection, at any statement, COMMIT included, where the outcome is unknown: 503,
+        // never 500, never retried, and the client is destroyed (SEC-R57). A client that reported
+        // the loss gets nothing more; one known lost only by the error, such as a session the
+        // server ended (57P01) before its socket closed, gets the ROLLBACK, which then fails.
+        if (connection.lost !== undefined || isConnectionLoss(error)) {
+          if (connection.lost === undefined) await rollBack(client);
+          connection.broken ??= new Error('database connection lost', { cause: error });
+          throw new ConnectionLost({ cause: error });
+        }
         // After RDS Proxy's borrow timeout nothing more is sent, not even ROLLBACK, which would
         // wait for a connection again: the client is destroyed on release (SEC-R49).
         connection.broken ??= isProxyBorrowTimeout(error)
@@ -259,6 +275,12 @@ export class TransactionRunner<Client extends RunnerClient> {
       }
     }
   }
+}
+
+/** The state of the run's connection: `lost` once the client reported its connection lost. */
+interface Connection {
+  broken?: Error;
+  lost?: Error;
 }
 
 /** Rolls back; returns the reason the client cannot go back to the pool, if there is one. */

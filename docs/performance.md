@@ -13,16 +13,16 @@ The latest result of the load test of SYS-R20 (`scripts/load-test.ts`), written 
 - Setup: 1000 customers, each with a pair of EUR accounts funded with "100000" EUR each through the API, and 10 operators: 4000 setup requests in 16 s.
 - Load: an open model. 12000 single deposits, withdrawals and transfers of "100" EUR in equal thirds, each with its own Idempotency-Key, scheduled one every 5 ms for a constant 200 requests per second over 60 s. Each leaves at its moment whether or not earlier ones were answered, over at most 256 connections, and its latency runs from its scheduled moment, so a slow answer, or a wait for a free connection, counts in full. Deposits rotate over the operators; withdrawals and transfers (from one account of a pair to the other) over the customers (SEC-AC05).
 - Count: every request still in flight when the schedule ends is drained, so each one ends as an answer, a connection error, or a loss after 60 s without an answer.
-- Finished at 2026-10-09T13:18:56.687Z.
+- Finished at 2026-10-09T14:43:42.522Z.
 
 ## Results
 
 | Measure                   |                                                   Value |
 | ------------------------- | ------------------------------------------------------: |
-| p50 latency               |                                                  3.7 ms |
-| p95 latency               |                                                  5.6 ms |
-| p99 latency               |                                                 12.4 ms |
-| Maximum latency           |                                                193.2 ms |
+| p50 latency               |                                                  3.9 ms |
+| p95 latency               |                                                  6.8 ms |
+| p99 latency               |                                                 15.1 ms |
+| Maximum latency           |                                                  186 ms |
 | Requests sent             |             12000 of 12000 scheduled, at 200 per second |
 | Achieved throughput       |                                200 responses per second |
 | Responses                 | 12000 (4000 deposits, 4000 withdrawals, 4000 transfers) |
@@ -33,6 +33,6 @@ The latest result of the load test of SYS-R20 (`scripts/load-test.ts`), written 
 | Drain after the last send |                                                     0 s |
 
 - Status codes: 201: 12000.
-- Target p99 under 300 ms: met: p99 12.4 ms is under 300 ms.
-- Generator: kept its schedule: every request left at most 3.6 ms after its moment (p99 1.1 ms; the limit is 100 ms).
+- Target p99 under 300 ms: met: p99 15.1 ms is under 300 ms.
+- Generator: kept its schedule: every request left at most 11.9 ms after its moment (p99 1.3 ms; the limit is 100 ms).
 - Reconciliation after the run: clean: every cached balance matches the ledger and every currency sums to zero (SYS-AC11, SYS-AC12).

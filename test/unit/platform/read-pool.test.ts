@@ -3,6 +3,7 @@ import pg from 'pg';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { acquiringPool, createDatabase } from '../../../src/platform/db/database.js';
 import {
+  ConnectionLost,
   PoolClosed,
   ProxyBorrowTimeout,
   StatementTimeout,
@@ -237,5 +238,20 @@ describe('the read pool', () => {
     expect(problem.type).toBe('/problems/service-unavailable');
     expect(problem.headers['retry-after']).toBe('1');
     expect(counted).toEqual([]);
+  });
+  it('SEC-AC49 a read whose connection is lost answers 503 with Retry-After: 1 and destroys its connection', async () => {
+    const { clock, client, db } = setup({
+      plan: () => ({ ms: 10, outcome: new Error('Connection terminated unexpectedly') }),
+    });
+    const state = outcome(sql`SELECT 1 AS n`.execute(db), clock);
+    await clock.advanceTo(10);
+    expect(state.error).toBeInstanceOf(ConnectionLost);
+    expect(toProblem(state.error)).toMatchObject({
+      status: 503,
+      type: '/problems/service-unavailable',
+      headers: { 'retry-after': '1' },
+    });
+    expect(client.releases).toHaveLength(1);
+    expect(client.releases[0]?.error).toBeInstanceOf(Error);
   });
 });

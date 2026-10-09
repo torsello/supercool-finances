@@ -1,9 +1,9 @@
 import { Kysely, PostgresDialect, type PostgresPool, type PostgresPoolClient } from 'kysely';
 import pg from 'pg';
 import { CLIENT_SIDE_LIMIT_MS, RequestTimeout, type RunScope } from '../http/request-timeout.js';
-import { PoolAcquireTimeout, PoolClosed } from './errors.js';
+import { ConnectionLost, PoolAcquireTimeout, PoolClosed } from './errors.js';
 import type { Database } from './schema.js';
-import { classifyDatabaseError, isProxyBorrowTimeout } from './sqlstate.js';
+import { classifyDatabaseError, isConnectionLoss, isProxyBorrowTimeout } from './sqlstate.js';
 
 /** pg's array of `text`, whose parser keeps every element a string (or null). */
 const TEXT_ARRAY_OID = 1009;
@@ -190,6 +190,11 @@ function readConnection(client: pg.PoolClient, scope: RunScope | undefined): Pos
     } catch (error) {
       if (isProxyBorrowTimeout(error)) {
         broken ??= new Error('the database proxy found no connection in time', { cause: error });
+      }
+      // A lost connection answers 503 and is destroyed, never reused (SEC-R57).
+      if (isConnectionLoss(error)) {
+        broken ??= new Error('database connection lost', { cause: error });
+        throw new ConnectionLost({ cause: error });
       }
       throw classifyDatabaseError(error, 'work');
     }

@@ -44,8 +44,9 @@ resource "aws_lb_target_group" "api" {
   protocol    = "HTTP"
   target_type = "ip"
   vpc_id      = var.vpc_id
-  # Above the 2 s drain delay, so the ALB stops sending before the task stops listening, and
-  # within the 40 s stop timeout (section 1.7, SEC-R25).
+  # ECS deregisters a stopping task and the ALB drains it for this long first; only then does ECS
+  # send SIGTERM and start the 40 s stop timeout, so the drain comes before that timeout, not
+  # within it (section 1.7, SEC-R25, docs/runbooks/shutdown.md).
   deregistration_delay = 35
 
   # Liveness, not readiness: ECS replaces every task the ALB reports unhealthy, so checking

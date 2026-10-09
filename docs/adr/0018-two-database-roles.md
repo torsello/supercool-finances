@@ -47,7 +47,7 @@ The database enforces the ledger's invariants as a second line of defence (ADR-0
 
 Chosen option: **Option A**. An owner role runs the migrations and owns the tables; the service connects with a runtime role that holds only the privileges it needs (`SELECT` and `INSERT` on the ledger), so a bug or a compromised service cannot disable the database checks. Triggers reject `UPDATE`, `DELETE` and `TRUNCATE` on the ledger even for the owner; only DDL or a superuser could bypass them, and the service never connects as either. One shared role is simpler but lets the application turn off its own safety net.
 
-The owner role also sets the runtime role's `statement_timeout` and `idle_in_transaction_session_timeout` with `ALTER ROLE` from a migration (SEC-R29), and only the runtime role may execute the lock-timeout function (SEC-R31, ADR-0019). The migrations run with `MIGRATION_DATABASE_URL`, locally in the `migrate` job and in AWS as a one-off task; the replicas and every other script use `DATABASE_URL` (DEP-R05, DEP-R28).
+The owner role also sets the runtime role's `statement_timeout` and `idle_in_transaction_session_timeout` with `ALTER ROLE` from a migration (SEC-R29), and only the runtime role may execute the lock-timeout function (SEC-R31, ADR-0019). The migrations run with `MIGRATION_DATABASE_URL`, locally in the `migrate` job and in AWS as a one-off task; the replicas and every other script use `DATABASE_URL` (DEP-R05, DEP-R28). (Update 2026-10-09, phase 14-docs: in AWS the one-off bootstrap task, added in phase 12-infra, connects with `BOOTSTRAP_DATABASE_URL` as the RDS master user to create both roles (DEP-R38 to DEP-R40); it is the only process that uses neither role.)
 
 ## Consequences
 

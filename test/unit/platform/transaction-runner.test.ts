@@ -3,6 +3,7 @@ import pg from 'pg';
 import { describe, expect, it } from 'vitest';
 import {
   AccountLockTimeout,
+  ConnectionLost,
   IdempotencyWaitTimeout,
   ProxyBorrowTimeout,
   RetriesExhausted,
@@ -75,6 +76,43 @@ function proxyBorrowTimeout(): pg.DatabaseError {
   const error = databaseError('08000');
   error.message = 'Timed-out waiting to acquire database connection';
   return error;
+}
+
+/** pg's error for a query whose connection closed under it, as `pg` raises it: no SQLSTATE. */
+function connectionTerminated(): Error {
+  return new Error('Connection terminated unexpectedly');
+}
+
+/**
+ * A client whose connection is lost at the statement `at`: it emits `'error'`, as `pg` does on the
+ * client it holds, then rejects that statement and every later one, as a client that is no longer
+ * queryable does.
+ */
+class LosingClient extends FakeClient {
+  #lost = false;
+
+  constructor(
+    private readonly at: string,
+    private readonly emits = true,
+  ) {
+    super();
+  }
+
+  override query(text: string): Promise<{ command: string }> {
+    if (this.#lost) {
+      this.statements.push(text);
+      return Promise.reject(
+        new Error('Client has encountered a connection error and is not queryable'),
+      );
+    }
+    if (text !== this.at) return super.query(text);
+    this.statements.push(text);
+    this.#lost = true;
+    this.status = null;
+    const error = connectionTerminated();
+    if (this.emits) this.emit('error', error);
+    return Promise.reject(error);
+  }
 }
 
 describe('transaction runner', () => {
@@ -386,19 +424,21 @@ describe('transaction runner', () => {
     expect(client.releases).toEqual([undefined]);
   });
 
-  it('SYS-R11 releases the client with the error it emitted while the run held it, and removes its listener', async () => {
+  it('SYS-R11 SEC-R57 releases the client with the error it emitted while the run held it, answers ConnectionLost, and removes its listener', async () => {
     const { runner, client } = setup();
     const lost = new Error('Connection terminated unexpectedly');
     const failure = new Error('statement failed');
-    await expect(
-      runner.run(
+    const error: unknown = await runner
+      .run(
         () => {
           client.emit('error', lost);
           return Promise.reject(failure);
         },
         { retry: 'movement' },
-      ),
-    ).rejects.toBe(failure);
+      )
+      .catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(ConnectionLost);
+    expect((error as Error).cause).toBe(failure);
     expect(client.releases).toEqual([lost]);
     expect(client.listenerCount('error')).toBe(0);
   });
@@ -438,5 +478,48 @@ describe('transaction runner', () => {
       );
     }
     expect(counted).toEqual(['idempotency', 'account']);
+  });
+  it('SEC-AC49 a connection lost at a statement answers ConnectionLost, 503 with Retry-After: 1, never retried, with no ROLLBACK, and the client destroyed', async () => {
+    const client = new LosingClient('SELECT 1');
+    const runner = new TransactionRunner({ pool: { connect: () => Promise.resolve(client) } });
+    const run = runner.run(
+      async (held) => {
+        await held.query('SELECT 1');
+      },
+      { retry: 'movement' },
+    );
+    const error: unknown = await run.catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(ConnectionLost);
+    expect(toProblem(error)).toMatchObject({
+      status: 503,
+      type: '/problems/service-unavailable',
+      headers: { 'retry-after': '1' },
+    });
+    expect(client.statements).toEqual([BEGIN, 'SELECT 1']);
+    expect(client.releases).toHaveLength(1);
+    expect(client.releases[0]).toBeInstanceOf(Error);
+    expect(client.listenerCount('error')).toBe(0);
+  });
+
+  it('SEC-AC49 a connection lost during COMMIT, whose outcome is unknown, answers ConnectionLost, 503 with Retry-After: 1, never 500, and destroys the client', async () => {
+    const client = new LosingClient('COMMIT');
+    const runner = new TransactionRunner({ pool: { connect: () => Promise.resolve(client) } });
+    const error: unknown = await runner
+      .run(() => Promise.resolve('done'), { retry: 'movement' })
+      .catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(ConnectionLost);
+    expect(toProblem(error)).toMatchObject({ status: 503, type: '/problems/service-unavailable' });
+    expect(client.statements).toEqual([BEGIN, 'COMMIT']);
+    expect(client.releases).toHaveLength(1);
+    expect(client.releases[0]).toBeInstanceOf(Error);
+  });
+
+  it('SEC-AC49 recognises a lost connection by the error of pg alone, when the client emitted nothing', async () => {
+    const client = new LosingClient('COMMIT', false);
+    const runner = new TransactionRunner({ pool: { connect: () => Promise.resolve(client) } });
+    await expect(runner.run(() => Promise.resolve(1), { retry: 'none' })).rejects.toBeInstanceOf(
+      ConnectionLost,
+    );
+    expect(client.releases[0]).toBeInstanceOf(Error);
   });
 });

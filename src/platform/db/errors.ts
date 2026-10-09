@@ -98,3 +98,17 @@ export class PoolClosed extends Error {
     super('the database pool is closed', options);
   }
 }
+
+/**
+ * The database connection was lost while a request used it (SEC-R57): `pg`'s connection error, or
+ * a session the server terminated. Before `COMMIT` the transaction rolled back; during `COMMIT` its
+ * outcome is unknown. Either way 503, never 500, so the client retries with the same
+ * Idempotency-Key and gets the stored response or a new run. The connection is destroyed.
+ */
+export class ConnectionLost extends Error {
+  override readonly name = 'ConnectionLost';
+
+  constructor(options: { cause: unknown }) {
+    super('the database connection was lost during the request', options);
+  }
+}

@@ -35,7 +35,9 @@
     "openapi:export": "tsx scripts/openapi-export.ts",
     "openapi:lint": "redocly lint docs/api/openapi.yaml",
     "infra:validate": "bash scripts/infra-validate.sh",
-    "load": "tsx scripts/load-test.ts"
+    "load": "tsx scripts/load-test.ts",
+    "docs:check": "tsx scripts/docs-check.ts",
+    "demo-env": "tsx --env-file-if-exists=.env scripts/demo-env.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.1",
@@ -63,7 +65,6 @@
     "@vitest/coverage-v8": "^5.0.3",
     "eslint": "^10.12.0",
     "eslint-config-prettier": "^10.1.8",
-    "pino-pretty": "^13.2.0",
     "prettier": "^3.9.9",
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
