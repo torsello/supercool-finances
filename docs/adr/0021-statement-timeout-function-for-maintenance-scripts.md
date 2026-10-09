@@ -81,4 +81,6 @@ Chosen option: **Option A**, because it reuses the transaction-local function pa
 - Phase 05-schema: the function in the migration `app-functions`, with a test of its range, its transaction scope and that `PUBLIC` cannot execute it.
 - Phases 06-domain and 07-idempotency: the reconcile and cleanup scripts call it with 600000 ms, asserted from their captured statements.
   - Done for the reconcile script in phase 06-domain on 2026-10-08; the cleanup script follows in 07-idempotency.
+  - Done for the cleanup script in phase 07-idempotency on 2026-10-08, asserted by the SEC-R48 test of `test/integration/idempotency/cleanup-script.test.ts`.
 - Phase 12-infra: re-check the RDS Proxy pinning behaviour together with ADR-0019's follow-up.
+  - Done in phase 12-infra on 2026-10-09, with ADR-0019's follow-up: calling a function still does not pin, so this decision stands.

@@ -68,16 +68,17 @@ Signals and uncaught errors, decided by the owner on 2026-10-08: `src/main.ts` l
 
 Shared errors are in section 7 of plan 000. This plan's typed errors:
 
-| Typed error            | When                                                                          | Status | Type                               | Extra headers                 | Stored for replay |
-| ---------------------- | ----------------------------------------------------------------------------- | ------ | ---------------------------------- | ----------------------------- | ----------------- |
-| `RateLimited`          | above `RATE_LIMIT_USER_MAX` in the user's window                              | 429    | `/problems/rate-limited`           | `Retry-After: <seconds left>` | no                |
-| `UnsupportedMediaType` | a body with a missing or other `Content-Type`                                 | 415    | `/problems/unsupported-media-type` |                               | no                |
-| `PayloadTooLarge`      | a body above 16384 bytes                                                      | 413    | `/problems/payload-too-large`      |                               | no                |
-| `PoolAcquireTimeout`   | no connection free within `DB_POOL_ACQUIRE_TIMEOUT_MS`                        | 503    | `/problems/service-unavailable`    | `Retry-After: 1`              | no                |
-| `StatementTimeout`     | SQLSTATE 57014 from `statement_timeout`                                       | 503    | `/problems/service-unavailable`    | `Retry-After: 1`              | no                |
-| `RequestTimeout`       | `REQUEST_TIMEOUT_MS` reached                                                  | 503    | `/problems/service-unavailable`    | `Retry-After: 1`              | no                |
-| not ready              | `SELECT 1` fails or is slow, a shipped migration is missing, or shutting down | 503    | `/problems/service-unavailable`    |                               | n/a               |
-| `ConfigError`          | any invalid variable, or the budget of SEC-R35 broken                         | none   | exit 1 before listening            |                               | n/a               |
+| Typed error            | When                                                                          | Status | Type                               | Extra headers                 | Stored for replay             |
+| ---------------------- | ----------------------------------------------------------------------------- | ------ | ---------------------------------- | ----------------------------- | ----------------------------- |
+| `RateLimited`          | above `RATE_LIMIT_USER_MAX` in the user's window                              | 429    | `/problems/rate-limited`           | `Retry-After: <seconds left>` | no                            |
+| `UnsupportedMediaType` | a body with a missing or other `Content-Type`                                 | 415    | `/problems/unsupported-media-type` |                               | no                            |
+| `PayloadTooLarge`      | a body above 16384 bytes                                                      | 413    | `/problems/payload-too-large`      |                               | no                            |
+| `PoolAcquireTimeout`   | no connection free within `DB_POOL_ACQUIRE_TIMEOUT_MS`                        | 503    | `/problems/service-unavailable`    | `Retry-After: 1`              | no                            |
+| `StatementTimeout`     | SQLSTATE 57014 from `statement_timeout`                                       | 503    | `/problems/service-unavailable`    | `Retry-After: 1`              | no                            |
+| `RequestTimeout`       | `REQUEST_TIMEOUT_MS` reached                                                  | 503    | `/problems/service-unavailable`    | `Retry-After: 1`              | no                            |
+| `ConnectionLost`       | the connection is lost at a statement or at `COMMIT` (SEC-R57)                | 503    | `/problems/service-unavailable`    | `Retry-After: 1`              | no, unless `COMMIT` succeeded |
+| not ready              | `SELECT 1` fails or is slow, a shipped migration is missing, or shutting down | 503    | `/problems/service-unavailable`    |                               | n/a                           |
+| `ConfigError`          | any invalid variable, or the budget of SEC-R35 broken                         | none   | exit 1 before listening            |                               | n/a                           |
 
 The not-ready body is the same whatever check failed; only the `warn` log line names the check (`database` or `migrations`). The load balancer's own 429 and 413 have the same problem shape (plan 008).
 
@@ -132,6 +133,8 @@ The not-ready body is the same whatever check failed; only the `warn` log line n
 | SEC-AC45 | integration | 12b-observability | `test/integration/security/error-reporting-unavailable.test.ts`                         |
 | SEC-AC46 | unit        | 12b-observability | `test/unit/platform/error-reporter.test.ts`                                             |
 | SEC-AC47 | unit        | 12b-observability | `test/unit/platform/metrics.test.ts`                                                    |
+| SEC-AC48 | integration | 14-docs           | `test/integration/platform/connection-loss.test.ts`                                     |
+| SEC-AC49 | unit        | 14-docs           | `test/unit/platform/transaction-runner.test.ts`, `test/unit/platform/read-pool.test.ts` |
 
 Notes:
 

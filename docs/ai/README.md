@@ -3,7 +3,7 @@
 The challenge asks for every prompt used with an AI along with every response. This folder holds them.
 
 - [`transcripts/`](transcripts/) has one plain-text export per work session, in order. Long phases are split into parts named `NN-name-part1.txt`, `NN-name-part2.txt`, ...
-- The rules the AI follows are in [`AGENTS.md`](../../AGENTS.md), and the project skills are in [`.claude/skills/`](../../.claude/skills/).
+- The rules the AI follows are in [`AGENTS.md`](../../AGENTS.md), and the project skills are in [`.claude/skills/`](../../.claude/skills/). What each skill does, the gates `/ship` runs and the permission rules are explained in [Project skills and guardrails](../development.md#project-skills-and-guardrails).
 
 ## How a session works
 

@@ -1,0 +1,1496 @@
+{
+  "info": {
+    "name": "SuperCool Finances",
+    "description": "Every endpoint of the balance service, in the order a reviewer would try them, against the local stack of the README Quickstart. Import it with docs/api/postman/local.postman_environment.json; tokens are minted by the collection's pre-request script. Guide: docs/api/README.md.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Mints fresh tokens for every request, so nobody runs make token or pastes one: HS256 JWTs of",
+          "// the demo users of table 1.2 of spec 008, with the claims of section 1.2 of spec 006 (sub, role,",
+          "// iat, exp 15 minutes later, iss, aud), signed with the local demo secret of the environment.",
+          "const crypto = require('crypto-js');",
+          "function base64url(words) {",
+          "  return crypto.enc.Base64.stringify(words).replace(/=+$/, '').replace(/\\+/g, '-').replace(/\\//g, '_');",
+          "}",
+          "function mint(sub, role) {",
+          "  const iat = Math.floor(Date.now() / 1000);",
+          "  const header = base64url(crypto.enc.Utf8.parse(JSON.stringify({ alg: 'HS256', typ: 'JWT' })));",
+          "  const claims = base64url(",
+          "    crypto.enc.Utf8.parse(",
+          "      JSON.stringify({",
+          "        sub: sub,",
+          "        role: role,",
+          "        iat: iat,",
+          "        exp: iat + 900,",
+          "        iss: pm.variables.get('jwtIssuer'),",
+          "        aud: pm.variables.get('jwtAudience'),",
+          "      }),",
+          "    ),",
+          "  );",
+          "  const signature = base64url(crypto.HmacSHA256(header + '.' + claims, pm.variables.get('jwtSecret')));",
+          "  return header + '.' + claims + '.' + signature;",
+          "}",
+          "pm.variables.set('customerToken', mint(pm.variables.get('customer1Id'), 'customer'));",
+          "pm.variables.set('customer2Token', mint(pm.variables.get('customer2Id'), 'customer'));",
+          "pm.variables.set('operatorToken', mint(pm.variables.get('operatorId'), 'operator'));"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Every answer carries a correlation id (SYS-R21).",
+          "pm.test('X-Request-Id is set', function () {",
+          "  pm.expect(pm.response.headers.get('X-Request-Id')).to.be.a('string').and.not.empty;",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "accountA",
+      "value": ""
+    },
+    {
+      "key": "accountB",
+      "value": ""
+    },
+    {
+      "key": "depositId",
+      "value": ""
+    },
+    {
+      "key": "transferId",
+      "value": ""
+    },
+    {
+      "key": "reversalId",
+      "value": ""
+    },
+    {
+      "key": "replayKey",
+      "value": ""
+    },
+    {
+      "key": "replayBody",
+      "value": ""
+    },
+    {
+      "key": "notFoundBody",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Health and docs",
+      "description": "No token: the health checks and the OpenAPI document are outside /v1.",
+      "item": [
+        {
+          "name": "Liveness",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('the process is up', function () {",
+                  "  pm.expect(pm.response.json()).to.eql({ status: 'ok' });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health/live",
+              "host": ["{{baseUrl}}"],
+              "path": ["health", "live"]
+            }
+          }
+        },
+        {
+          "name": "Readiness",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('the database answers and every migration is applied', function () {",
+                  "  pm.expect(pm.response.json()).to.eql({ status: 'ready' });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health/ready",
+              "host": ["{{baseUrl}}"],
+              "path": ["health", "ready"]
+            }
+          }
+        },
+        {
+          "name": "OpenAPI document",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('is an OpenAPI 3.1 document', function () {",
+                  "  pm.expect(pm.response.json().openapi).to.eql('3.1.0');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/docs/json",
+              "host": ["{{baseUrl}}"],
+              "path": ["docs", "json"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Accounts",
+      "description": "demo-customer-1 opens two EUR accounts, A and B, then reads and lists them.",
+      "item": [
+        {
+          "name": "Open account A (EUR)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('Location points to the new resource', function () {",
+                  "  pm.expect(pm.response.headers.get('Location')).to.eql('/v1/accounts/' + pm.response.json().id);",
+                  "});",
+                  "pm.test('opens an active EUR account with balance \"0\"', function () {",
+                  "  const account = pm.response.json();",
+                  "  pm.expect(account.currency).to.eql('EUR');",
+                  "  pm.expect(account.status).to.eql('active');",
+                  "  pm.expect(account.balance).to.eql('0');",
+                  "});",
+                  "pm.collectionVariables.set('accountA', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/accounts",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "accounts"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currency\": \"EUR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Open account B (EUR)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('Location points to the new resource', function () {",
+                  "  pm.expect(pm.response.headers.get('Location')).to.eql('/v1/accounts/' + pm.response.json().id);",
+                  "});",
+                  "pm.collectionVariables.set('accountB', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/accounts",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "accounts"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currency\": \"EUR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Read account A (customer)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('is account A, without ownerId for its owner', function () {",
+                  "  const account = pm.response.json();",
+                  "  pm.expect(account.id).to.eql(pm.collectionVariables.get('accountA'));",
+                  "  pm.expect(account).to.not.have.property('ownerId');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/accounts/{{accountA}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "accounts", "{{accountA}}"]
+            }
+          }
+        },
+        {
+          "name": "Read account A (operator)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('an operator sees the owner', function () {",
+                  "  pm.expect(pm.response.json().ownerId).to.eql(pm.variables.get('customer1Id'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{operatorToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/accounts/{{accountA}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "accounts", "{{accountA}}"]
+            }
+          }
+        },
+        {
+          "name": "List your accounts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('the two newest are B then A', function () {",
+                  "  const ids = pm.response.json().items.map(function (account) { return account.id; });",
+                  "  pm.expect(ids).to.eql([pm.collectionVariables.get('accountB'), pm.collectionVariables.get('accountA')]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/accounts?limit=2",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "accounts"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "2"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Money movements",
+      "description": "An operator deposits 100.00 EUR into A; the customer withdraws 20.00 EUR and transfers 10.50 EUR to B; then the balance and the history.",
+      "item": [
+        {
+          "name": "Deposit 100.00 EUR into A (operator)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('Location points to the new resource', function () {",
+                  "  pm.expect(pm.response.headers.get('Location')).to.eql('/v1/transactions/' + pm.response.json().id);",
+                  "});",
+                  "pm.test('is not a replay', function () {",
+                  "  pm.expect(pm.response.headers.get('Idempotent-Replayed')).to.be.undefined;",
+                  "});",
+                  "pm.test('is a deposit of \"10000\" EUR', function () {",
+                  "  pm.expect(pm.response.json()).to.include({ kind: 'deposit', amount: '10000', currency: 'EUR' });",
+                  "});",
+                  "pm.collectionVariables.set('depositId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{operatorToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/accounts/{{accountA}}/deposits",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "accounts", "{{accountA}}", "deposits"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": \"10000\",\n  \"currency\": \"EUR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Withdraw 20.00 EUR from A",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('Location points to the new resource', function () {",
+                  "  pm.expect(pm.response.headers.get('Location')).to.eql('/v1/transactions/' + pm.response.json().id);",
+                  "});",
+                  "pm.test('leaves \"8000\" on A', function () {",
+                  "  pm.expect(pm.response.json().balance).to.eql('8000');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/accounts/{{accountA}}/withdrawals",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "accounts", "{{accountA}}", "withdrawals"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": \"2000\",\n  \"currency\": \"EUR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Transfer 10.50 EUR from A to B",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('Location points to the new resource', function () {",
+                  "  pm.expect(pm.response.headers.get('Location')).to.eql('/v1/transactions/' + pm.response.json().id);",
+                  "});",
+                  "pm.test('leaves \"6950\" on A', function () {",
+                  "  pm.expect(pm.response.json()).to.include({ kind: 'transfer', balance: '6950' });",
+                  "});",
+                  "pm.collectionVariables.set('transferId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/accounts/{{accountA}}/transfers",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "accounts", "{{accountA}}", "transfers"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"destinationAccountId\": \"{{accountB}}\",\n  \"amount\": \"1050\",\n  \"currency\": \"EUR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Balance of A",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('is \"6950\"', function () {",
+                  "  pm.expect(pm.response.json().balance).to.eql('6950');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/accounts/{{accountA}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "accounts", "{{accountA}}"]
+            }
+          }
+        },
+        {
+          "name": "History of A",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('holds the transfer, the withdrawal and the deposit, newest first', function () {",
+                  "  const entries = pm.response.json().items;",
+                  "  pm.expect(entries.map(function (entry) { return entry.kind; })).to.eql(['transfer', 'withdrawal', 'deposit']);",
+                  "  pm.expect(entries.map(function (entry) { return entry.amount; })).to.eql(['-1050', '-2000', '10000']);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/accounts/{{accountA}}/entries?limit=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "accounts", "{{accountA}}", "entries"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Read the transfer (customer)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('is the transfer, with the entries of the customer\\'s own accounts', function () {",
+                  "  const transaction = pm.response.json();",
+                  "  pm.expect(transaction.kind).to.eql('transfer');",
+                  "  pm.expect(transaction.entries).to.have.lengthOf(2);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/transactions/{{transferId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "transactions", "{{transferId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Idempotency",
+      "description": "The same withdrawal sent twice with one key moves money once; the same key with another body is refused.",
+      "item": [
+        {
+          "name": "Withdraw 1.00 EUR with a new key",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// One key per run, used by the three requests of this folder, so a rerun starts afresh.",
+                  "pm.collectionVariables.set('replayKey', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('is not a replay', function () {",
+                  "  pm.expect(pm.response.headers.get('Idempotent-Replayed')).to.be.undefined;",
+                  "});",
+                  "pm.test('leaves \"6850\" on A', function () {",
+                  "  pm.expect(pm.response.json().balance).to.eql('6850');",
+                  "});",
+                  "pm.collectionVariables.set('replayBody', pm.response.text());"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{replayKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/accounts/{{accountA}}/withdrawals",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "accounts", "{{accountA}}", "withdrawals"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": \"100\",\n  \"currency\": \"EUR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Same request, same key: replayed",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('Idempotent-Replayed: true', function () {",
+                  "  pm.expect(pm.response.headers.get('Idempotent-Replayed')).to.eql('true');",
+                  "});",
+                  "pm.test('the stored response, byte for byte', function () {",
+                  "  pm.expect(pm.response.text()).to.eql(pm.collectionVariables.get('replayBody'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{replayKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/accounts/{{accountA}}/withdrawals",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "accounts", "{{accountA}}", "withdrawals"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": \"100\",\n  \"currency\": \"EUR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Balance of A: moved once",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('is still \"6850\"', function () {",
+                  "  pm.expect(pm.response.json().balance).to.eql('6850');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/accounts/{{accountA}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "accounts", "{{accountA}}"]
+            }
+          }
+        },
+        {
+          "name": "Same key, another body: refused",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 422', function () {",
+                  "  pm.response.to.have.status(422);",
+                  "});",
+                  "pm.test('is problem details of type /problems/idempotency-key-reused', function () {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  pm.expect(pm.response.json().type).to.eql('/problems/idempotency-key-reused');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{replayKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/accounts/{{accountA}}/withdrawals",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "accounts", "{{accountA}}", "withdrawals"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": \"200\",\n  \"currency\": \"EUR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Reversals",
+      "description": "An operator reverses the transfer: a new transaction with every entry negated. A transaction is reversed at most once.",
+      "item": [
+        {
+          "name": "Reverse the transfer (operator)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('Location points to the new resource', function () {",
+                  "  pm.expect(pm.response.headers.get('Location')).to.eql('/v1/transactions/' + pm.response.json().id);",
+                  "});",
+                  "pm.test('reverses the transfer', function () {",
+                  "  pm.expect(pm.response.json()).to.include({ kind: 'reversal', amount: '1050', reversedTransactionId: pm.collectionVariables.get('transferId') });",
+                  "});",
+                  "pm.collectionVariables.set('reversalId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{operatorToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/transactions/{{transferId}}/reversals",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "transactions", "{{transferId}}", "reversals"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Transfer sent to the wrong account\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Read the reversal (operator)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('negates the transfer\\'s entries', function () {",
+                  "  const amounts = pm.response.json().entries.map(function (entry) { return entry.amount; }).sort();",
+                  "  pm.expect(amounts).to.eql(['-1050', '1050']);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{operatorToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/transactions/{{reversalId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "transactions", "{{reversalId}}"]
+            }
+          }
+        },
+        {
+          "name": "Reverse it again: refused",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 409', function () {",
+                  "  pm.response.to.have.status(409);",
+                  "});",
+                  "pm.test('is problem details of type /problems/already-reversed', function () {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  pm.expect(pm.response.json().type).to.eql('/problems/already-reversed');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{operatorToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/transactions/{{transferId}}/reversals",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "transactions", "{{transferId}}", "reversals"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Second attempt\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Account status",
+      "description": "An operator freezes B, a withdrawal from it is refused, B is unfrozen, then closed: its balance is \"0\" after the reversal.",
+      "item": [
+        {
+          "name": "Freeze B (operator)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('B is frozen', function () {",
+                  "  pm.expect(pm.response.json().status).to.eql('frozen');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{operatorToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/accounts/{{accountB}}/freeze",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "accounts", "{{accountB}}", "freeze"]
+            }
+          }
+        },
+        {
+          "name": "Withdraw from frozen B: refused",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 422', function () {",
+                  "  pm.response.to.have.status(422);",
+                  "});",
+                  "pm.test('is problem details of type /problems/account-not-active', function () {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  pm.expect(pm.response.json().type).to.eql('/problems/account-not-active');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/accounts/{{accountB}}/withdrawals",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "accounts", "{{accountB}}", "withdrawals"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": \"100\",\n  \"currency\": \"EUR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Unfreeze B (operator)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('B is active again', function () {",
+                  "  pm.expect(pm.response.json().status).to.eql('active');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{operatorToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/accounts/{{accountB}}/unfreeze",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "accounts", "{{accountB}}", "unfreeze"]
+            }
+          }
+        },
+        {
+          "name": "Close B (operator)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('B is closed, with balance \"0\"', function () {",
+                  "  pm.expect(pm.response.json()).to.include({ status: 'closed', balance: '0' });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{operatorToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/accounts/{{accountB}}/close",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "accounts", "{{accountB}}", "close"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Errors",
+      "description": "Every error is application/problem+json; the answers that must not leak anything look the same.",
+      "item": [
+        {
+          "name": "No token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 401', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test('is problem details of type /problems/unauthenticated', function () {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  pm.expect(pm.response.json().type).to.eql('/problems/unauthenticated');",
+                  "});",
+                  "pm.test('WWW-Authenticate names the realm', function () {",
+                  "  pm.expect(pm.response.headers.get('WWW-Authenticate')).to.eql('Bearer realm=\"supercool-finances\"');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/accounts",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "accounts"]
+            }
+          }
+        },
+        {
+          "name": "An invalid token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 401', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test('is problem details of type /problems/unauthenticated', function () {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  pm.expect(pm.response.json().type).to.eql('/problems/unauthenticated');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer not-a-valid-token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/accounts",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "accounts"]
+            }
+          }
+        },
+        {
+          "name": "An unknown account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 404', function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});",
+                  "pm.test('is problem details of type /problems/not-found', function () {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  pm.expect(pm.response.json().type).to.eql('/problems/not-found');",
+                  "});",
+                  "const unknown = pm.response.json();",
+                  "delete unknown.requestId;",
+                  "pm.collectionVariables.set('notFoundBody', JSON.stringify(unknown));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer2Token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/accounts/01a120f6-0000-7000-8000-000000000000",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "accounts", "01a120f6-0000-7000-8000-000000000000"]
+            }
+          }
+        },
+        {
+          "name": "Another customer's account: answered like an unknown one",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 404', function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});",
+                  "pm.test('is problem details of type /problems/not-found', function () {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  pm.expect(pm.response.json().type).to.eql('/problems/not-found');",
+                  "});",
+                  "pm.test('the same body as for an unknown id, but its requestId', function () {",
+                  "  const foreign = pm.response.json();",
+                  "  delete foreign.requestId;",
+                  "  pm.expect(JSON.stringify(foreign)).to.eql(pm.collectionVariables.get('notFoundBody'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer2Token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/accounts/{{accountA}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "accounts", "{{accountA}}"]
+            }
+          }
+        },
+        {
+          "name": "A customer's deposit: refused",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 403', function () {",
+                  "  pm.response.to.have.status(403);",
+                  "});",
+                  "pm.test('is problem details of type /problems/forbidden', function () {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  pm.expect(pm.response.json().type).to.eql('/problems/forbidden');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/accounts/{{accountA}}/deposits",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "accounts", "{{accountA}}", "deposits"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": \"100\",\n  \"currency\": \"EUR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Insufficient funds",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 422', function () {",
+                  "  pm.response.to.have.status(422);",
+                  "});",
+                  "pm.test('is problem details of type /problems/insufficient-funds', function () {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  pm.expect(pm.response.json().type).to.eql('/problems/insufficient-funds');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/accounts/{{accountA}}/withdrawals",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "accounts", "{{accountA}}", "withdrawals"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": \"99999999\",\n  \"currency\": \"EUR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "A malformed amount",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('answers 422', function () {",
+                  "  pm.response.to.have.status(422);",
+                  "});",
+                  "pm.test('is problem details of type /problems/validation-error', function () {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  pm.expect(pm.response.json().type).to.eql('/problems/validation-error');",
+                  "});",
+                  "pm.test('names the amount', function () {",
+                  "  pm.expect(pm.response.json().errors[0].pointer).to.eql('/amount');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/accounts/{{accountA}}/withdrawals",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "accounts", "{{accountA}}", "withdrawals"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": \"10.50\",\n  \"currency\": \"EUR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

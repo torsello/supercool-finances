@@ -1,6 +1,7 @@
 import pg from 'pg';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createPool } from '../../../src/platform/db/database.js';
+import { ConnectionLost } from '../../../src/platform/db/errors.js';
 import { TransactionRunner } from '../../../src/platform/db/transaction-runner.js';
 import { closePools, createCustomerAccount, runtimePool } from '../../support/db.js';
 import { requireEnv } from '../../support/env.js';
@@ -32,7 +33,7 @@ describe('transaction runner on a real connection', () => {
     await closePools();
   });
 
-  it('SYS-R11 a backend terminated in the middle of a transaction fails the call with a typed error, keeps the process running and destroys the client', async () => {
+  it('SYS-R11 SEC-R57 a backend terminated in the middle of a transaction fails the call with a typed error, keeps the process running and destroys the client', async () => {
     const warnings: Record<string, unknown>[] = [];
     // One connection only, so a client handed back to the pool would be the next one used.
     const pool = createPool({
@@ -71,8 +72,11 @@ describe('transaction runner on a real connection', () => {
       const waiting = await blockedBy(await backendPid(holder));
       // The runtime role may end its own role's backends; the owner role may not.
       await holder.query('SELECT pg_terminate_backend($1)', [waiting]);
-      await expect(outcome).rejects.toBeInstanceOf(pg.DatabaseError);
-      await expect(outcome).rejects.toMatchObject({ code: '57P01' });
+      // SEC-R57: the lost connection is ConnectionLost, answered 503, with the server's error kept.
+      const error: unknown = await outcome.catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(ConnectionLost);
+      expect((error as Error).cause).toBeInstanceOf(pg.DatabaseError);
+      expect((error as Error).cause).toMatchObject({ code: '57P01' });
       expect(waiting).toBe(victim);
     } finally {
       await holder.query('ROLLBACK');

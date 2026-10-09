@@ -185,6 +185,23 @@ jobs:
           git ls-files --error-unmatch docs/traceability.md
           git diff --exit-code -- docs/traceability.md
 
+  # DEP-R47: every Markdown file tracked by git, its mermaid diagrams rendered by the Mermaid CLI
+  # image pinned by digest and its relative links resolved; external URLs are not checked.
+  docs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run docs:check
+
   secret-scan:
     runs-on: ubuntu-24.04
     timeout-minutes: 10

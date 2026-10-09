@@ -75,3 +75,10 @@ No task for this spec: `REPLICA_ID` and `MIGRATION_DATABASE_URL` are validated b
 - [x] Add the profile's start and removal and port 3030 to `test/e2e/support/stack.ts`, with `test/e2e/stack-support.test.ts` proving them (DEP-R42); then test first: DEP-AC33 in `test/e2e/observability.test.ts`, in group 2 of the sequencer.
 - [x] Extend DEP-AC01 in `test/e2e/stack-start.test.ts`: `prometheus` and `grafana` were not started.
 - [x] Update the docs: a README section on the observability profile (command, URL, panels) and on the override `compose.error-reporting.yaml`, the profile's command in the commands table of AGENTS.md from 12b-observability and `docker/prometheus/` and `docker/grafana/` in its repository map, the two images in `docs/dependencies.md` marked approved, and the follow-up closed in ADR-0023.
+
+## 14-docs
+
+- [x] Test first: DEP-R47 in `test/unit/docs-links.test.ts` for the link and anchor parsing of `scripts/docs-links.ts`; then `scripts/docs-check.ts`, the script `docs:check` and the job `docs` in `.github/workflows/ci.yml` with the step `npm run docs:check`: DEP-AC35.
+- [x] Update the docs: `npm run docs:check` in the commands table of AGENTS.md from 14-docs, the image `minlag/mermaid-cli` in `docs/dependencies.md` marked approved, and the job `docs` in the README's CI section.
+- [x] Test first: DEP-AC36 in `test/unit/deployment/demo-env.test.ts`; then `scripts/demo-env.ts`, the script `demo-env` and the `Makefile` target `demo-env`; the README Quickstart and the commands table of AGENTS.md use it.
+- [x] Test first: DEP-AC37 in `test/unit/deployment/postman.test.ts` and DEP-AC38 in `test/e2e/postman.test.ts`; then the collection and the environment in `docs/api/postman/`, newman in `docs/dependencies.md`, and links from `docs/api/README.md` and the README's API overview and Quickstart.

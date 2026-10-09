@@ -86,3 +86,7 @@ These tasks run in the cross-spec order of plan 000 section 1 for 08-api: authen
 - [x] Test first: SEC-AC45 in `test/integration/security/error-reporting-unavailable.test.ts`; then the transition lines of the reporter.
 - [x] Test first: SEC-AC47 in `test/unit/platform/metrics.test.ts`; then every label value of the counters of table 1.4 at 0 when `Metrics` is built, in `src/platform/metrics/metrics.ts` (SEC-R56).
 - [x] Update the docs: a README section on error reporting (off by default, how to turn it on, exactly what is sent), `SENTRY_DSN=` empty in `.env.example`, the AWS note of section 1.10 in `docs/deployment/aws.md`, and the follow-up closed in ADR-0023.
+
+## 14-docs
+
+- [x] Test first: SEC-AC49 in `test/unit/platform/transaction-runner.test.ts` and `test/unit/platform/read-pool.test.ts`, and SEC-AC48 in `test/integration/platform/connection-loss.test.ts`; then `ConnectionLost` in `src/platform/db/errors.ts`, `isConnectionLoss` in `src/platform/db/sqlstate.ts`, the runner and the read pool raising it and destroying the connection, and its 503 in `toProblem` (SEC-R57).

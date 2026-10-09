@@ -68,6 +68,7 @@ The sizes and settings are those of section 1.7 of spec 008: 0.5 vCPU and 1 GB p
 - Losing a task or an availability zone keeps the service up; the ALB routes only to ready tasks.
 - No servers to patch; the database is backed up and fails over on its own.
 - 6 tasks × (10 + 1) connections stay within RDS Proxy's budget (SEC-R36).
+  - (Update 2026-10-09, phase 14-docs.) The budget that SEC-AC29 checks counts a deployment's surge, approved in phase 12-infra: a rollout at the autoscaling maximum runs `max_tasks` × `deployment_maximum_percent` / 100 = 6 × 200 / 100 = 12 tasks, so 12 × (10 + 1) + 10 = 142 connections, below the 197 of `max_connections` 200 less the 3 reserved, with RDS Proxy keeping its 90% (section 1.9 of spec 007, plan 000 section 11).
 
 ### Negative / costs
 

@@ -138,6 +138,50 @@ Error reporting (section 1.10 of spec 007) stays off in AWS: the task definition
 4. The task authenticates the token, applies the per-user limit in Redis (failing open without it) and the checks of section 1.3 of spec 007, then runs the movement in one database transaction through RDS Proxy, which hands the transaction a database connection and takes it back at commit.
 5. The answer returns the same way. Logs go to CloudWatch Logs through the endpoint; nothing leaves the VPC except the response.
 
+The overview diagram of the whole deployment, with the one-off tasks and the endpoints, is in the README's [Deployment to AWS](../../README.md#deployment-to-aws).
+
+## Scaling
+
+Only the ECS service scales on its own. The database and the cache keep the size the Terraform gives them.
+
+### The service
+
+An `aws_appautoscaling_target` on `ecs:service:DesiredCount` holds the service between `min_tasks` (2) and `max_tasks` (6), and the policy `scf-api-cpu`, of type `TargetTrackingScaling` on the predefined metric `ECSServiceAverageCPUUtilization`, keeps the average CPU of the tasks at 60% (section 1.7 of spec 008). The target is a literal of the root module, not a variable, and the policy sets no cooldown, so AWS's defaults apply. `desired_count` (2) only seeds the service: it is in `ignore_changes`, so an apply never resets the count autoscaling chose. `desired_count` and `min_tasks` refuse any value below 2 (DEP-R27).
+
+Each task is 0.5 vCPU and 1 GB. The alarm on ECS CPU fires at 80% average over 5 minutes, above the 60% target, so it fires when autoscaling cannot bring the CPU back down, as at the maximum of 6 tasks.
+
+### What bounds it
+
+The task count is bounded by the database's connections, not by Fargate:
+
+| Bound                          | Where                                                                   | Value                                                             |
+| ------------------------------ | ----------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Connections per task           | `DB_POOL_MAX` (`db_pool_max`) plus the readiness connection (SEC-R36)   | 10 + 1                                                            |
+| Tasks during a rollout         | `max_tasks` × `deployment_maximum_percent` / 100                        | 6 × 200 / 100 = 12                                                |
+| Connection budget              | the second validation of `max_tasks`, against `db_max_connections` − 3  | 12 × (10 + 1) + 10 = 142 < 197                                    |
+| The instance's connections     | `max_connections` of the parameter group (`db_max_connections`)         | 200, applied at the next reboot                                   |
+| RDS Proxy's share              | `max_connections_percent` (`db_proxy_max_connections_percent`, DEP-R29) | 90% of 200; the rest is left to the migration and bootstrap tasks |
+| Wait for a database connection | `connection_borrow_timeout` of RDS Proxy                                | 5 s, then SQLSTATE 08000 and a 503 (SEC-R49)                      |
+
+The validation computes `floor(max_tasks × deployment_maximum_percent / 100) × (db_pool_max + 1) + 10 < db_max_connections − 3`, so raising `max_tasks`, `deployment_maximum_percent` or `db_pool_max` fails at `terraform plan` unless `db_max_connections` grows with it. With every other default, the largest `max_tasks` it accepts is 8: 16 × 11 + 10 = 186 < 197, while 9 gives 18 × 11 + 10 = 208. A larger `db_max_connections` is a static parameter, applied only when the instance reboots. The alarm on RDS connections fires when RDS Proxy's database connections pass 80% of its `MaxDatabaseConnectionsAllowed`.
+
+### During a rollout
+
+The service keeps `deployment_minimum_healthy_percent` 100 and `deployment_maximum_percent` 200: ECS never runs fewer healthy tasks than the desired count, and may start as many new tasks as there are old ones before it stops any. At the autoscaling maximum that is 12 tasks for the length of the rollout, which the connection budget above already counts. A lower `deployment_maximum_percent` lowers that peak.
+
+### The load balancer while scaling
+
+The target group registers each task by IP. A new task receives requests once it passes 2 consecutive checks of `/health/live` (interval 10 s, timeout 5 s, `healthy_threshold` 2); ECS ignores the ALB's checks for the first 30 s of a task (`health_check_grace_period_seconds`), and the container's own check starts after its `startPeriod` of 10 s. The ALB checks liveness, so a task that cannot reach the database still joins and answers 503 on its own (section 1.6 of spec 008).
+
+On a scale-in, ECS deregisters the task, the ALB drains it for 35 s (`deregistration_delay`), and the task then shuts down as in [the shutdown runbook](../runbooks/shutdown.md): `SHUTDOWN_DRAIN_DELAY_MS` (2 s), the requests in flight within `SHUTDOWN_TIMEOUT_MS` (30 s), and SIGKILL only at the 40 s `stopTimeout`. Every request is answered by its `REQUEST_TIMEOUT_MS` (25 s), which `SHUTDOWN_TIMEOUT_MS` never undercuts (SEC-R35), so a scale-in cuts no request off.
+
+### Redis and RDS
+
+Neither scales on its own:
+
+- **Redis**: 2 `cache.t4g.small` nodes, a primary and one replica, from the module's `node_count` (default 2, at least 2), which the root module does not expose. `REDIS_URL` names the primary endpoint, so every command goes to the primary. Redis holds only the per-user rate-limit counters, nothing of the money; the alarm on ElastiCache memory fires above 80% on any node. Growing it is a change of `node_type` in the `cache` module.
+- **RDS**: one Multi-AZ `db.t4g.medium` instance and no read replica: every read and every write goes to the one instance (ADR-0005). The instance class is a literal of the `database` module, not a variable. Storage grows on its own from 20 GB to `db_max_allocated_storage_gb` (100 GB), watched by the storage events of the Observability section; CPU is watched by the alarm on RDS CPU at 80%. Aurora PostgreSQL is the upgrade path of ADR-0014.
+
 ## Deployment and migration steps
 
 Placeholders: `<region>`, `<cluster>` (output `cluster_name`), `<subnets>` (output `private_subnet_ids`, comma-separated), `<one-off-sg>` (output `one_off_db_security_group_id`), `<tag>` (the image tag).
@@ -184,6 +228,47 @@ The pipeline runs, in order, and stops at the first failure:
 
 Rolling back the code is applying the previous tag; the schema still supports it. In production the way back for the schema is a new forward migration, never `migrate:down`.
 
+### Rollout and rollback
+
+```mermaid
+sequenceDiagram
+  participant P as Pipeline
+  participant M as scf-migrate task
+  participant DB as RDS instance
+  participant E as ECS service scf-api
+  participant A as ALB target group
+  P->>M: aws ecs run-task
+  M->>DB: node dist/cli/migrate.js up, as scf_owner
+  M-->>P: exit code 0, or the deployment stops
+  P->>E: terraform apply with the new image_tag
+  E->>A: register the new tasks, up to 200% of the desired count
+  A-->>E: 2 passing checks of /health/live per task
+  E->>A: deregister the old tasks, drained for 35 s
+  E->>E: SIGTERM to the old tasks, SIGKILL at the 40 s stopTimeout
+  Note over E: tasks that never turn healthy: the circuit breaker rolls back
+  P->>E: aws ecs wait services-stable
+```
+
+The ECS service rolls out with these settings of the `service` module (DEP-R27):
+
+| Setting                              | Value                | Effect                                                                             |
+| ------------------------------------ | -------------------- | ---------------------------------------------------------------------------------- |
+| `deployment_minimum_healthy_percent` | 100                  | the old tasks stop only once as many new ones are healthy; capacity never drops    |
+| `deployment_maximum_percent`         | 200                  | up to twice the desired count during the rollout, counted in the connection budget |
+| `health_check_grace_period_seconds`  | 30                   | the ALB's checks of a new task count only after 30 s                               |
+| `deployment_circuit_breaker`         | `enable`, `rollback` | a deployment whose tasks never turn healthy goes back to the last one that did     |
+
+For a while the old and the new version serve side by side against one schema, which is why the migration runs first and why it may only expand (ADR-0020). Readiness accepts migrations newer than the code (SEC-R24), so an old task stays ready on the new schema.
+
+What the circuit breaker sees is a task that fails to start, exits, or fails its health checks: a configuration the service refuses (SEC-R40), a crash, or a failed `/health/live`. Nothing in AWS checks readiness, and the service sets no deployment alarms, so a version that is live but answers 503 or 500 is not rolled back on its own: the alarms on ALB 5xx and on healthy targets page, and an operator rolls back.
+
+To roll back the code:
+
+1. Apply the previous tag: `terraform apply -var image_tag=<previous tag>`, then `aws ecs wait services-stable --cluster <cluster> --services scf-api`. Tags are immutable in ECR, so the previous tag is the same image that ran before. This is the way that keeps Terraform and the service in step.
+2. When there is no time for an apply: `aws ecs update-service --cluster <cluster> --service scf-api --task-definition scf-api:<previous revision>`, then the same wait. Terraform owns the service's task definition (only `desired_count` is in `ignore_changes`), so the next apply must carry the previous tag, or it rolls the new one out again.
+
+Either way the rollout is the same rolling deployment, with the same draining. What is not rolled back is the schema: the migration task runs only `node dist/cli/migrate.js up`, no task definition runs `down`, and `migrate:down` is for development (ADR-0020). Expand-then-contract makes the schema compatible with the version just before, so a rollback by one release is safe; a migration that has to be undone is undone by a new forward migration, deployed like any other. A contract migration drops only what no running release uses any more (ADR-0020), so rolling back across one is not covered by that guarantee.
+
 ### Rotating a secret
 
 - `JWT_SECRET`, `CURSOR_SECRET`: put the new value, then `aws ecs update-service --cluster <cluster> --service scf-api --force-new-deployment`. Tokens and cursors signed with the old value stop being accepted.
@@ -200,21 +285,82 @@ Rolling back the code is applying the previous tag; the schema still supports it
 
 What each loss does to requests and to money, and how the deployment recovers.
 
+| Failure              | Detected by                                                                                | Recovery                                                          | The client sees                                                           |
+| -------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| A task               | 3 failed `/health/live` checks of the ALB, 10 s apart (30 s), or 3 failed container checks | ECS replaces the task; the alarm on healthy targets fires below 2 | a connection error or the ALB's 502 for the requests in flight on it      |
+| An availability zone | the same checks, in every task of the zone                                                 | ECS starts the desired count in the other zone                    | as for a task, then normal service                                        |
+| The database primary | RDS, which fails over to the standby; RDS Proxy keeps its endpoint                         | the tasks serve again without a restart                           | 503 with `Retry-After: 1` after at most 5 s per request, until it is back |
+| A Redis node         | the 100 ms command timeout of the service; ElastiCache's automatic failover                | ElastiCache promotes the replica                                  | nothing: requests are served, without the per-user limit                  |
+
 ### Loss of a task
 
 The ALB marks the target unhealthy after three failed liveness checks (30 s) and stops sending it requests; ECS replaces it in either zone. A task stopped by ECS drains first (SEC-R25). Requests in flight on a task that dies are lost to the client as a connection error or a 502; the client retries with the same Idempotency-Key, and the key's row tells whether the movement committed (DEP-R17, spec 005). Money is never lost or duplicated, which DEP-AC11 proves locally by killing a replica under load.
+
+Two checks find a dead or hung task. The ALB checks `/health/live` every 10 s with a 5 s timeout and marks the target unhealthy after 3 failures (`unhealthy_threshold`); the task definition's own health check, which ECS does read, runs `node dist/healthcheck.js` every 10 s with a 3 s timeout and 3 retries after a `startPeriod` of 10 s. Either one makes ECS replace the task, and the replacement takes requests after 2 passing checks of the ALB. The alarm on healthy targets fires when the Minimum of `HealthyHostCount` drops below 2 over a minute, so losing one of the two tasks pages.
+
+A task that ECS stops itself, on a deployment, a scale-in or a replacement, is deregistered and drained for 35 s first, then shuts down within its 40 s `stopTimeout`, so it loses nothing ([shutdown runbook](../runbooks/shutdown.md)). Only a task that dies, or is killed with SIGKILL (exit code 137), drops requests in flight; their transactions never commit, or commit with their key row, so the retry sees one result either way.
 
 ### Loss of an availability zone
 
 The ALB, the tasks, RDS Proxy and Redis span both zones. The ALB stops routing to the lost zone; ECS keeps the desired count by starting tasks in the remaining zone; autoscaling adds tasks if CPU rises. If the lost zone held the RDS primary, the database fails over as below; if it held the Redis primary, ElastiCache promotes the replica. The interface endpoints have a network interface in each zone, so the remaining zone keeps reaching AWS services.
 
+Every tier has one subnet in each of the two zones of `availability_zones`, and the DB and cache subnet groups both span the two isolated subnets, so nothing is pinned to one zone. While the zone is gone, the desired count runs in the remaining one; with the minimum of 2 that is both tasks in one zone. The service sets `availability_zone_rebalancing` to `ENABLED`, so ECS spreads the tasks across both zones again once the lost one returns. There is no NAT gateway, so no zone holds a component the other needs to reach AWS.
+
+The database and Redis each fail over as below; the two failovers are independent, and a zone outage can bring both at once. Money is protected as for the loss of a task and the database failover.
+
 ### Database failover
 
 RDS promotes the standby, usually within one to two minutes, and RDS Proxy reconnects to it without the service changing its endpoint. During the failover, RDS Proxy holds each new transaction's first statement for at most its `connection_borrow_timeout` of 5 s, then answers SQLSTATE 08000, and readiness answers 503: requests answer 503 with `Retry-After` (SEC-R49), the connection that met the timeout is destroyed rather than reused, a movement in flight rolls back and its key row is released, and clients retry with the same key. The ALB checks liveness, so the targets stay healthy and ECS replaces no task: they answer 503 until the database is back, and serve again without a restart (section 1.6 of spec 008, ADR-0014). Losing the instance without a standby is recovered from the automated backups to a point in time within 7 days.
 
+Step by step, as the Terraform and spec 007 set it:
+
+1. The primary is lost. RDS promotes the standby in the other zone; the instance's endpoint and RDS Proxy's endpoint stay the same, so no task changes its `DATABASE_URL`.
+2. A transaction still open on the lost primary does not commit, and its key row goes with it: its connection is lost, the request answers 503 `/problems/service-unavailable` with `Retry-After: 1` (SEC-R57), and a retry with the same key runs the movement afresh. A connection lost during `COMMIT` answers the same 503 with an outcome unknown to the client, and the retry with the same key replays the stored answer if the commit succeeded.
+3. A new transaction waits for a database connection at RDS Proxy for at most 5 s (`connection_borrow_timeout`), then gets SQLSTATE 08000. The service answers 503 `/problems/service-unavailable` with `Retry-After: 1`, sends nothing more on that connection, `ROLLBACK` included, and destroys it instead of returning it to the pool (SEC-R49). The pool opens a new one on the next request.
+4. Every request is still bounded by `REQUEST_TIMEOUT_MS` (25 s), below the ALB's idle timeout of 60 s, so the service, not the ALB, answers it (SEC-R34). A request whose `COMMIT` was already sent at its deadline has an outcome unknown to the client, as after a gateway error, and its retry with the same key gets the stored response (ADR-0022).
+5. `/health/live` keeps answering 200, so the ALB keeps the targets and ECS replaces no task; readiness answers 503 while `SELECT 1` fails, but nothing in AWS checks it (section 1.6 of spec 008).
+6. Once the new primary takes connections, the proxy hands them out again and the tasks serve without a restart.
+
+The failover is felt as a burst of 503s for its length (ADR-0014). The alarm on ALB 5xx counts the targets' 5xx, so a failover long enough to pass 1% of the requests over 5 minutes pages. How long failovers take in practice is what ADR-0014 says to watch, since it decides whether Aurora's faster failover is worth its cost.
+
 ### Loss of Redis
 
 The per-user rate limit fails open: each Redis command times out after `REDIS_COMMAND_TIMEOUT_MS` (100 ms), the request is served, and the service logs one warning on the transition and one line on recovery (SEC-R06). Readiness ignores Redis, so no task is taken out of the ALB. Money movements never touch Redis, so they stay correct; the per-IP limit of AWS WAF still applies. On a node failure ElastiCache promotes the replica and the service reconnects.
+
+The replication group has `automatic_failover_enabled` and `multi_az_enabled`, with its two nodes in the two zones (DEP-R30). The service reaches it through the primary endpoint of `REDIS_URL`, so it needs no change after a promotion. While Redis does not answer, each request waits at most `REDIS_COMMAND_TIMEOUT_MS` (100 ms) for the check, a wait already counted in the request's budget (SEC-R35), and `scf_rate_limit_store_errors_total` rises. Per-user limits are not enforced until Redis is back; the per-IP limit of WAF, 30000 requests per IP per minute, still is. The counters live only in Redis, so whatever a failover loses of them is a rate-limit window, never money.
+
+### What the client sees
+
+The client follows the retry policy of section 1.5 of spec 008: it retries with the same Idempotency-Key on a connection error, a 502, 503 or 504, or a 409 `/problems/request-in-progress`, waits the `Retry-After` of the response when it has one and 200 ms otherwise, up to 60 times, and never retries another 4xx. The service's 503s carry `Retry-After: 1`. The ALB's own 502, 503 and 504 are `text/html` with no `Retry-After` and no problem body (Edge section), so the client waits 200 ms after them; it keys on the status, so it retries them the same way.
+
+### What protects the money
+
+No failure above can lose or duplicate a movement, because nothing about money lives outside PostgreSQL (ADR-0005):
+
+- Each movement is one database transaction, and its idempotency key row is the transaction's first write (ADR-0009). The key and the movement commit together or not at all, so a retry with the same key either gets the stored response of the one execution or runs the movement for the first time (DEP-R17, spec 005).
+- Balances are checked only after the customer accounts are locked with `SELECT ... FOR UPDATE`, in the same transaction (ADR-0008), so no failover or retry can bring a balance below zero.
+- The ledger is append-only; a movement that did commit is corrected only by a reversal, never by a failure path.
+- Redis holds only rate-limit counters, and the tasks hold no state, so losing either loses nothing but capacity.
+- A committed transaction is kept by the Multi-AZ instance and its 7 days of backups with point-in-time recovery (DEP-R29).
+
+## Multi-region (not implemented)
+
+Out of scope: section 6 of [spec 008](../../specs/008-deployment/spec.md) leaves out multi-region deployment and disaster recovery beyond Multi-AZ and RDS backups, as section 6 of [spec 000](../../specs/000-overview/spec.md) does multi-region deployment and cross-region replication. Nothing below is built or decided; it records what this design would have to change, as considerations for a future spec and ADR.
+
+What does not move. PostgreSQL is the only source of truth (ADR-0005): the idempotency key row is written in the movement's transaction (ADR-0009), and balances are checked under `FOR UPDATE` locks on the customer accounts (ADR-0008). All three need one database that every request for an account writes to. A second region therefore changes where that writer runs and how it is replaced, not the rule that there is one.
+
+- **Active-passive.** One region serves; the other holds a copy of the database and a stopped or scaled-down copy of the service, and takes over in a disaster. It keeps the single writer. The options for the copy are a cross-region read replica of the RDS instance, promoted on failover, or Aurora PostgreSQL Global Database, which ADR-0014 names as the upgrade path for its faster failover and which would replace RDS PostgreSQL, against that ADR's reason for keeping PostgreSQL identical to the local one.
+- **Active-active.** Both regions write. Two writers of the same ledger would need either cross-region coordination of every account lock and key row, or each account pinned to a home region with every transfer between regions turned into a cross-database protocol: the sagas that ADR-0002 avoids by keeping one consistency boundary. The ledger's invariants favour the single writer.
+
+The trade-offs to settle before choosing:
+
+- **RPO.** Cross-region replication is asynchronous, so a promotion can lose the last transactions the old primary committed, key rows included. A client that retries in the new region with the same key would then find no key and run the movement again: the guarantee of DEP-R17 holds only for what the new primary has. The recovery plan must reconcile the ledger after a promotion (`npm run reconcile`, which has no AWS task yet: see below) and say how lost commits are found.
+- **RTO.** Promotion, pointing the tasks of the other region at the new writer (RDS Proxy is regional and targets an instance of its own region), running the service there and moving traffic. The old region must stop writing before the new one starts, or the ledger forks.
+- **Routing.** Route 53 failover records with health checks, or AWS Global Accelerator, in front of one ALB per region. Each region needs its own ACM certificate and WAF web ACL, whose scope is `REGIONAL`.
+- **Redis per region.** The rate-limit counters stay regional, so a user's per-user limit would apply in each region separately; the service already fails open without Redis (SEC-R06), and no money depends on it.
+- **Secrets and keys.** `JWT_SECRET` and `CURSOR_SECRET` must be the same in both regions for tokens and cursors to stay valid after a failover; each region has its own Secrets Manager secrets and KMS keys, so the values are replicated or set in both.
+- **One-off and scheduled tasks.** The migration task runs once, against the writer only; the hourly cleanup runs only where the writer is.
+- **Terraform.** The configuration takes one `aws_region` and one state; a second region is a second state with the same modules, plus the resources that join them.
 
 ## Limitations and follow-ups
 
@@ -224,21 +370,21 @@ The per-user rate limit fails open: each Redis command times out after `REDIS_CO
 
 Approximate monthly cost in `eu-west-1` at on-demand prices, before taxes, for the configuration as committed and light traffic. Prices change; check them with the AWS Pricing Calculator before relying on them.
 
-| Item                                    | Assumption                                       | USD per month |
-| --------------------------------------- | ------------------------------------------------ | ------------: |
-| ECS Fargate, service                    | 2 tasks × 0.5 vCPU, 1 GB, always on              |            36 |
-| ECS Fargate, one-off tasks              | hourly cleanup, a few minutes each               |             1 |
-| Application Load Balancer               | 730 hours and about 1 LCU                        |            25 |
-| AWS WAF                                 | 1 web ACL, 3 rules, a few million requests       |            10 |
-| RDS PostgreSQL `db.t4g.medium` Multi-AZ | instance hours, standby included                 |           105 |
-| RDS storage and backups                 | 20 GB gp3 Multi-AZ; backups within the free size |             6 |
-| RDS Proxy                               | 2 vCPU of the instance                           |            22 |
-| ElastiCache `cache.t4g.small`           | 2 nodes                                          |            53 |
-| VPC interface endpoints                 | 4 endpoints × 2 zones, little data               |            65 |
-| Secrets Manager, KMS                    | 6 secrets, 5 keys                                |             8 |
-| CloudWatch                              | a few GB of logs, 11 alarms, Container Insights  |            15 |
-| ECR                                     | a few images                                     |             1 |
-| **Total**                               |                                                  |     **≈ 350** |
+| Item                                    | Assumption                                                             | USD per month |
+| --------------------------------------- | ---------------------------------------------------------------------- | ------------: |
+| ECS Fargate, service                    | 2 tasks × 0.5 vCPU, 1 GB, always on                                    |            36 |
+| ECS Fargate, one-off tasks              | hourly cleanup, a few minutes each                                     |             1 |
+| Application Load Balancer               | 730 hours and about 1 LCU                                              |            25 |
+| AWS WAF                                 | 1 web ACL, 3 rules, a few million requests                             |            10 |
+| RDS PostgreSQL `db.t4g.medium` Multi-AZ | instance hours, standby included                                       |           105 |
+| RDS storage and backups                 | 20 GB gp3 Multi-AZ; backups within the free size                       |             6 |
+| RDS Proxy                               | 2 vCPU of the instance                                                 |            22 |
+| ElastiCache `cache.t4g.small`           | 2 nodes                                                                |            53 |
+| VPC interface endpoints                 | 4 endpoints × 2 zones, little data                                     |            65 |
+| Secrets Manager, KMS                    | 6 secrets, 4 customer-managed keys                                     |             7 |
+| CloudWatch                              | a few GB of logs, 10 alarms and 1 EventBridge rule, Container Insights |            15 |
+| ECR                                     | a few images                                                           |             1 |
+| **Total**                               |                                                                        |     **≈ 350** |
 
 At 6 tasks, Fargate adds about 72. The largest fixed items are the Multi-AZ database and the interface endpoints; the endpoints cost about as much as one NAT gateway with its data, and they keep the tasks without any path to the internet. Aurora PostgreSQL, the upgrade path of ADR-0014, would cost more at this size.
 

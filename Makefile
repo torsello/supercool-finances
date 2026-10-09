@@ -11,7 +11,7 @@ TOOLS = $(COMPOSE) build --quiet tools && $(COMPOSE) run --rm tools
 SUB ?= 0192f0a0-0000-7000-8000-00000000d0c1
 ROLE ?= customer
 
-.PHONY: up down logs seed token test reconcile e2e load observability
+.PHONY: up down logs seed demo-env token test reconcile e2e load observability
 
 # Builds the image, the tools image included, and starts the stack, returning once every service
 # is healthy. The tools service is not started: seed, token and reconcile run it on demand.
@@ -34,6 +34,11 @@ logs:
 # Creates the demo accounts and deposits through the API; running it again changes nothing.
 seed:
 	@$(TOOLS) npm run --silent seed
+
+# Runs the seed, then prints TOKEN, OPERATOR_TOKEN, A and B as shell assignments, for
+# eval "$$(make demo-env)" in the Quickstart (DEP-R48); writes no file.
+demo-env:
+	@$(TOOLS) npm run --silent demo-env
 
 # Prints a bearer token: make token, or make token SUB=<uuid> ROLE=operator.
 token:

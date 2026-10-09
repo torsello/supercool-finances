@@ -151,6 +151,14 @@ The dashboard's panels use only the metrics of table 1.4 of spec 007 and Prometh
 | Rate-limited requests               | `sum(rate(scf_rate_limited_total[1m]))`                                                                                                                                                                                            |
 | Pool usage                          | `scf_db_pool_connections` by `replica` and `state`, and `sum by (replica) (rate(scf_db_pool_acquire_timeouts_total[1m]))`                                                                                                          |
 
+### 1.10 Documentation checks
+
+The README and the documents of `docs/` explain the system with Mermaid diagrams, which GitHub renders, and link each other and the code with relative links. The CI job `docs` runs `npm run docs:check` over every Markdown file tracked by git: each fenced `mermaid` block is rendered by the Mermaid CLI from its official image, `minlag/mermaid-cli`, pinned by version and digest, so a diagram GitHub would show as an error fails the build; each relative link must name a file or folder of the repository, and its anchor a heading of the target Markdown file. External URLs are not checked, so the job needs no network but the image pull and gives the same answer on every run.
+
+### 1.11 Postman collection
+
+Next to `docs/api/requests.http`, a Postman collection in format v2.1 and a local environment let a reviewer try the API by hand from Postman, or from Insomnia or Bruno, which import that format: `docs/api/postman/supercool-finances.postman_collection.json` and `docs/api/postman/local.postman_environment.json`. The environment holds only local values: `baseUrl` `http://localhost:8080`, the ids of the demo users of table 1.2, and the demo JWT settings of `compose.yaml`, visibly fake and allowlisted by gitleaks by exact value (DEP-R35, DEP-R36). A collection-level pre-request script mints, before each request, fresh 15-minute HS256 tokens with the claims of section 1.2 of spec 006 for demo-customer-1, demo-customer-2 and demo-operator, with the sandbox's CryptoJS. The folders follow the order a reviewer would try: health and docs; accounts; money movements; idempotency; reversals; account status; errors. Each request saves the ids it creates in collection variables, uses `{{$guid}}` as its Idempotency-Key except where a replay needs one key, kept for the run, and tests its status and key headers, so a run passes from top to bottom against a freshly seeded stack, and again on the same stack. The e2e suite runs it with newman, through `npx`, pinned to an exact version.
+
 ## 2. Requirements
 
 | ID      | Requirement (EARS)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
@@ -201,6 +209,9 @@ The dashboard's panels use only the metrics of table 1.4 of spec 007 and Prometh
 | DEP-R44 | WHILE the profile `observability` runs THE SYSTEM SHALL serve Grafana on `127.0.0.1:3030` only, to anonymous visitors with the role `Viewer`, with the login form, basic authentication and sign-up disabled, the Prometheus datasource and the dashboard of section 1.9 provisioned so that no visitor can change them, and usage reporting and update checks off.                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | DEP-R45 | THE SYSTEM SHALL provision a Grafana dashboard with the panels of section 1.9, whose queries use only the metrics of table 1.4 of spec 007 and Prometheus's `up`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | DEP-R46 | THE SYSTEM SHALL pass `SENTRY_DSN` to no service of `compose.yaml`, and provide the override file `compose.error-reporting.yaml`, which adds to `api-1` and `api-2` only `SENTRY_DSN` as `${SENTRY_DSN:?<message>}`, so that Compose refuses to start them with that file unless `SENTRY_DSN` is set and not empty (section 1.9).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| DEP-R47 | THE SYSTEM SHALL check in CI, in the job `docs` of `.github/workflows/ci.yml` with the step `npm run docs:check`, every Markdown file tracked by git, and fail the build when a Mermaid diagram of one of them does not render with the Mermaid CLI image pinned by version and digest, or when one of their Markdown links or link reference definitions with a relative target names a path that does not exist in the repository, or a `#` anchor that matches no heading of its target Markdown file (section 1.10).                                                                                                                                                                                                                                                                                                            |
+| DEP-R48 | WHEN `make demo-env` runs THE SYSTEM SHALL run the seed of DEP-R10 in the tools service and print on standard output only four shell assignments, each value in single quotes: `TOKEN`, a token of demo-customer-1 with the role `customer`; `OPERATOR_TOKEN`, a token of demo-operator with the role `operator`; `A`, the id of the EUR account of demo-customer-1; and `B`, the id of the EUR account of demo-customer-2 (table 1.2), writing no file; IF the seed fails or its output lacks one of those accounts THEN THE SYSTEM SHALL print nothing on standard output, name the reason on standard error and exit with a non-zero code (section 1.2).                                                                                                                                                                         |
+| DEP-R49 | THE SYSTEM SHALL provide the Postman collection and environment of section 1.11, with a request for every operation of `docs/api/openapi.yaml`, an environment of local values only, and tests on every request, so that running the collection with that environment against a freshly seeded stack passes every test.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
 ## 3. Acceptance criteria
 
@@ -489,6 +500,39 @@ Unless stated otherwise: "the stack" is started with `docker compose up --build 
 - **When** they are parsed
 - **Then** no service of `compose.yaml` has a `SENTRY_DSN` variable, and the text of `compose.yaml` does not contain `SENTRY_DSN`; `compose.error-reporting.yaml` defines only the services `api-1` and `api-2`, each with only an `environment` holding only `SENTRY_DSN`, whose value has the form `${SENTRY_DSN:?<message>}` with a message that names `SENTRY_DSN`; and it sets no `image`, `build`, `ports`, `profiles` or `env_file`
 
+### DEP-AC35 · Every Mermaid diagram renders and every relative link resolves
+
+- **Level:** ci
+- **Covers:** DEP-R47
+- **Verified by:** CI job `docs`, step `npm run docs:check` (phase 14-docs)
+- **Given** the Markdown files tracked by git, among them `README.md`, `docs/**/*.md` and `specs/**/*.md`
+- **When** CI runs `npm run docs:check`
+- **Then** it fails, naming the file and line, unless every fenced `mermaid` block renders with the Mermaid CLI image pinned by version and digest, and every relative target of a Markdown link or link reference definition outside code blocks and code spans names a file or folder of the repository, with its `#` anchor, when the target is a Markdown file, matching a heading of that file under GitHub's anchor rules; `http:`, `https:` and `mailto:` targets are not checked
+
+### DEP-AC36 · make demo-env prints the Quickstart's variables and nothing else
+
+- **Level:** unit
+- **Covers:** DEP-R48
+- **Given** a seed that prints the users of table 1.2 with demo-customer-1's EUR account `01a1...0001` and demo-customer-2's EUR account `01a1...0002`, the `JWT_SECRET`, `JWT_ISSUER` and `JWT_AUDIENCE` of `compose.yaml`, and the `Makefile`
+- **When** the demo environment command runs with that seed; then with a seed that exits 1; then with a seed whose output has no EUR account for demo-customer-2
+- **Then** the first run exits 0 and prints exactly four lines, `TOKEN='<jwt>'`, `OPERATOR_TOKEN='<jwt>'`, `A='01a1...0001'` and `B='01a1...0002'`, whose tokens verify with those settings and carry the `sub` and `role` of demo-customer-1 (`customer`) and demo-operator (`operator`); the other two runs exit non-zero with an empty standard output and a reason on standard error; and the `Makefile` target `demo-env` runs `npm run --silent demo-env` in the tools service and writes no file
+
+### DEP-AC37 · The Postman collection covers every operation, with local values only
+
+- **Level:** unit
+- **Covers:** DEP-R49
+- **Given** `docs/api/openapi.yaml`, `docs/api/postman/supercool-finances.postman_collection.json` and `docs/api/postman/local.postman_environment.json`
+- **When** the operations of the OpenAPI document and the requests of the collection, with every `{{variable}}` path segment read as a path parameter, are compared, and the environment is read
+- **Then** the collection uses the schema of format v2.1, has a request for every method and path of the OpenAPI document, and every request has a test script; every deposit, withdrawal, transfer and reversal sends an `Idempotency-Key`; and the environment holds exactly `baseUrl` `http://localhost:8080`, the four user ids of table 1.2, and the `JWT_SECRET`, `JWT_ISSUER` and `JWT_AUDIENCE` of `compose.yaml`
+
+### DEP-AC38 · The collection runs green against the stack
+
+- **Level:** e2e
+- **Covers:** DEP-R49
+- **Given** the stack running and seeded, and never during the load test of SYS-AC17
+- **When** newman, run through `npx` at an exact version, runs the collection with the environment, its `baseUrl` set to the stack's load balancer
+- **Then** it exits with code 0, every request of the collection is sent once, and no assertion fails
+
 ## 4. Error catalogue
 
 Errors shared by every capability are in spec 000, and the load balancer's 429 and 413 in spec 007. This spec adds:
@@ -519,6 +563,7 @@ Errors shared by every capability are in spec 000, and the load balancer's 429 a
 - A custom domain and its DNS records; the certificate's domain is a Terraform variable.
 - Hot reload and source mounts for development inside Compose; development runs on the host with `npm run dev`.
 - Prometheus and Grafana in AWS: scraping in AWS stays the next step that `docs/deployment/aws.md` documents. Locally: alert rules, log or trace backends (Loki, Tempo), and keeping metrics after the container is removed.
+- Checking external URLs in the documentation: a link to another site can break or change without a commit, so `npm run docs:check` checks only relative links (section 1.10).
 - Error reporting in AWS (section 1.10 of spec 007): the tasks have no outbound internet path (section 1.7), so the Terraform sets no `SENTRY_DSN` and reporting stays off; enabling it needs a NAT gateway with an egress allow-list for the endpoint, and the DSN as a Secrets Manager secret.
 
 ## 7. Open questions

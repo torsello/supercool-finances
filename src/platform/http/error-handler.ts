@@ -20,6 +20,7 @@ import {
 } from '../../modules/movements/index.js';
 import {
   AccountLockTimeout,
+  ConnectionLost,
   IdempotencyWaitTimeout,
   LedgerWriteRejected,
   PoolAcquireTimeout,
@@ -185,6 +186,7 @@ export function toProblem(error: unknown): Problem {
     error instanceof StatementTimeout ||
     error instanceof PoolAcquireTimeout ||
     error instanceof ProxyBorrowTimeout ||
+    error instanceof ConnectionLost ||
     error instanceof PoolClosed ||
     error instanceof ShuttingDown ||
     error instanceof RequestTimeout

@@ -219,9 +219,14 @@ variable "db_max_allocated_storage_gb" {
 }
 
 variable "db_proxy_max_connections_percent" {
-  description = "The share of max_connections RDS Proxy may use: at most 90 (DEP-R29)."
+  description = "The share of max_connections RDS Proxy may use: from 1 to 90 (DEP-R29)."
   type        = number
   default     = 90
+
+  validation {
+    condition     = var.db_proxy_max_connections_percent >= 1 && var.db_proxy_max_connections_percent <= 90 && floor(var.db_proxy_max_connections_percent) == var.db_proxy_max_connections_percent
+    error_message = "DEP-R29 lets RDS Proxy use a whole percentage of max_connections from 1 to 90."
+  }
 }
 
 variable "redis_auth_token_version" {

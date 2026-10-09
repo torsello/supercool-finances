@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildProductionApp, type BuiltApp } from '../../support/app.js';
 import { balanceOf, closePools, runtimePool } from '../../support/db.js';
-import { createAccount, deposit } from '../../support/http.js';
+import { createAccount, deposit, problemOf } from '../../support/http.js';
 import { LOG_LEVEL } from '../../support/logs.js';
 import { openLockSession, type LockSession } from '../../support/sessions.js';
 import { tokenFor } from '../../support/tokens.js';
@@ -64,7 +64,7 @@ describe('a request whose database connection is lost (SYS-R22, SEC-R21)', () =>
     const response = await pending;
     await session.release();
 
-    expect(response.statusCode).toBeGreaterThanOrEqual(500);
+    expect(response.statusCode).toBe(503);
     const own = built.logs
       .linesOf('req-lost')
       .filter((line) => (line.level ?? 0) >= LOG_LEVEL.warn);
@@ -75,5 +75,42 @@ describe('a request whose database connection is lost (SYS-R22, SEC-R21)', () =>
     for (const line of lost) expect(line.reqId).toBeUndefined();
 
     expect(await balanceOf(a1.id)).toBe('1000');
+  });
+  it('SEC-AC48 a withdrawal whose connection is lost answers 503 with Retry-After: 1, moves no money, and the retry with the same key runs it once', async () => {
+    const c1 = tokenFor(randomUUID(), 'customer');
+    const a1 = await createAccount(built.app, c1);
+    expect(
+      (await deposit(built.app, tokenFor(randomUUID(), 'operator'), a1.id, '1000')).statusCode,
+    ).toBe(201);
+    const key = randomUUID();
+    const send = () =>
+      built.app.inject({
+        method: 'POST',
+        url: `/v1/accounts/${a1.id}/withdrawals`,
+        headers: { authorization: `Bearer ${c1}`, 'idempotency-key': key },
+        payload: { amount: '100', currency: 'EUR' },
+      });
+
+    await session.lockRow('accounts', a1.id);
+    const pending = send();
+    const pid = await waitingBackend();
+    await session.waitUntilBlocked(pid);
+    await runtimePool().query('SELECT pg_terminate_backend($1)', [pid]);
+    const lost = await pending;
+    await session.release();
+
+    expect(lost.statusCode).toBe(503);
+    expect(lost.headers['retry-after']).toBe('1');
+    expect(problemOf(lost).type).toBe('/problems/service-unavailable');
+    expect(await balanceOf(a1.id)).toBe('1000');
+
+    const retried = await send();
+    expect(retried.statusCode).toBe(201);
+    expect(retried.headers['idempotent-replayed']).toBeUndefined();
+    const replayed = await send();
+    expect(replayed.statusCode).toBe(201);
+    expect(replayed.headers['idempotent-replayed']).toBe('true');
+    expect(replayed.body).toBe(retried.body);
+    expect(await balanceOf(a1.id)).toBe('900');
   });
 });
