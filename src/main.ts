@@ -57,32 +57,43 @@ async function main(): Promise<void> {
     process.exitCode = 1;
     return;
   }
-  try {
-    await listen(app, config);
-  } catch (error) {
-    // The app's logger keeps secrets out of the line (SEC-R22).
-    app.log.fatal({ err: error }, 'startup failed');
-    process.exitCode = 1;
-    await app.close();
-    return;
-  }
-
   const shutdown = createShutdown(app, config);
   const limitMs = config.shutdownDrainDelayMs + config.shutdownTimeoutMs + SHUTDOWN_MARGIN_MS;
-  let started = false;
-  const onSignal = (signal: NodeJS.Signals): void => {
-    if (started) {
-      app.log.warn({ signal }, 'signal received during the shutdown: ignored');
-      return;
-    }
-    started = true;
+  const runShutdown = (signal: NodeJS.Signals): void => {
     setTimeout(() => {
       app.log.error({ limitMs }, 'the shutdown did not end in time: exiting');
       process.exit(1);
     }, limitMs).unref();
     void shutdown.shutdown(signal).then((code) => process.exit(code));
   };
+  // Installed before listening, so a signal that arrives during startup is never left to Node's
+  // default action: it is held, and runs the shutdown once listening has finished.
+  let started = false;
+  let listening = false;
+  let pending: NodeJS.Signals | undefined;
+  const onSignal = (signal: NodeJS.Signals): void => {
+    if (started) {
+      app.log.warn({ signal }, 'signal received during the shutdown: ignored');
+      return;
+    }
+    started = true;
+    if (listening) runShutdown(signal);
+    else pending = signal;
+  };
   for (const signal of SHUTDOWN_SIGNALS) process.on(signal, onSignal);
+
+  try {
+    await listen(app, config);
+  } catch (error) {
+    for (const signal of SHUTDOWN_SIGNALS) process.off(signal, onSignal);
+    // The app's logger keeps secrets out of the line (SEC-R22).
+    app.log.fatal({ err: error }, 'startup failed');
+    process.exitCode = 1;
+    await app.close();
+    return;
+  }
+  listening = true;
+  if (pending !== undefined) runShutdown(pending);
 
   closeWithGrace(
     {

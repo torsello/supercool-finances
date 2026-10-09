@@ -11215,3 +11215,195 @@ completed (exit code 0)
     it's the one edit outside the skill's verify-only scope.
 
 ✻ Crunched for 2m 49s · done 9:15 PM
+
+❯ /export docs/ai/transcripts/09-hardening.txt                                  
+  ⎿  Conversation exported to: /Users/matiastorsello/supercool-finances/docs/ai/
+     transcripts/09-hardening.txt
+
+❯ /ship add the final transcript of phase 09                                    
+
+⏺ Bash(git branch --show-current)
+  ⎿  phase/09-hardening
+
+⏺ Bash(npm run check)
+  ⎿  > supercool-finances@0.1.0 check
+     > npm run typecheck && npm run lint && npm run format:check && npm run
+      test
+     … +78 lines (ctrl+o to expand)
+  ⎿  (timeout 5m)
+
+⏺ Bash(npm run infra:up)
+  ⎿  > supercool-finances@0.1.0 infra:up
+     > docker compose up -d --wait postgres redis
+     … +6 lines (ctrl+o to expand)
+
+⏺ Bash(npm run test:integration)
+  ⎿  Error: Exit code 1
+
+     > supercool-finances@0.1.0 test:integration
+     > vitest run --project integration --reporter=default --reporter=json 
+     --outputFile.json=reports/vitest-integration.json
+
+
+      RUN  v5.0.3 /Users/matiastorsello/supercool-finances
+
+      ✓ |integration| test/integration/security/user-rate-limit.test.ts (2 
+     tests) 10372ms
+        ✓ the per-user rate limit (2)
+     … +127 lines (ctrl+o to expand)
+
+⏺ Stopping at the failed gate, as the skill says: nothing is staged, committed
+  or pushed.
+
+  Failed gate: npm run test:integration. Of 323 tests, 322 pass and 1 fails:
+
+  LED-AC15 (test/integration/ledger/reconciliation-concurrency.test.ts:72)
+  AssertionError: run 18: expected 200 to be less than 200
+
+  This is the check I added in the last audit round: after each of the 20
+  reconciliations, some of the 200 transfers must still be pending. On this run
+  all 200 had settled by the reconciliation of run 18, so the reconciliations
+  only partly overlapped the burst. The bursts of 200 transfers finish in about
+  0.5 s, so the 20 sequential reconciliations can outlast them on a faster or
+  quieter run. I ran it three times earlier and it passed each time, so this is
+  a flaky assertion in the test, not a defect in the service: the reports
+  themselves were clean.
+
+  npm run check: passed (320 unit tests). I did not run trace, because the
+  integration run failed.
+
+  Two possible fixes, for you to decide in the main conversation:
+  1. Make the overlap robust: run reconciliations in a loop until the transfers
+     settle, and assert the overlap on at least one of them (or on the first
+     few), instead of on all 20.
+  2. Make the burst larger or slower, which makes the test longer.
+
+  I recommend option 1. The only file with changes is the transcript,
+  docs/ai/transcripts/09-hardening.txt, still unstaged.
+
+✻ Crunched for 2m 5s · done 9:18 PM
+
+❯ Option 1. In the LED-AC15 test, keep reconciling in a loop until all 200      
+  transfers have settled, with at least 20 reconciliations in total, and assert 
+  that at least one reconciliation finished while transfers were still          
+  pending; every report must still have no discrepancies. Change nothing else,  
+  and run that test file five times in a row to show it is stable.              
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(test/integration/ledger/reconciliation-concurrency.test.ts)
+  ⎿  Added 7 lines, removed 3 lines
+      65          return response;
+      66        }),
+      67      );
+      68 +    // Reconciles until every transfer has settled, at least 20
+         + times, recording how many                                     
+      69 +    // reconciliations finished while transfers were still pend
+         +ing.                                                           
+      70      const reports = [];
+      69 -    for (let run = 0; run < 20; run += 1) {                    
+      71 +    let duringTransfers = 0;                                   
+      72 +    while (reports.length < 20 || settled < 200) {             
+      73        reports.push(await reconcile(query));
+      71 -      // Each reconciliation ran while the transfers were still
+         - moving money.                                                 
+      72 -      expect(settled, `run ${String(run)}`).toBeLessThan(200); 
+      74 +      if (settled < 200) duringTransfers += 1;                 
+      75      }
+      76      const responses = await transfers;
+      77 +    // At least one reconciliation ran while the transfers were
+         + still moving money.                                           
+      78 +    expect(duringTransfers).toBeGreaterThan(0);                
+      79  
+      80      for (const [run, { report, exitCode }] of reports.entries()
+          ) {
+      81        expect(report.discrepancies, `run ${String(run)}`).toEqua
+          l([]);
+
+⏺ Bash(npx prettier --check
+      test/integration/ledger/reconciliation-concurrency.test.ts && npx eslint
+      test/integration/ledger/reconciliation-concurrency.test.ts && for…)
+  ⎿  Checking formatting...
+     All matched files use Prettier code style!
+           Tests  1 passed (1)
+     … +4 lines (ctrl+o to expand)
+  ⎿  (timeout 5m)
+
+⏺ The LED-AC15 test now keeps reconciling until all 200 transfers have settled,
+  with at least 20 reconciliations in total. It asserts that at least one of
+  them finished while transfers were still pending. As before, every report must
+  have no discrepancies and every currency total must be "0". Nothing else
+  changed.
+
+  The test file passes prettier and lint, and passed five runs in a row. I did
+  not rerun the full suite or the trace, and nothing is staged or committed; the
+  transcript is still the only other change.
+
+✻ Worked for 20s · done 9:19 PM
+❯ /ship make the LED-AC15 overlap check robust                                  
+
+⏺ Bash(git branch --show-current)
+  ⎿  phase/09-hardening
+
+⏺ Bash(npm run check)
+  ⎿  > supercool-finances@0.1.0 check
+     > npm run typecheck && npm run lint && npm run format:check && npm run
+      test
+     … +76 lines (ctrl+o to expand)
+  ⎿  (timeout 5m)
+
+⏺ Bash(npm run infra:up)
+  ⎿  > supercool-finances@0.1.0 infra:up
+     > docker compose up -d --wait postgres redis
+     … +6 lines (ctrl+o to expand)
+
+⏺ Bash(npm run test:integration 2>&1 | grep -E "×|FAIL|Test Files|Tests
+      |AssertionError")
+  ⎿   Test Files  133 passed (133)
+           Tests  323 passed (323)
+  ⎿  (timeout 10m)
+
+⏺ Bash(npm run trace -- --require unit,integration 2>&1 | tail -2)
+  ⎿  221 ACs in 9 specs: 182 covered, 21 pending, 0 missing, 18 unverified.
+      Test reports read: unit, integration.
+
+⏺ All three gates pass. infra/terraform doesn't exist, so checkov is skipped.
+  The transcript already has its row in docs/ai/README.md, so I'm staging.
+
+⏺ Bash(git add -A)
+  ⎿  (No output)
+
+⏺ Bash(git status --short)
+  ⎿  M  docs/ai/transcripts/09-hardening.txt
+     M  test/integration/ledger/reconciliation-concurrency.test.ts
+
+⏺ Bash(git commit -F - <<'EOF'
+      test(ledger): make the LED-AC15 overlap check robust…)
+  ⎿  [phase/09-hardening e67963d] test(ledger): make the LED-AC15 overlap c
+     heck robust
+      2 files changed, 144 insertions(+), 4 deletions(-)
+
+⏺ Bash(gitleaks git --no-banner --redact --log-opts="origin/main..HEAD")
+  ⎿  9:22PM INF 3 commits scanned.
+     9:22PM INF scanned ~1025062 bytes (1.03 MB) in 1.03s
+     9:22PM INF no leaks found
+
+⏺ Bash(git push -u origin HEAD)
+  ⎿  To https://github.com/torsello/supercool-finances.git
+        6887669..e67963d  HEAD -> phase/09-hardening
+     branch 'phase/09-hardening' set up to track 'origin/phase/09-hardening
+     '.
+
+⏺ - Commit: e67963d test(ledger): make the LED-AC15 overlap check robust. It's
+    pushed to phase/09-hardening, and gitleaks found no leaks.
+  - Gates: npm run check passed (320 unit tests), npm run test:integration
+    passed (323 tests), and npm run trace -- --require unit,integration passed
+    (182 ACs covered, 0 missing).
+  - AC IDs covered: LED-AC15.
+  - Pull request: not opened, because this isn't a "close phase" description. PR
+    #9 already exists for the branch and now includes this commit.
+  - Also committed: the refreshed transcript
+    docs/ai/transcripts/09-hardening.txt. Checkov was skipped because
+    infra/terraform does not exist yet.
+
+✻ Baked for 2m 14s · done 9:22 PM
