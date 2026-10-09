@@ -1,6 +1,6 @@
 # 003 · Money movements
 
-- **Status:** Approved
+- **Status:** Implemented
 - **ID prefix:** MOV
 - **Related ADRs:** [ADR-0001](../../docs/adr/0001-spec-driven-development-with-adrs-and-ai-agents.md), [ADR-0002](../../docs/adr/0002-modular-monolith.md), [ADR-0003](../../docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md), [ADR-0004](../../docs/adr/0004-typescript-with-fastify.md), [ADR-0006](../../docs/adr/0006-double-entry-ledger-with-signed-integer-minor-units.md), [ADR-0007](../../docs/adr/0007-system-accounts-without-a-cached-balance.md), [ADR-0008](../../docs/adr/0008-read-committed-with-ordered-pessimistic-row-locks.md), [ADR-0009](../../docs/adr/0009-idempotency-inside-the-movements-transaction.md), [ADR-0010](../../docs/adr/0010-kysely-and-pg-instead-of-an-orm.md), [ADR-0011](../../docs/adr/0011-amounts-as-strings-in-the-api-and-bigint-in-the-domain.md), [ADR-0016](../../docs/adr/0016-error-model.md), [ADR-0019](../../docs/adr/0019-timeout-layers-and-rds-proxy.md), [ADR-0022](../../docs/adr/0022-request-timeout-answer-first-then-roll-back.md)
 - **Depends on specs:** 000-overview, 001-accounts, 002-ledger, 004-reversals, 005-idempotency, 007-security-ops

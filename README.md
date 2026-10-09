@@ -213,7 +213,7 @@ Nothing in this repository applies the Terraform (DEP-R34). `npm run infra:valid
 
 - `ci`: `npm run check`, `npm run openapi:lint`, `npm run infra:validate`, the integration tests against Postgres and Redis, `npm run reconcile` on the test database they leave (LED-AC17), `npm run trace -- --require unit,integration` and `npm run build`. It uploads the unit and integration reports.
 - `e2e`: `npm run test:e2e` on its own Compose project, `scf-e2e`, with the load test at `LOAD_RATE_PER_SECOND` 100; it uploads the e2e report, and on failure prints the stack's logs and uploads them with `reports/load-test.json`.
-- `traceability`: after `ci` and `e2e`, `npm run trace -- --require unit,integration,e2e` on the three reports, so every acceptance criterion that must be proven has a passing test at its level.
+- `traceability`: after `ci` and `e2e`, `npm run trace -- --require unit,integration,e2e --write` on the three reports, so every acceptance criterion has a passing test at its level, then fails if the regenerated [`docs/traceability.md`](docs/traceability.md) differs from the committed one.
 - `secret-scan`: gitleaks over the full git history.
 - `security`: `npm audit --audit-level=high`, and trivy on the files, on the configuration and on the runtime image, from the `aquasec/trivy` image pinned by digest, failing on any HIGH or CRITICAL finding.
 

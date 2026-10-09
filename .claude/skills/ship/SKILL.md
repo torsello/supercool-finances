@@ -34,6 +34,7 @@ If the current branch is `main`, stop and ask the user to create the phase branc
 ## Step 3: docs in sync
 
 - The ACs touched still match code and tests. Spec statuses are not changed here.
+- If a spec, a task or a test name changed, `docs/traceability.md` must be regenerated from three fresh reports: `npm run test:e2e`, then `npm run trace -- --require unit,integration,e2e --write`. CI's `traceability` job fails when the committed file differs from the one it regenerates.
 - New ADRs are listed in `docs/adr/README.md`.
 - If the description starts with "close phase NN" and no file matching `docs/ai/transcripts/NN-*` exists, stop and ask the user to run `/export docs/ai/transcripts/NN-<phase>.txt` first.
 - Every transcript in `docs/ai/transcripts/` has a row in `docs/ai/README.md`: phase number plus part if any, date, file link, one-line summary of what the session produced.

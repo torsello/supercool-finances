@@ -1,6 +1,6 @@
 # 006 · Authentication and authorization
 
-- **Status:** Approved
+- **Status:** Implemented
 - **ID prefix:** AUT
 - **Related ADRs:** [ADR-0001](../../docs/adr/0001-spec-driven-development-with-adrs-and-ai-agents.md), [ADR-0004](../../docs/adr/0004-typescript-with-fastify.md), [ADR-0005](../../docs/adr/0005-postgresql-as-the-only-source-of-truth.md), [ADR-0012](../../docs/adr/0012-simulated-authentication-with-jwt-and-two-roles.md), [ADR-0016](../../docs/adr/0016-error-model.md)
 - **Depends on specs:** 000-overview, 001-accounts, 003-money-movements, 004-reversals, 005-idempotency, 007-security-ops

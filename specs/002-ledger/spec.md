@@ -1,6 +1,6 @@
 # 002 · Ledger
 
-- **Status:** Approved
+- **Status:** Implemented
 - **ID prefix:** LED
 - **Related ADRs:** [ADR-0001](../../docs/adr/0001-spec-driven-development-with-adrs-and-ai-agents.md), [ADR-0002](../../docs/adr/0002-modular-monolith.md), [ADR-0003](../../docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md), [ADR-0005](../../docs/adr/0005-postgresql-as-the-only-source-of-truth.md), [ADR-0006](../../docs/adr/0006-double-entry-ledger-with-signed-integer-minor-units.md), [ADR-0007](../../docs/adr/0007-system-accounts-without-a-cached-balance.md), [ADR-0008](../../docs/adr/0008-read-committed-with-ordered-pessimistic-row-locks.md), [ADR-0010](../../docs/adr/0010-kysely-and-pg-instead-of-an-orm.md), [ADR-0011](../../docs/adr/0011-amounts-as-strings-in-the-api-and-bigint-in-the-domain.md), [ADR-0016](../../docs/adr/0016-error-model.md), [ADR-0017](../../docs/adr/0017-keyset-pagination-with-signed-cursors.md), [ADR-0018](../../docs/adr/0018-two-database-roles.md), [ADR-0021](../../docs/adr/0021-statement-timeout-function-for-maintenance-scripts.md)
 - **Depends on specs:** 000-overview, 001-accounts, 003-money-movements, 004-reversals, 005-idempotency

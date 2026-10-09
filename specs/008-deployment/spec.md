@@ -1,6 +1,6 @@
 # 008 · Deployment
 
-- **Status:** Approved
+- **Status:** Implemented
 - **ID prefix:** DEP
 - **Related ADRs:** [ADR-0001](../../docs/adr/0001-spec-driven-development-with-adrs-and-ai-agents.md), [ADR-0002](../../docs/adr/0002-modular-monolith.md), [ADR-0005](../../docs/adr/0005-postgresql-as-the-only-source-of-truth.md), [ADR-0009](../../docs/adr/0009-idempotency-inside-the-movements-transaction.md), [ADR-0012](../../docs/adr/0012-simulated-authentication-with-jwt-and-two-roles.md), [ADR-0013](../../docs/adr/0013-rate-limiting-at-the-edge-and-in-redis.md), [ADR-0014](../../docs/adr/0014-aws-deployment-on-ecs-fargate-with-rds-postgresql.md), [ADR-0015](../../docs/adr/0015-terraform-for-infrastructure-as-code.md), [ADR-0016](../../docs/adr/0016-error-model.md), [ADR-0017](../../docs/adr/0017-keyset-pagination-with-signed-cursors.md), [ADR-0018](../../docs/adr/0018-two-database-roles.md), [ADR-0019](../../docs/adr/0019-timeout-layers-and-rds-proxy.md), [ADR-0020](../../docs/adr/0020-expand-then-contract-migrations.md), [ADR-0023](../../docs/adr/0023-optional-observability-off-by-default.md)
 - **Depends on specs:** 000-overview, 002-ledger, 005-idempotency, 006-auth, 007-security-ops

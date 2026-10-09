@@ -1,6 +1,6 @@
 # 005 · Idempotency
 
-- **Status:** Approved
+- **Status:** Implemented
 - **ID prefix:** IDM
 - **Related ADRs:** [ADR-0001](../../docs/adr/0001-spec-driven-development-with-adrs-and-ai-agents.md), [ADR-0002](../../docs/adr/0002-modular-monolith.md), [ADR-0003](../../docs/adr/0003-hexagonal-architecture-with-tactical-ddd.md), [ADR-0004](../../docs/adr/0004-typescript-with-fastify.md), [ADR-0005](../../docs/adr/0005-postgresql-as-the-only-source-of-truth.md), [ADR-0008](../../docs/adr/0008-read-committed-with-ordered-pessimistic-row-locks.md), [ADR-0009](../../docs/adr/0009-idempotency-inside-the-movements-transaction.md), [ADR-0010](../../docs/adr/0010-kysely-and-pg-instead-of-an-orm.md), [ADR-0012](../../docs/adr/0012-simulated-authentication-with-jwt-and-two-roles.md), [ADR-0014](../../docs/adr/0014-aws-deployment-on-ecs-fargate-with-rds-postgresql.md), [ADR-0016](../../docs/adr/0016-error-model.md), [ADR-0019](../../docs/adr/0019-timeout-layers-and-rds-proxy.md), [ADR-0021](../../docs/adr/0021-statement-timeout-function-for-maintenance-scripts.md), [ADR-0022](../../docs/adr/0022-request-timeout-answer-first-then-roll-back.md)
 - **Depends on specs:** 000-overview, 001-accounts, 002-ledger, 003-money-movements, 004-reversals, 007-security-ops, 008-deployment
