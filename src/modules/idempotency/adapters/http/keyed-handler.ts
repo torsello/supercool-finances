@@ -7,6 +7,8 @@ import {
   toProblem,
   type BodyExtension,
 } from '../../../../platform/http/error-handler.js';
+import { PoolAcquireTimeout, PoolClosed } from '../../../../platform/db/errors.js';
+import { RequestTimeout } from '../../../../platform/http/request-timeout.js';
 import type { IdempotentRunner, KeyedAnswer } from '../../application/idempotent-runner.js';
 import type { KeyedTransactions, Presenter } from '../../application/ports.js';
 import { keyHooks, keyOf, receivedBody, type KeyHooks } from './key-header.js';
@@ -54,6 +56,16 @@ export interface KeyedHandlerOptions {
   responseBody?: ResponseBodyHook;
   afterCommit?: AfterCommitHook;
   observer?: KeyedObserver;
+}
+
+/**
+ * Whether a request answered 5xx reached the idempotency step: not when no connection was free or
+ * the pool was closed, nor when its request timeout came before its transaction began, so only
+ * movements that reached that step are counted as failed (table 1.4 of spec 007).
+ */
+function reachedKeyStep(error: unknown): boolean {
+  if (error instanceof PoolAcquireTimeout || error instanceof PoolClosed) return false;
+  return !(error instanceof RequestTimeout) || error.transactionStarted;
 }
 
 /** A response the runner returned: a replay, a new 201, or a new stored rejection. */
@@ -143,7 +155,9 @@ export class KeyedHandler {
     } catch (error) {
       const problem = toProblem(error);
       logFailure(request, error, problem);
-      if (problem.status >= 500) this.#observer?.answered(keyed.kind, 'failed');
+      if (problem.status >= 500 && reachedKeyStep(error)) {
+        this.#observer?.answered(keyed.kind, 'failed');
+      }
       return await sendProblem(reply, problemResponse(problem, request.id, this.#extend()));
     }
     this.#observer?.answered(keyed.kind, outcomeOf(answer));

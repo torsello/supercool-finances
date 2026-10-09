@@ -5,7 +5,7 @@ import { MalformedRequest, UnsupportedMediaType } from './errors.js';
 export const BODY_LIMIT_BYTES = 16384;
 
 /** Whether a request carries a body: chunked, or with a `Content-Length` other than 0. */
-function hasBody(request: FastifyRequest): boolean {
+export function hasBody(request: FastifyRequest): boolean {
   const length = request.headers['content-length'];
   return (
     request.headers['transfer-encoding'] !== undefined || (length !== undefined && length !== '0')

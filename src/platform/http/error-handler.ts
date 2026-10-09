@@ -22,21 +22,26 @@ import {
   AccountLockTimeout,
   IdempotencyWaitTimeout,
   LedgerWriteRejected,
+  PoolAcquireTimeout,
+  PoolClosed,
   RetriesExhausted,
   StatementTimeout,
 } from '../db/errors.js';
 import { sqlstateOf } from '../db/sqlstate.js';
 import {
   MalformedRequest,
+  NotReady,
   PayloadTooLarge,
   RateLimited,
   RouteNotFound,
+  ShuttingDown,
   UnsupportedMediaType,
   ValidationFailed,
   type MalformedPart,
   type ValidationIssue,
 } from './errors.js';
 import { PROBLEM_CONTENT_TYPE, PROBLEM_TYPES, type ProblemTypeUri } from './problem.js';
+import { RequestTimeout } from './request-timeout.js';
 
 /** An error as the HTTP edge answers it, before the request's correlation id is added. */
 export interface Problem {
@@ -59,6 +64,7 @@ export interface ProblemHttpResponse {
 
 const UNAUTHENTICATED_HEADERS = { 'www-authenticate': 'Bearer realm="supercool-finances"' };
 const RETRY_AFTER = { 'retry-after': '1' };
+const CONNECTION_CLOSE = { connection: 'close' };
 
 const MALFORMED_DETAILS: Readonly<Record<MalformedPart, string>> = {
   request: 'The request could not be parsed.',
@@ -152,8 +158,11 @@ export function toProblem(error: unknown): Problem {
       'retry-after': String(error.retryAfterSeconds),
     });
   }
-  if (isUnsupportedMediaType(error)) return problemOf('/problems/unsupported-media-type');
-  if (isPayloadTooLarge(error)) return problemOf('/problems/payload-too-large');
+  // The refused body is not read: closing the connection discards it, so it never stalls.
+  if (isUnsupportedMediaType(error)) {
+    return problemOf('/problems/unsupported-media-type', CONNECTION_CLOSE);
+  }
+  if (isPayloadTooLarge(error)) return problemOf('/problems/payload-too-large', CONNECTION_CLOSE);
   if (error instanceof MalformedRequest) {
     return { ...problemOf('/problems/malformed-request'), detail: MALFORMED_DETAILS[error.part] };
   }
@@ -170,10 +179,16 @@ export function toProblem(error: unknown): Problem {
   if (
     error instanceof AccountLockTimeout ||
     error instanceof RetriesExhausted ||
-    error instanceof StatementTimeout
+    error instanceof StatementTimeout ||
+    error instanceof PoolAcquireTimeout ||
+    error instanceof PoolClosed ||
+    error instanceof ShuttingDown ||
+    error instanceof RequestTimeout
   ) {
     return problemOf('/problems/service-unavailable', RETRY_AFTER);
   }
+  // The same body whatever check failed, without Retry-After: the orchestrator polls (SEC-R24).
+  if (error instanceof NotReady) return problemOf('/problems/service-unavailable');
   const rejection = REJECTIONS.find(([type]) => error instanceof type);
   if (rejection !== undefined) return problemOf(rejection[1]);
   if (isUnrecognisedClientError(error)) {
@@ -238,10 +253,23 @@ export async function handleError(
 /**
  * Logs an error answered as a 500 at `error`, with the error, which stays in the log only, and
  * the SQLSTATE of a database error, so the request whose connection was lost names it with its
- * `reqId` (SYS-R22); a `LedgerWriteRejected` also names its constraint (LED-R28). Every other
- * answer is not logged here.
+ * `reqId` (SYS-R22); a `LedgerWriteRejected` also names its constraint (LED-R28). A transient 503
+ * is logged at `warn` with its cause and SQLSTATE, so a statement timeout (57014) is told apart
+ * from the request timeout or an exhausted pool (SEC-R32, SEC-R33, SEC-R37). Every other answer
+ * is not logged here.
  */
 export function logFailure(request: FastifyRequest, error: unknown, problem: Problem): void {
+  if (problem.type === '/problems/service-unavailable') {
+    const sqlstate = sqlstateOf(error);
+    request.log.warn(
+      {
+        cause: error instanceof Error ? error.name : typeof error,
+        ...(sqlstate === undefined ? {} : { sqlstate }),
+      },
+      'service unavailable',
+    );
+    return;
+  }
   if (problem.status >= 500 && problem.type === '/problems/internal-error') {
     const sqlstate = sqlstateOf(error);
     const fields =

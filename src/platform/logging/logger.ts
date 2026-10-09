@@ -27,11 +27,11 @@ function requestSerializer(request: FastifyRequest): Record<string, unknown> {
 }
 
 /**
- * The forms a secret can take in a log line: as it is, escaped inside a JSON string, and
- * percent-encoded as in a URL.
+ * The forms a secret can take inside a JSON string value of a log line: as it is and
+ * percent-encoded as in a URL, each written with the escapes of a JSON string.
  */
 function formsOf(secret: string): string[] {
-  return [secret, JSON.stringify(secret).slice(1, -1), encodeURIComponent(secret)];
+  return [secret, encodeURIComponent(secret)].map((form) => JSON.stringify(form).slice(1, -1));
 }
 
 /** The password of a URL, as written in it and decoded; none when it has none or is not a URL. */
@@ -52,11 +52,15 @@ export interface LogSecrets {
   redisUrl: string;
 }
 
+/** A JSON string token, and the colon that makes it a key. */
+const STRING_TOKEN = /"(?:[^"\\]|\\.)*"(\s*:)?/g;
+
 /**
- * Replaces in a line every form of `JWT_SECRET`, `CURSOR_SECRET` and the passwords of
- * `DATABASE_URL` and `REDIS_URL` with `[Redacted]`, whatever field or message holds them, such as
- * an error a driver built from its connection settings (SEC-R22). Longer values first, so a
- * secret that contains another is replaced whole.
+ * Replaces in a log line every form of `JWT_SECRET`, `CURSOR_SECRET` and the passwords of
+ * `DATABASE_URL` and `REDIS_URL` with `[Redacted]`, wherever a string value holds them, such as an
+ * error a driver built from its connection settings (SEC-R22). Keys and numbers are never touched,
+ * so the line stays valid JSON even for a password such as "30" (SEC-R21). Longer values first,
+ * so a secret that contains another is replaced whole.
  */
 export function secretScrubber(secrets: LogSecrets): (line: string) => string {
   const values = [
@@ -68,7 +72,13 @@ export function secretScrubber(secrets: LogSecrets): (line: string) => string {
     .filter((value) => value !== '')
     .flatMap(formsOf);
   const unique = [...new Set(values)].sort((a, b) => b.length - a.length);
-  return (line) => unique.reduce((text, value) => text.replaceAll(value, REDACTED), line);
+  if (unique.length === 0) return (line) => line;
+  return (line) =>
+    line.replace(STRING_TOKEN, (token, colon: string | undefined) =>
+      colon === undefined
+        ? unique.reduce((text, value) => text.replaceAll(value, REDACTED), token)
+        : token,
+    );
 }
 
 /** Standard output, written to as given. */

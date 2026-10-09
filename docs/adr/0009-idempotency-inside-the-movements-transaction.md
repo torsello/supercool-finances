@@ -106,5 +106,7 @@ Details fixed by spec 005 that this ADR follows:
 ### Follow-ups
 
 - Phase 05-schema: the key table, its primary key (user, key) and the deferred trigger of IDM-R18.
+  - Done in phase 05-schema on 2026-10-08.
 - Phase 07-idempotency: the key step, fingerprint, savepoint and stored responses.
+  - Done in phase 07-idempotency on 2026-10-08; proven across replicas by IDM-AC10 to IDM-AC13 in phase 09-hardening on 2026-10-08.
 - Phase 12-infra: the hourly cleanup schedule (DEP-R37).

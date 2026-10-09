@@ -46,9 +46,9 @@ These tasks run in the cross-spec order of plan 000 section 1 for 08-api: authen
 
 ## 09-hardening
 
-- [ ] Test first: IDM-AC10, IDM-AC11 and IDM-AC12 in `test/integration/idempotency/concurrent-keys.test.ts`, once the request and shutdown timeouts are configurable.
-- [ ] Test first: IDM-AC13 in `test/integration/idempotency/wait-timeout.test.ts`.
-- [ ] Update the docs: the OpenAPI description of the `Idempotency-Key` header on every route that takes it, the replay header, the TTL and the retry advice of section 1.5 of spec 008; a runbook `docs/runbooks/idempotency-cleanup.md`; the README flow for a duplicate request; and the follow-ups closed in ADR-0009.
+- [x] Test first: IDM-AC10, IDM-AC11 and IDM-AC12 in `test/integration/idempotency/concurrent-keys.test.ts`, once the request and shutdown timeouts are configurable.
+- [x] Test first: IDM-AC13 in `test/integration/idempotency/wait-timeout.test.ts`.
+- [x] Update the docs: the OpenAPI description of the `Idempotency-Key` header on every route that takes it, the replay header, the TTL and the retry advice of section 1.5 of spec 008; a runbook `docs/runbooks/idempotency-cleanup.md`; the README flow for a duplicate request; and the follow-ups closed in ADR-0009.
 
 ## 10-runtime
 

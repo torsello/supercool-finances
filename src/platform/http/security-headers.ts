@@ -40,6 +40,18 @@ export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
   'cache-control': 'no-store',
 };
 
+/** The route of every path, such as the `OPTIONS` route that answers CORS preflights. */
+const CATCH_ALL_ROUTE = '*';
+
+/** The path of a request as the router decodes it; undefined when it does not decode. */
+function decodedPath(url: string): string | undefined {
+  try {
+    return decodeURIComponent(url.split('?')[0] ?? '');
+  } catch {
+    return undefined;
+  }
+}
+
 /** Whether `path` is `prefix` or below it. */
 function isUnder(path: string, prefix: string): boolean {
   return path === prefix || path.startsWith(`${prefix}/`);
@@ -51,7 +63,8 @@ function isUnder(path: string, prefix: string): boolean {
  * it, given as the routes' helmet configuration when Swagger UI registers them; and
  * `Cache-Control: no-store` on every response of a route under `apiPrefix` and on every answer to
  * a path that is not a route, so no cache keeps a balance or a history. The route is the one the
- * router matched, after it decoded the path, so a percent-encoded `/v1` is covered too. Fastify sends no `X-Powered-By`, and helmet removes one if anything sets it (SEC-R15).
+ * router matched, after it decoded the path, so a percent-encoded `/v1` is covered too; for the
+ * catch-all route of CORS preflights, the decoded path of the request decides. Fastify sends no `X-Powered-By`, and helmet removes one if anything sets it (SEC-R15).
  * Registered before the routes and the not-found hook, so even a 404 at the route step carries the
  * headers.
  */
@@ -74,7 +87,8 @@ export function registerSecurityHeaders(
   });
   app.addHook('onRequest', (request, reply, done) => {
     const route = request.routeOptions.url;
-    if (request.is404 || route === undefined || isUnder(route, options.apiPrefix)) {
+    const path = route === CATCH_ALL_ROUTE ? decodedPath(request.url) : route;
+    if (request.is404 || path === undefined || isUnder(path, options.apiPrefix)) {
       void reply.header('cache-control', 'no-store');
     }
     done();

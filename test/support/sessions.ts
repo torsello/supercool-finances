@@ -2,6 +2,8 @@ import pg from 'pg';
 import { requireEnv } from './env.js';
 
 export interface LockSession {
+  /** This session's backend pid, the blocker other backends wait for. */
+  readonly pid: number;
   /** Begins a transaction if none is open and locks one row of a table by id. */
   lockRow(table: 'accounts' | 'transactions', id: string, mode?: RowLockMode): Promise<void>;
   /** Begins a transaction if none is open and runs a statement that takes a lock. */
@@ -49,6 +51,7 @@ export async function openLockSession(): Promise<LockSession> {
   }
 
   return {
+    pid: ownPid,
     async lockRow(table, id, mode = 'FOR UPDATE') {
       await begin();
       // table and mode are closed unions, never caller-supplied text.

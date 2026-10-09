@@ -1,9 +1,11 @@
 import { execFile, spawn } from 'node:child_process';
+import { mkdirSync, renameSync, rmSync } from 'node:fs';
 import { connect } from 'node:net';
 import { promisify } from 'node:util';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { TEST_CURSOR_SECRET } from '../../support/app.js';
 import { freePort } from '../../support/ports.js';
+import { requireEnv } from '../../support/env.js';
 import { K, TEST_AUDIENCE, TEST_ISSUER } from '../../support/tokens.js';
 
 const run = promisify(execFile);
@@ -77,5 +79,51 @@ describe('startup with an invalid configuration', () => {
     const lines = output.split('\n').filter((line) => line !== '');
     expect(lines).toHaveLength(1);
     expect(JSON.parse(lines[0] ?? '')).toMatchObject({ level: 60 });
+  });
+
+  it('SEC-R21 a failure while building the app is written as one JSON line and exits 1 without listening', async () => {
+    // A build whose migrations folder is empty: readiness cannot know what to check, so the app
+    // is not built.
+    rmSync('dist/migrations-moved', { recursive: true, force: true });
+    renameSync('dist/migrations', 'dist/migrations-moved');
+    mkdirSync('dist/migrations');
+    let kill = () => undefined as unknown;
+    try {
+      const port = await freePort();
+      const child = spawn(process.execPath, ['dist/main.js'], {
+        env: {
+          PATH: process.env['PATH'],
+          DATABASE_URL: requireEnv('TEST_DATABASE_URL'),
+          REDIS_URL: requireEnv('REDIS_URL'),
+          JWT_SECRET: K,
+          JWT_ISSUER: TEST_ISSUER,
+          JWT_AUDIENCE: TEST_AUDIENCE,
+          CURSOR_SECRET: TEST_CURSOR_SECRET,
+          PORT: String(port),
+          METRICS_PORT: String(await freePort()),
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      kill = () => child.kill('SIGKILL');
+      let output = '';
+      child.stdout.on('data', (chunk: Buffer) => (output += chunk.toString('utf8')));
+      child.stderr.on('data', (chunk: Buffer) => (output += chunk.toString('utf8')));
+      const code = await new Promise<number | null>((resolve) => {
+        child.once('exit', (exitCode) => {
+          resolve(exitCode);
+        });
+      });
+
+      expect(code).toBe(1);
+      expect(await accepts(port)).toBe(false);
+      const lines = output.split('\n').filter((line) => line !== '');
+      expect(lines).toHaveLength(1);
+      expect(JSON.parse(lines[0] ?? '')).toMatchObject({ level: 60, msg: 'startup failed' });
+      for (const secret of [K, TEST_CURSOR_SECRET]) expect(output.includes(secret)).toBe(false);
+    } finally {
+      kill();
+      rmSync('dist/migrations', { recursive: true, force: true });
+      renameSync('dist/migrations-moved', 'dist/migrations');
+    }
   });
 });

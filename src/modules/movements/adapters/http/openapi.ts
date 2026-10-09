@@ -13,7 +13,7 @@ import {
 
 /** What every movement and reversal shares (specs 003 and 005). */
 const KEYED =
-  'Requires an `Idempotency-Key` header of 1 to 255 visible ASCII characters, fresh for each new request; a missing or malformed one answers 400 `/problems/malformed-request`. A repeat with the same key and body answers the stored response with `Idempotent-Replayed: true`; the same key with another body answers 422 `/problems/idempotency-key-reused`; while the first request is still running, 409 `/problems/request-in-progress`. Answers 201 with `Location: /v1/transactions/{id}`. A lock or retry that runs out answers 503 `/problems/service-unavailable` with `Retry-After: 1`; retry with the same key.';
+  'Requires an `Idempotency-Key` header of 1 to 255 visible ASCII characters, fresh for each new request; a missing or malformed one answers 400 `/problems/malformed-request`. A repeat with the same key and body answers the stored response with `Idempotent-Replayed: true`; the same key with another body answers 422 `/problems/idempotency-key-reused`; while the first request is still running, 409 `/problems/request-in-progress` with `Retry-After: 1`: retry with the same key. Answers 201 with `Location: /v1/transactions/{id}`. A lock or retry that runs out answers 503 `/problems/service-unavailable` with `Retry-After: 1`; retry with the same key.';
 
 /** The account rules of a movement (spec 001 section 1.2, spec 003). */
 const ACCOUNT_RULES =

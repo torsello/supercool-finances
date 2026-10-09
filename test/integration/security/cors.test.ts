@@ -127,4 +127,17 @@ describe('CORS', () => {
     expect(problemOf(answer).type).toBe('/problems/not-found');
     expect(accessControlHeaders(answer)).toEqual([]);
   });
+
+  it('SEC-R14 with CORS on, a preflight under /v1 is not stored either, also through a percent-encoded path', async () => {
+    const built = await started({ CORS_ORIGINS: 'https://app.example' });
+    for (const path of ['/v1/accounts/x/withdrawals', '/%761/accounts/x/withdrawals']) {
+      const answer = await built.app.inject({
+        method: 'OPTIONS',
+        url: path,
+        headers: { origin: 'https://app.example', 'access-control-request-method': 'POST' },
+      });
+      expect(answer.statusCode, path).toBe(204);
+      expect(answer.headers['cache-control'], path).toBe('no-store');
+    }
+  });
 });

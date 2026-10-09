@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { request as httpRequest } from 'node:http';
-import type { AddressInfo } from 'node:net';
+import { connect, type AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildProductionApp, type BuiltApp } from '../../support/app.js';
 import { balanceOf, closePools } from '../../support/db.js';
@@ -215,6 +215,42 @@ describe('request bodies', () => {
       });
       expect(freeze.statusCode, contentType).toBe(200);
       expect(freeze.json<{ status: string }>().status, contentType).toBe('frozen');
+    }
+  });
+
+  it('SEC-R10 SEC-R11 a refused body of about 100 KB is answered with Connection: close and never stalls its connection', async () => {
+    const c1 = tokenFor(randomUUID(), 'customer');
+    const a1 = await createAccount(built.app, c1, 'EUR');
+    for (const [contentType, status] of [
+      ['text/plain', '415 Unsupported Media Type'],
+      ['application/json', '413 Payload Too Large'],
+    ] as const) {
+      const socket = connect({ host: '127.0.0.1', port });
+      const state = { received: '', closed: false };
+      socket.on('data', (chunk: Buffer) => (state.received += chunk.toString('latin1')));
+      socket.on('close', () => (state.closed = true));
+      socket.on('error', () => undefined);
+      await new Promise<void>((resolve) => {
+        socket.once('connect', () => {
+          resolve();
+        });
+      });
+      const body = 'x'.repeat(102400);
+      socket.write(
+        `POST /v1/accounts/${a1.id}/withdrawals HTTP/1.1\r\nHost: 127.0.0.1\r\n` +
+          `Authorization: Bearer ${c1}\r\nIdempotency-Key: ${randomUUID()}\r\n` +
+          `Content-Type: ${contentType}\r\nContent-Length: ${String(body.length)}\r\n\r\n`,
+      );
+      socket.write(body);
+
+      const deadline = Date.now() + 5000;
+      while (!state.closed && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      expect(state.received.split('\r\n')[0], contentType).toBe(`HTTP/1.1 ${status}`);
+      expect(state.received.toLowerCase(), contentType).toContain('connection: close');
+      expect(state.closed, contentType).toBe(true);
+      socket.destroy();
     }
   });
 });

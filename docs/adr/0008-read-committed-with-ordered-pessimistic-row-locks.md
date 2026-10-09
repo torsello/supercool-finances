@@ -82,6 +82,8 @@ Details fixed by the specs:
 ### Follow-ups
 
 - Phase 05-schema: the lock-timeout SQL function of SEC-R31.
+  - Done in phase 05-schema on 2026-10-08.
 - Phase 06-domain: the lock plan as a pure function (MOV-AC15) and the transaction runner with retry (SYS-AC16).
   - Done in phase 06-domain on 2026-10-08; SYS-AC16 itself waits for `toProblem` in 08-api.
 - Phase 07-idempotency and 08-api: the ordering of key row insert, lock timeout and account locks.
+  - Done in phases 07-idempotency and 08-api on 2026-10-08; proven over HTTP by MOV-AC14 and MOV-AC19 in phase 09-hardening on 2026-10-08.

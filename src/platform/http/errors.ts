@@ -78,3 +78,29 @@ export class RateLimited extends Error {
     super('per-user rate limit exceeded');
   }
 }
+
+/**
+ * The replica is not ready: the database did not answer in time, a shipped migration is missing,
+ * or the process is shutting down (SEC-R24, SEC-R26): 503 `/problems/service-unavailable`, with
+ * one body whatever the cause, which only the log names.
+ */
+export class NotReady extends Error {
+  override readonly name = 'NotReady';
+
+  constructor() {
+    super('not ready');
+  }
+}
+
+/**
+ * A request that arrived after the replica stopped accepting connections, on a connection kept
+ * alive from before (SEC-R25): 503 `/problems/service-unavailable` with `Retry-After: 1`, answered
+ * before it reaches the pool, so the client retries on another replica.
+ */
+export class ShuttingDown extends Error {
+  override readonly name = 'ShuttingDown';
+
+  constructor() {
+    super('the replica is shutting down');
+  }
+}

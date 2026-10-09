@@ -44,9 +44,9 @@ These tasks run in the cross-spec order of plan 000 section 1 for 08-api: authen
 
 ## 09-hardening
 
-- [ ] Test first: MOV-AC14 in `test/integration/movements/concurrency.test.ts`, once the pool acquire, request and shutdown timeouts are configurable.
-- [ ] Test first: MOV-AC19 in `test/integration/movements/lock-timeout.test.ts`.
-- [ ] Update the docs: the OpenAPI descriptions of the four routes (bodies, responses, every problem type of plan section 5, the `Idempotency-Key` requirement and the retry advice for 409 and 503), the README flows for a transfer and for concurrent transfers, and the follow-ups closed in ADR-0008 and ADR-0011.
+- [x] Test first: MOV-AC14 in `test/integration/movements/concurrency.test.ts`, once the pool acquire, request and shutdown timeouts are configurable.
+- [x] Test first: MOV-AC19 in `test/integration/movements/lock-timeout.test.ts`.
+- [x] Update the docs: the OpenAPI descriptions of the four routes (bodies, responses, every problem type of plan section 5, the `Idempotency-Key` requirement and the retry advice for 409 and 503), the README flows for a transfer and for concurrent transfers, and the follow-ups closed in ADR-0008 and ADR-0011.
 
 ## 10-runtime
 

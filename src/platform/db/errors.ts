@@ -61,3 +61,27 @@ export class LedgerWriteRejected extends Error {
     super('the database refused a ledger write', options);
   }
 }
+
+/**
+ * No pool connection became free within `DB_POOL_ACQUIRE_TIMEOUT_MS` (SEC-R37): 503, and nothing
+ * was written, since no statement was sent.
+ */
+export class PoolAcquireTimeout extends Error {
+  override readonly name = 'PoolAcquireTimeout';
+
+  constructor(options: { cause: unknown }) {
+    super('no database connection became free in time', options);
+  }
+}
+
+/**
+ * The request pool was already closed by the shutdown (SEC-R27): a transient condition, 503 like
+ * an exhausted pool, never 500 (SYS-R34).
+ */
+export class PoolClosed extends Error {
+  override readonly name = 'PoolClosed';
+
+  constructor(options: { cause: unknown }) {
+    super('the database pool is closed', options);
+  }
+}
