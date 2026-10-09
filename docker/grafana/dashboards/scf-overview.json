@@ -1,0 +1,402 @@
+{
+  "uid": "scf-overview",
+  "title": "SuperCool Finances",
+  "description": "The replicas' metrics of table 1.4 of spec 007, scraped by the observability profile (section 1.9 of spec 008).",
+  "editable": false,
+  "tags": ["scf"],
+  "timezone": "browser",
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "10s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Replicas scraped",
+      "description": "1 when Prometheus scraped the replica's /metrics on METRICS_PORT, 0 when it could not.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "scf-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "scf-prometheus"
+          },
+          "expr": "up{job=\"scf-api\"}",
+          "legendFormat": "{{replica}}",
+          "range": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Requests by status class",
+      "description": "Responses per second of both replicas, by status class.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "scf-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "scf-prometheus"
+          },
+          "expr": "sum by (status_class) (label_replace(rate(scf_http_request_duration_seconds_count[1m]), \"status_class\", \"${1}xx\", \"status_code\", \"([1-5])[0-9][0-9]\"))",
+          "legendFormat": "{{status_class}}",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Errors by status class",
+      "description": "4xx and 5xx responses per second, and the share of 5xx among all responses.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "scf-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "5xx share"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "scf-prometheus"
+          },
+          "expr": "sum by (status_class) (label_replace(rate(scf_http_request_duration_seconds_count{status_code=~\"[45]..\"}[1m]), \"status_class\", \"${1}xx\", \"status_code\", \"([1-5])[0-9][0-9]\")) or label_replace(vector(0), \"status_class\", \"5xx\", \"\", \"\")",
+          "legendFormat": "{{status_class}}",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "scf-prometheus"
+          },
+          "expr": "sum(rate(scf_http_request_duration_seconds_count{status_code=~\"5..\"}[1m])) / sum(rate(scf_http_request_duration_seconds_count[1m])) or vector(0)",
+          "legendFormat": "5xx share",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Latency p50, p95 and p99",
+      "description": "Response time of the /v1 routes; the histogram's default buckets bound each percentile's precision.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "scf-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "scf-prometheus"
+          },
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(scf_http_request_duration_seconds_bucket{route=~\"/v1/.*\"}[1m])))",
+          "legendFormat": "p50",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "scf-prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(scf_http_request_duration_seconds_bucket{route=~\"/v1/.*\"}[1m])))",
+          "legendFormat": "p95",
+          "range": true
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "scf-prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(scf_http_request_duration_seconds_bucket{route=~\"/v1/.*\"}[1m])))",
+          "legendFormat": "p99",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Money movements by kind and outcome",
+      "description": "Movements that reached the idempotency step, per second: applied, rejected or failed.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "scf-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "scf-prometheus"
+          },
+          "expr": "sum by (kind, outcome) (rate(scf_money_movements_total[1m]))",
+          "legendFormat": "{{kind}} {{outcome}}",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Lock timeouts",
+      "description": "SQLSTATE 55P03 at an account row lock (503) or at the key insert (409), per second.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "scf-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "scf-prometheus"
+          },
+          "expr": "sum by (lock) (rate(scf_lock_timeouts_total[1m]))",
+          "legendFormat": "{{lock}}",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Idempotent replays",
+      "description": "Responses answered from a stored key row, per second.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "scf-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 20,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "scf-prometheus"
+          },
+          "expr": "sum by (kind) (rate(scf_idempotent_replays_total[1m]))",
+          "legendFormat": "{{kind}}",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Rate-limited requests",
+      "description": "Requests answered 429 by the per-user limit, per second.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "scf-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 28,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "scf-prometheus"
+          },
+          "expr": "sum(rate(scf_rate_limited_total[1m]))",
+          "legendFormat": "429 per-user limit",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Pool usage",
+      "description": "Connections of each replica's request pool (total, idle) and requests waiting for one, and 503s for a pool wait that timed out.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "scf-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 28,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "scf-prometheus"
+          },
+          "expr": "sum by (replica, state) (scf_db_pool_connections{job=\"scf-api\"})",
+          "legendFormat": "{{replica}} {{state}}",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "scf-prometheus"
+          },
+          "expr": "sum by (replica) (rate(scf_db_pool_acquire_timeouts_total[1m]))",
+          "legendFormat": "{{replica}} acquire timeouts",
+          "range": true
+        }
+      ]
+    }
+  ]
+}

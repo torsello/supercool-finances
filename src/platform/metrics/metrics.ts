@@ -3,19 +3,26 @@ import { collectDefaultMetrics, Counter, Gauge, Histogram, Registry } from '@pro
 import type { FastifyInstance } from 'fastify';
 
 /** The kinds of a money movement (section 1.4 of spec 007). */
-export type MovementKind = 'deposit' | 'withdrawal' | 'transfer' | 'reversal';
+const MOVEMENT_KINDS = ['deposit', 'withdrawal', 'transfer', 'reversal'] as const;
+export type MovementKind = (typeof MOVEMENT_KINDS)[number];
+
+/** A movement's outcome. */
+const MOVEMENT_OUTCOMES = ['applied', 'rejected', 'failed'] as const;
 
 /** What a keyed request's answer counts as: a movement's outcome, or a replay. */
-export type KeyedOutcome = 'applied' | 'rejected' | 'failed' | 'replayed';
+export type KeyedOutcome = (typeof MOVEMENT_OUTCOMES)[number] | 'replayed';
 
 /** The kinds a replay is counted under: the movements and account creation. */
-export type KeyedKind = MovementKind | 'account_creation';
+const KEYED_KINDS = [...MOVEMENT_KINDS, 'account_creation'] as const;
+export type KeyedKind = (typeof KEYED_KINDS)[number];
 
 /** A lock wait that ended with SQLSTATE 55P03. */
-export type LockKind = 'account' | 'idempotency';
+const LOCK_KINDS = ['account', 'idempotency'] as const;
+export type LockKind = (typeof LOCK_KINDS)[number];
 
 /** The SQLSTATEs the transaction runner retries (SYS-R18). */
-export type RetriedSqlstate = '40P01' | '40001';
+const RETRIED_SQLSTATES = ['40P01', '40001'] as const;
+export type RetriedSqlstate = (typeof RETRIED_SQLSTATES)[number];
 
 /** The part of a `pg` pool the gauge reads. */
 export interface PoolStatistics {
@@ -33,7 +40,8 @@ const METRICS_PATH = '/metrics';
 /**
  * The metrics of table 1.4 of spec 007, with the default Node.js process metrics, in a registry of
  * this app's own, so two apps in one process never share a count. Every label has a fixed set of
- * values (SEC-R42).
+ * values (SEC-R42), and each counter starts with a series at 0 for every one of them, so none is
+ * missing before its first event (SEC-R56).
  */
 export class Metrics {
   readonly registry = new Registry();
@@ -111,6 +119,20 @@ export class Metrics {
       help: 'Per-user limit checks that failed open because Redis did not answer.',
       registers,
     });
+    this.#startAtZero();
+  }
+
+  /**
+   * A series at 0 for every label value of each labelled counter of table 1.4; the counters
+   * without labels are exposed at 0 already (SEC-R56).
+   */
+  #startAtZero(): void {
+    for (const kind of MOVEMENT_KINDS) {
+      for (const outcome of MOVEMENT_OUTCOMES) this.#movements.inc({ kind, outcome }, 0);
+    }
+    for (const kind of KEYED_KINDS) this.#replays.inc({ kind }, 0);
+    for (const lock of LOCK_KINDS) this.#lockTimeouts.inc({ lock }, 0);
+    for (const sqlstate of RETRIED_SQLSTATES) this.#retries.inc({ sqlstate }, 0);
   }
 
   request(method: string, route: string, statusCode: number, seconds: number): void {
@@ -156,6 +178,21 @@ export class Metrics {
   }
 }
 
+/** The part of a request that names its route. */
+export interface RoutedRequest {
+  readonly is404: boolean;
+  readonly routeOptions: { readonly url?: string | undefined };
+}
+
+/**
+ * A request's route template, such as `/v1/accounts/:id`, never the path as received, or
+ * `unmatched` for a path that is not a route (SEC-R42); also the route of an error report
+ * (section 1.10 of spec 007).
+ */
+export function routeOf(request: RoutedRequest): string {
+  return request.is404 ? UNMATCHED_ROUTE : (request.routeOptions.url ?? UNMATCHED_ROUTE);
+}
+
 /**
  * Observes every response of `app` in `scf_http_request_duration_seconds`, labelled with the route
  * template, such as `/v1/accounts/:id`, never the path as received, and `unmatched` for a path
@@ -163,8 +200,7 @@ export class Metrics {
  */
 export function registerRequestMetrics(app: FastifyInstance, metrics: Metrics): void {
   app.addHook('onResponse', (request, reply, done) => {
-    const route = request.is404 ? UNMATCHED_ROUTE : (request.routeOptions.url ?? UNMATCHED_ROUTE);
-    metrics.request(request.method, route, reply.statusCode, reply.elapsedTime / 1000);
+    metrics.request(request.method, routeOf(request), reply.statusCode, reply.elapsedTime / 1000);
     done();
   });
 }

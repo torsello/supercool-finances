@@ -126,7 +126,9 @@ The CloudWatch log groups of the four task definitions and of AWS WAF, kept 30 d
 
 Storage is watched through RDS events, because storage autoscaling grows the volume long before free space runs out, so a threshold on `FreeStorageSpace` would page during normal growth. An EventBridge rule sends the four events that say space really is running out: RDS-EVENT-0225 (allocated storage at 80% of the 100 GB maximum), RDS-EVENT-0224 (an autoscaling step would reach the maximum), RDS-EVENT-0223 (autoscaling cannot scale) and RDS-EVENT-0007 (storage exhausted). An RDS event subscription cannot be used: it filters by category only, and the "low storage" category also holds RDS-EVENT-0089, which fires before every autoscaling step, while 0223, 0224 and 0225 sit in the broad "failure" and "notification" categories.
 
-The service's Prometheus metrics stay on `METRICS_PORT`, which no security group admits. Scraping them is the next step, out of scope here: an AWS Distro for OpenTelemetry collector as a sidecar, writing to Amazon Managed Service for Prometheus.
+The service's Prometheus metrics stay on `METRICS_PORT`, which no security group admits. Scraping them is the next step, out of scope here: an AWS Distro for OpenTelemetry collector as a sidecar, writing to Amazon Managed Service for Prometheus. Locally, the Compose profile `observability` scrapes them with Prometheus and shows them in Grafana (ADR-0023).
+
+Error reporting (section 1.10 of spec 007) stays off in AWS: the task definitions set no `SENTRY_DSN`, and the tasks have no outbound internet path to reach an endpoint. Turning it on needs a NAT gateway with an egress allow-list for the endpoint, and the DSN as a Secrets Manager secret injected like the others.
 
 ## Request path
 

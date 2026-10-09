@@ -1,9 +1,10 @@
 import { isIPv4, isIPv6 } from 'node:net';
+import { parseSentryDsn, SENTRY_DSN_RULE } from '../error-reporting/dsn.js';
 
 /**
  * The service's configuration, read from environment variables once and validated before anything
  * connects or listens (plan 000 section 4, SEC-R39): every variable of section 1.2 of spec 007, of
- * specs 002, 003, 005 and 006, `REPLICA_ID` and `MIGRATION_DATABASE_URL` (spec 008), the
+ * specs 002, 003, 005 and 006, `SENTRY_DSN`, `REPLICA_ID` and `MIGRATION_DATABASE_URL` (spec 008), the
  * timeout budget of SEC-R35, and the demo secrets refused in production (DEP-R07). Every invalid
  * variable is collected into one `ConfigError` that names it with its rule and never its value
  * (SEC-R40, AUT-R18).
@@ -62,6 +63,11 @@ export interface Config {
    * in AWS receive it (section 1.7 of spec 008); read here only so the logs never hold it (SEC-R22).
    */
   databasePassword: string | undefined;
+  /**
+   * The DSN of the Sentry-compatible endpoint that receives the 500s; `undefined`, when unset or
+   * empty, turns error reporting off (section 1.10 of spec 007, SEC-R51). Never logged (SEC-R22).
+   */
+  sentryDsn: string | undefined;
   jwt: JwtConfig;
 }
 
@@ -428,6 +434,15 @@ export function loadConfig(env: Environment): Config {
       'unset, or a non-empty value',
       (value) => value !== '',
     ),
+    // Empty is off, like unset, so an empty line of .env turns nothing on (SEC-R51).
+    sentryDsn:
+      env['SENTRY_DSN'] === ''
+        ? undefined
+        : reader.optional(
+            'SENTRY_DSN',
+            SENTRY_DSN_RULE,
+            (value) => parseSentryDsn(value) !== undefined,
+          ),
     jwt,
   };
   // pg reads PGOPTIONS when the URL has no `options`, and sends it as the connection's options.

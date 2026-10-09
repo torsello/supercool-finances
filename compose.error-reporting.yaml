@@ -1,0 +1,15 @@
+# Opt-in error reporting for the local stack (section 1.9 of spec 008, DEP-R46): compose.yaml never
+# passes SENTRY_DSN, so nothing leaves the machine unless this file is used on purpose:
+#
+#   SENTRY_DSN=https://<public key>@<host>/<project id> \
+#     docker compose -f compose.yaml -f compose.error-reporting.yaml up --build --wait
+#
+# Compose refuses to start without SENTRY_DSN, and the service validates it (section 1.2 of spec
+# 007): https, or http only for 127.0.0.1, [::1] or localhost.
+services:
+  api-1:
+    environment:
+      SENTRY_DSN: ${SENTRY_DSN:?set SENTRY_DSN to the DSN of a Sentry-compatible endpoint}
+  api-2:
+    environment:
+      SENTRY_DSN: ${SENTRY_DSN:?set SENTRY_DSN to the DSN of a Sentry-compatible endpoint}

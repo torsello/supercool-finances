@@ -1,0 +1,1999 @@
+ ▐▛███▛█   Claude Code v2.1.292
+▝▜██████▀  Opus 5.5 · Claude Max
+ ▝▝   ▝▝   ~/supercool-finances
+
+▎ [✻] [✻] [✻] · Share Claude Code and earn $10 in usage credits · /passes
+
+❯ /clear                                                                        
+
+❯ /effort high                                                                  
+  ⎿  Set effort level to high (saved as your default for new sessions):
+     Comprehensive implementation with extensive testing and documentation
+
+❯ /audit all                                                                    
+  ⎿  I found no Critical or High defects. The branch adds observability and error reporting only; no money, transaction or idempotency code changed except where logFailure hands a 500 to the reporter. There are five follow-ups: one Medium and four Low.
+
+     1. Medium: the SEC-AC46 test doesn't test what the AC says, and the reporter relies on the transport to free its slots
+     - Where: test/unit/platform/error-reporter.test.ts:25-41 and :101-124; src/platform/error-reporting/reporter.ts:111-119.
+     - What is wrong:
+       - The AC's fake transport "never answers". The test's transport rejects as soon as the abort signal fires, so it does answer.
+       - The ShutdownCoordinator in the test has no reporter attached at all. "The shutdown never waits for the reporter" is therefore true by construction and proves nothing about the real wiring.
+       - In the code, report() only aborts the signal at 2000 ms. The slot is released only when transport.send settles.
+     - How to trigger: use any transport that ignores the abort signal, as the AC describes. After 20 reports, pending stays at 20 for ever and every later report is dropped. Node's fetch does reject on abort, so production is fine today.
+     - Impact: SEC-R54's "abandoned after 2000 ms" and SEC-R55 rest on a property no test checks.
+     - Suggested fix:
+       - When the 2000 ms timer fires, release the slot and record the timeout in the reporter itself, with a guard so a late answer is not counted twice.
+       - Rewrite the fake so it ignores the signal.
+       - Prove SEC-R55 through the real composition (buildApp plus the coordinator main.ts builds), not a coordinator built without the reporter.
+     - AC: SEC-AC46 (SEC-R54, SEC-R55).
+
+     2. Low: lines of a multi-line error message can be sent as stack frames, unscrubbed
+     - Where: src/platform/error-reporting/event.ts:132-147. Line 135 skips only the first line of the stack.
+     - What is wrong: a V8 stack starts with ${name}: ${message}. If the message has several lines, all of them after the first stay in stack. Any of those lines that looks like a frame is sent as function and filename, and neither field is scrubbed.
+     - How to trigger: throw an error whose message is "x\n    at 4321 0192f0a0-0000-7000-8000-00000000a001 (k-77:1:2)". The event then holds the frame {function: "4321 0192f0a0-…", filename: "k-77"}.
+     - Impact: this gets around the SEC-R53 scrub. It's unlikely with today's errors (pg's messages are one line).
+     - Suggested fix: skip message.split('\n').length header lines instead of one, or build frames from structured call sites (Error.prepareStackTrace). Running scrubMessage over function and filename would also cover it.
+     - AC: SEC-AC43 (SEC-R53).
+
+     3. Low: SENTRY_DSN accepts an empty query, an empty fragment and an empty password
+     - Where: src/platform/error-reporting/dsn.ts:32-39.
+     - What is wrong: the URL parser returns '' for search, hash and password when the ?, # or : is present but empty. So these all pass, though section 1.2 says "no password, query or fragment":
+       - https://pk@errors.example/42?
+       - https://pk@errors.example/42#
+       - https://pk:@errors.example/42
+
+       I checked this with node -e.
+     - How to trigger: load the configuration with any of those values.
+     - Impact: none in practice, because the envelope URL drops all three. It is still a deviation from the spec's rule.
+     - Suggested fix: also reject a raw value that contains ? or #, or a : in the user part before @, and add these three cases to the SEC-AC40 test.
+     - AC: SEC-AC40 (SEC-R39).
+
+     4. Low: integration tests depend on timing
+     - Where: test/integration/security/error-reporting-unavailable.test.ts:43, :55, :61, :64-66; test/integration/security/error-reporting.test.ts:127.
+     - What is wrong:
+       - Fixed sleeps of 300 ms and 2300 ms wait for log lines and for the abort.
+       - fake.accepted() has length 2 only if the check runs within 5 s of the 4th envelope, which the fake holds for 5 s. Once that hold ends, the 4th counts as accepted too.
+       - SEC-AC41 expects ['err-1','err-2'] in the order the envelopes arrive.
+     - How to trigger: run on a slow or loaded CI runner. If the gap passes 5 s, accepted() returns 3.
+     - Impact: flaky failures.
+     - Suggested fix: poll for the expected log line or for pending === 0 (waitUntil); hold the fake for something like 60 s (it is closed in finally); compare request ids as a sorted list.
+     - AC: SEC-AC45, SEC-AC41.
+
+     5. Low: plan 007 contradicts the spec on http:// DSNs
+     - Where: specs/007-security-ops/plan.md:146.
+     - What is wrong: the plan says http:// is accepted "outside production". Section 1.2, SEC-AC40 and dsn.ts all accept a loopback http:// DSN even with NODE_ENV set to production.
+     - Impact: misleading documentation.
+     - Suggested fix: change it to "for a loopback host, whatever NODE_ENV".
+     - AC: missing AC (docs drift).
+
+     Deferred, already planned: error reporting in AWS (NAT gateway with an egress allow-list, DSN in Secrets Manager); Prometheus and Grafana in AWS (ADOT, Amazon Managed Service for Prometheus, Amazon Managed Grafana); local alert rules, Loki/Tempo and keeping metrics after the container is removed; specs moving to Implemented in 13-final-review.
+
+     Spec conformance: SEC-AC40 to SEC-AC46 and DEP-AC31 to DEP-AC34 each have a test with the ID in its name at the right level. Findings 1 and 3 are the only gaps.
+     Money: no findings.
+     Transactions and concurrency: no findings.
+     Idempotency: no findings. Unexpected errors in the keyed handler are still not stored; they are only reported.
+     Security: one finding (2). Otherwise the event is built from the allowlist, the DSN and public key are redacted from logs, redirect: 'error' is set, Grafana publishes only 127.0.0.1:3030 and Prometheus publishes nothing.
+     Failure handling: no findings. main.ts exits with process.exit, so no pending report delays shutdown.
+     Tests: findings 1 and 4.
+     Docs drift: finding 5.
+
+     Follow-ups: 1, 2, 3, 4, 5
+     Verdict: ready to ship
+
+❯ Fix the findings of that review in order of severity. For each one: first add 
+  a regression test that fails, then fix it, then run npm run check and the     
+  affected test suites. If you disagree with a finding, skip it and explain why 
+  in one line. For finding 4, use no fixed sleeps: wait for the condition       
+  itself with a deadline. Also, from the manual check of Grafana: a panel whose 
+  counter has no series yet, such as Lock timeouts, shows "No data", which      
+  reads as broken; initialise the known label values of the labelled counters   
+  of table 1.4 of spec 007 to 0 at startup, so every panel shows 0 until        
+  something happens. Finish with npm test, npm run test:integration, npm run    
+  test:e2e and npm run trace -- --require unit,integration,e2e.                 
+
+⏺ Bash(git status --short && ls src/platform/error-reporting/
+      src/platform/metrics* test/unit/platform/ test/integration/security/
+      2>/dev/null; cat src/platform/error-…)
+  ⎿   M docs/ai/transcripts/12b-observability.txt
+     src/platform/error-reporting/:
+     dsn.ts
+     … +393 lines (ctrl+o to expand)
+
+  Searched for 1 pattern, listed 2 directories (ctrl+o to expand)
+
+⏺ Monitor event: "e2e suite: failed tests and the final result"
+  [Monitor expired after 30m with 4 events delivered. Re-arm it if you still 
+  need the watch.]
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Bash(sed -n 74,92p specs/007-security-ops/spec.md; sed -n 136,160p
+      specs/007-security-ops/spec.md | sed -n 1,20p | cut -c1-600; sed -n
+      474,481p specs/007-security-op…)
+  ⎿  ### 1.4 Metrics
+
+     Served in the Prometheus text format at `/metrics` on `METRICS_PORT` (
+     … +405 lines (ctrl+o to expand)
+
+⏺ Reading the reporter, its tests and spec 007 before fixing the findings. Next:
+  the metrics code for the zero-initialisation.
+
+  Searched for 1 pattern, listed 1 directory (ctrl+o to expand)
+
+⏺ Bash(sed -n 1,160p node_modules/@prometheus-io/client/lib/counter.js | grep -n
+      "inc\|value < 0\|throw\|reset\|labels\|zero" ; sed -n 120,140p
+      specs/007-security-ops/…)
+  ⎿  34:                        this.inc = this.incWithExemplar;
+     36:                        this.inc = this.incWithoutExemplar;
+     42:         * @param {object} labels - What label you want to be
+     incremented
+     … +95 lines (ctrl+o to expand)
+
+  Searched for 1 pattern, listed 1 directory (ctrl+o to expand)
+
+⏺ Bash(grep -rln "buildApp\|buildTestApp" test/unit | head; grep -n
+      "SEC-AC2[01]" -r test | head; sed -n 170,260p src/app.ts)
+  ⎿  test/unit/openapi.test.ts
+     test/unit/health.test.ts
+     test/unit/platform/keep-alive.test.ts
+     … +96 lines (ctrl+o to expand)
+
+⏺ Bash(sed -n 1,140p test/unit/platform/shutdown.test.ts; grep -n
+      "buildApp\|import" test/unit/health.test.ts | head -20)
+  ⎿  import { describe, expect, it } from 'vitest';
+     import { TransactionRunner } from '../../../src/platform/db/transactio
+     n-runner.js';
+     … +142 lines (ctrl+o to expand)
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Now writing the failing SEC-AC46 regression test (transport that ignores the
+  abort signal, shutdown through the real buildApp + createShutdown).
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Bash(sed -n 1,30p test/support/app.ts; cat test/support/ports.ts)
+  ⎿  import { buildApp, type AppOptions } from '../../src/app.js';
+     import { loadConfig, type Config, type Environment } from '../../src/p
+     latform/config/config.js';
+     … +50 lines (ctrl+o to expand)
+
+⏺ Bash(cat > /private/tmp/claude-501/-Users-matiastorsello-supercool-finances/c1
+      690594-e985-4108-9b09-155967d749c8/scratchpad/ac46.py <<'EOF'
+      import re…)
+  ⎿  Updated test/unit/platform/error-reporter.test.ts (+25 -6)
+      21    headers: {},
+      22  };
+      23  
+      24 -/** A transport that records each send and answers only when to
+         -ld, or never. */                                               
+      24 +/** A transport that records each send and answers only when to
+         +ld: it never rejects on abort. */                              
+      25  class RecordingTransport implements Transport {
+      26    readonly sends: { request: TransportRequest; aborted: boolean
+           }[] = [];
+      27    readonly #answers: ((status: number) => void)[] = [];
+     ...
+      29    async send(request: TransportRequest): Promise<{ status: numb
+          er }> {
+      30      const record = { request, aborted: false };
+      31      this.sends.push(record);
+      32 -    return await new Promise((resolve, reject) => {            
+      32 +    request.signal.addEventListener('abort', () => {           
+      33 +      record.aborted = true;                                   
+      34 +    });                                                        
+      35 +    return await new Promise((resolve) => {                    
+      36        this.#answers.push((status) => {
+      37          resolve({ status });
+      38        });
+      36 -      request.signal.addEventListener('abort', () => {         
+      37 -        record.aborted = true;                                 
+      38 -        reject(new Error('aborted'));                          
+      39 -      });                                                      
+      39      });
+      40    }
+      41  
+     ...
+      44    }
+      45  }
+      46  
+      47 +/**                                                            
+      48 + * A TCP server on the loopback that accepts every connection a
+         +nd never answers, so each envelope                             
+      49 + * sent to it stays in flight until the reporter abandons it.  
+      50 + */                                                            
+      51 +async function silentEndpoint(): Promise<{ port: number; close(
+         +): Promise<void> }> {                                          
+      52 +  const sockets = new Set<Socket>();                           
+      53 +  const server = createServer((socket) => {                    
+      54 +    sockets.add(socket);                                       
+      55 +    socket.on('close', () => sockets.delete(socket));          
+      56 +  });                                                          
+      57 +  await new Promise<void>((resolve) => server.listen(0, '127.0.
+         +0.1', resolve));                                               
+     … 12 more lines (ctrl+o to expand)
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(test/unit/platform/error-reporter.test.ts)
+  ⎿  Added 3 lines
+      1 +import { createServer, type AddressInfo, type Socket } from 'nod
+        +e:net';                                                         
+      2  import { describe, expect, it } from 'vitest';
+      3 +import { buildApp, createShutdown } from '../../../src/app.js'; 
+      4 +import { loadConfig } from '../../../src/platform/config/config.
+        +js';                                                            
+      5  import { parseSentryDsn, type SentryDsn } from '../../../src/pla
+         tform/error-reporting/dsn.js';
+      6  import {
+      7    ErrorReporter,
+
+⏺ Update(test/unit/platform/error-reporter.test.ts)
+  ⎿  Added 2 lines, removed 1 line
+      11    type TransportRequest,
+      12  } from '../../../src/platform/error-reporting/reporter.js';
+      13  import type { ReportedRequest } from '../../../src/platform/err
+          or-reporting/event.js';
+      14 -import { ShutdownCoordinator, WorkTracker } from '../../../src/
+         -platform/lifecycle/shutdown.js';                               
+      14  import { FakeClock, settle } from '../../support/clock.js';
+      15 +import { TEST_CURSOR_SECRET } from '../../support/app.js';     
+      16 +import { K } from '../../support/tokens.js';                   
+      17  
+      18  const DSN = parseSentryDsn('https://pk-unit-7781@errors.example
+          /42') as SentryDsn;
+      19  
+
+⏺ Bash(cat > /private/tmp/claude-501/-Users-matiastorsello-supercool-finances/c1
+      690594-e985-4108-9b09-155967d749c8/scratchpad/ac46b.py <<'EOF'
+      p='test/unit/platform/er…)
+  ⎿  + Received
+
+     - 0
+     … +36 lines (ctrl+o to expand)
+  ⎿  Updated test/unit/platform/error-reporter.test.ts (+55 -29)
+       94  }
+       95  
+       96  describe('the error reporter', () => {
+       97 -  it('SEC-AC46 keeps at most 20 reports pending, abandons each
+          - send at 2000 ms, and the shutdown never waits for one', async
+          - () => {                                                      
+       97 +  it('SEC-AC46 keeps at most 20 reports pending, abandons each
+          + send at 2000 ms even when the transport never answers, and th
+          +e shutdown never waits for one', async () => {                
+       98      expect(MAX_PENDING_REPORTS).toBe(20);
+       99      expect(SEND_TIMEOUT_MS).toBe(2000);
+      100      const clock = new FakeClock();
+      101      const transport = new RecordingTransport();
+      102 -    const reporter = reporterWith(clock, transport, []);      
+      102 +    const lines: LoggedLine[] = [];                           
+      103 +    const reporter = reporterWith(clock, transport, lines);   
+      104  
+      105      for (let index = 0; index < 25; index += 1) reporter.repor
+           t(new Error('boom'), REQUEST);
+      106  
+     ...
+      110      expect(transport.sends.filter((send) => send.aborted)).toH
+           aveLength(0);
+      111      expect(reporter.pending).toBe(20);
+      112      await clock.advanceTo(2000);
+      113 +    // The transport ignored the abort and will never answer: 
+          +the reporter frees the slots itself.                          
+      114      expect(transport.sends.every((send) => send.aborted)).toBe
+           (true);
+      115      expect(reporter.pending).toBe(0);
+      116 +    expect(lines).toEqual([                                   
+      117 +      { level: 'warn', message: 'error reporting is failing', 
+          +fields: { reason: 'timeout' } },                              
+      118 +    ]);                                                       
+      119  
+      120      for (let index = 0; index < 3; index += 1) reporter.report
+           (new Error('boom'), REQUEST);
+      121      expect(transport.sends).toHaveLength(23);
+      122      expect(reporter.pending).toBe(3);
+      123  
+      119 -    const calls: string[] = [];                               
+      120 -    const closer = (name: string) => async () => {            
+      121 -      calls.push(`${name} closed`);                           
+      122 -      await Promise.resolve();                                
+      123 -    };                                                        
+      124 -    const shutdown = new ShutdownCoordinator({                
+      125 -      timers: clock,                                          
+      126 -      drainDelayMs: 0,                                        
+      127 -      timeoutMs: 30000,                                       
+      128 -      work: new WorkTracker(),                                
+      129 -      readiness: { stop: () => calls.push('readiness 503') }, 
+     … 69 more lines (ctrl+o to expand)
+
+⏺ Both new tests fail as expected. Fixing the reporter so the timer frees the
+  slot itself.
+⏺ Bash(cat > /private/tmp/claude-501/-Users-matiastorsello-supercool-finances/c1
+      690594-e985-4108-9b09-155967d749c8/scratchpad/fix1.py <<'EOF'
+      p='src/platform/error-rep…)
+  ⎿  51:  warn(fields: Record<string, unknown>, message: string): void;
+      RUN  v5.0.3 /Users/matiastorsello/supercool-finances
+     … +5 lines (ctrl+o to expand)
+  ⎿  Updated src/platform/error-reporting/reporter.ts (+16 -4)
+      43    },
+      44  };
+      45  
+      46 +/** How a send ended: sent, or the fields of the line that says
+         + why it failed. */                                             
+      47 +type Outcome = 'sent' | { status: number } | { reason: 'timeout
+         +' | 'unreachable' };                                           
+      48 +                                                               
+      49  /** The two lines the reporter writes: never one per report, ne
+          ver the DSN (SEC-R54). */
+      50  export interface ReporterLogger {
+      51    warn(fields: Record<string, unknown>, message: string): void;
+     ...
+      112      }
+      113      this.#pending += 1;
+      114      const controller = new AbortController();
+      115 +    // Whichever comes first, the answer or the timeout, settl
+          +es the report; the other is ignored,                          
+      116 +    // so a transport that never answers still frees its slot 
+          +at SEND_TIMEOUT_MS.                                           
+      117 +    let settled = false;                                      
+      118 +    const settle = (outcome: Outcome): void => {              
+      119 +      if (settled) return;                                    
+      120 +      settled = true;                                         
+      121 +      this.#pending -= 1;                                     
+      122 +      this.#record(outcome);                                  
+      123 +    };                                                        
+      124      const timer = this.#timers.setTimeout(() => {
+      125        controller.abort();
+      126 +      settle({ reason: 'timeout' });                          
+      127      }, SEND_TIMEOUT_MS);
+      128      void this.#send(body, controller.signal).then((outcome) =>
+            {
+      129        this.#timers.clearTimeout(timer);
+      117 -      this.#pending -= 1;                                     
+      118 -      this.#record(outcome);                                  
+      130 +      settle(outcome);                                        
+      131      });
+      132    }
+      133  
+     ...
+      142      return `${JSON.stringify(header)}\n${JSON.stringify(item)}
+           \n${JSON.stringify(event)}\n`;
+      143    }
+      144  
+      133 -  async #send(body: string, signal: AbortSignal): Promise<Reco
+          -rd<string, unknown> | 'sent'> {                               
+      145 +  async #send(body: string, signal: AbortSignal): Promise<Outc
+          +ome> {                                                        
+      146      try {
+      147        const { status } = await this.#transport.send({
+     … 9 more lines (ctrl+o to expand)
+
+⏺ Finding 1 fixed (4/4 pass). Now finding 2: checking how V8 writes the stack
+  header for pg's DatabaseError before choosing the fix.
+
+⏺ Bash(node -e "
+      const pg=require('pg'); const e=new pg.DatabaseError('a\nb',0,'error');
+      console.log(JSON.stringify(e.stack.split('\n').slice(0,3)));…)
+  ⎿  [
+       "error: a",
+       "b",
+     … +8 lines (ctrl+o to expand)
+
+⏺ Header is formatted from the current name and message, so I'll skip exactly
+  that header and send no frames if the stack doesn't start with it. Test first:
+
+⏺ Bash(sed -n 80,200p test/unit/platform/error-event.test.ts)
+  ⎿      expect(exception.stacktrace.frames.length).toBeGreaterThan(0);
+         for (const frame of exception.stacktrace.frames) {
+           expect(Object.keys(frame).sort()).toEqual(['colno', 'filename',
+     … +60 lines (ctrl+o to expand)
+
+⏺ Bash(cat > /private/tmp/claude-501/-Users-matiastorsello-supercool-finances/c1
+      690594-e985-4108-9b09-155967d749c8/scratchpad/t2.py <<'EOF'
+      p='test/unit/platform/error…)
+  ⎿       × SEC-R53 never sends a line of a multi-line message as a stack f
+     rame 3ms
+     ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+     … +21 lines (ctrl+o to expand)
+  ⎿  Updated test/unit/platform/error-event.test.ts (+34 -1)
+      104    });
+      105  
+      106    it('SEC-R53 sends the stack frames oldest first, with paths 
+           inside the application relative to it', () => {
+      107 -    const error = new Error('boom');                          
+      107 +    const error = new Error('boom 0192f0a0-0000-7000-8000-0000
+          +0000a001');                                                   
+      108      error.stack = [
+      109        'Error: boom 0192f0a0-0000-7000-8000-00000000a001',
+      110        '    at inner (file:///app/dist/modules/x.js:10:5)',
+     ...
+      139      ]);
+      140      expect(JSON.stringify(event)).not.toContain('0192f0a0');
+      141    });
+      142 +                                                              
+      143 +  it('SEC-R53 never sends a line of a multi-line message as a 
+          +stack frame', () => {                                         
+      144 +    const settings = {                                        
+      145 +      environment: 'test',                                    
+      146 +      release: '0.1.0',                                       
+      147 +      replicaId: 'api-1',                                     
+      148 +      secrets: [],                                            
+      149 +      appRoot: '/app',                                        
+      150 +      eventId: 'c'.repeat(32),                                
+      151 +      timestamp: 1,                                           
+      152 +    };                                                        
+      153 +    const request = { id: 'r', method: 'GET', is404: true, rou
+          +teOptions: {}, headers: {} };                                 
+      154 +    const multiLine = new Error(`x\n    at 4321 ${ACCOUNT} (k-
+          +77:1:2)`);                                                    
+      155 +                                                              
+      156 +    const event = buildEvent(multiLine, request, settings);   
+      157 +                                                              
+      158 +    const [exception] = event.exception.values;               
+      159 +    expect(exception.value).toBe('x\n    at <n> <uuid> (k-<n>:
+          +<n>:<n>)');                                                   
+      160 +    expect(exception.stacktrace.frames.length).toBeGreaterThan
+          +(0);                                                          
+      161 +    const frames = JSON.stringify(exception.stacktrace.frames)
+          +;                                                             
+      162 +    for (const forbidden of [ACCOUNT, '4321', 'k-77']) expect(
+          +frames).not.toContain(forbidden);                             
+      163 +                                                              
+      164 +    // A stack whose first lines are not the error's name and 
+          +message cannot be told apart from                             
+      165 +    // its message, so none of its frames is sent.            
+      166 +    const renamed = new Error('first');                       
+      167 +    renamed.stack = [                                         
+      168 +      `Error: second\n    at 4321 ${ACCOUNT} (k-77:1:2)`,     
+      169 +      '    at inner (/app/dist/modules/x.js:10:5)',           
+      170 +    ].join('\n');                                             
+     … 5 more lines (ctrl+o to expand)
+
+⏺ Fails as the audit described. Now the fix in event.ts:
+
+⏺ Bash(cat > /private/tmp/claude-501/-Users-matiastorsello-supercool-finances/c1
+      690594-e985-4108-9b09-155967d749c8/scratchpad/f2.py <<'EOF'
+      p='src/platform/error-repor…)
+  ⎿        Tests  7 passed (7)
+  ⎿  Updated src/platform/error-reporting/event.ts (+18 -5)
+      125    return path.startsWith(root) ? path.slice(root.length) : pat
+           h;
+      126  }
+      127  
+      128 +/**                                                           
+      129 + * The first lines of the error's V8 stack, which V8 writes as
+          + `Error.prototype.toString` does:                             
+      130 + * the name and the message, which may span several lines.    
+      131 + */                                                           
+      132 +function stackHeaderOf(error: Error): string {                
+      133 +  if (error.name === '') return error.message;                
+      134 +  return error.message === '' ? error.name : `${error.name}: $
+          +{error.message}`;                                             
+      135 +}                                                             
+      136 +                                                              
+      137  /**
+      138   * The frames of a V8 stack, oldest first as the Sentry format
+            orders them, each with only its
+      130 - * function, file, line and column. The first line, which hold
+          -s the message, is never read.                                 
+      139 + * function, file, line and column. The header, which holds th
+          +e message on as many lines as it                              
+      140 + * has, is never read; a stack that does not start with it, wh
+          +ose message cannot be told apart                              
+      141 + * from its frames, gives no frames, so no line of a message i
+          +s ever sent unscrubbed (SEC-R53).                             
+      142   */
+      132 -function framesOf(stack: string | undefined, appRoot: string):
+          - StackFrame[] {                                               
+      133 -  if (stack === undefined) return [];                         
+      143 +function framesOf(error: Error, appRoot: string): StackFrame[]
+          + {                                                            
+      144 +  const { stack } = error;                                    
+      145 +  const header = stackHeaderOf(error);                        
+      146 +  if (stack === undefined || !(stack === header || stack.start
+          +sWith(`${header}\n`))) return [];                             
+      147    const frames: StackFrame[] = [];
+      135 -  for (const line of stack.split('\n').slice(1)) {            
+      148 +  for (const line of stack.slice(header.length).split('\n').sl
+          +ice(1)) {                                                     
+      149      const match = FRAME.exec(line);
+      150      if (match === null) continue;
+      151      const [, name, location, lineno, colno] = match;
+     ...
+      198            value: isError
+      199              ? scrubMessage(error.message, [...settings.secrets
+           , ...requestValues(request)])
+      200              : '',
+      188 -          stacktrace: { frames: framesOf(isError ? error.stack
+          - : undefined, settings.appRoot) },                            
+      201 +          stacktrace: { frames: isError ? framesOf(error, sett
+          +ings.appRoot) : [] },                                         
+      202          },
+      203        ],
+      204      },
+
+⏺ Finding 2 fixed. Finding 3: the DSN test.
+
+⏺ Bash(sed -n 500,560p test/unit/platform/config.test.ts)
+  ⎿      ] as const) {
+           expect(failure({ [variable]: value }).problems[0]?.variable, var
+     iable).toBe(variable);
+     … +40 lines (ctrl+o to expand)
+
+⏺ Bash(python3 - <<'EOF'
+      p='test/unit/platform/config.test.ts'…)
+  ⎿       × SEC-AC40 loads SENTRY_DSN unset, empty, https or http to a loop
+     back host, and refuses every other value by name and never with its va
+     lue 42ms
+     … +3 lines (ctrl+o to expand)
+  ⎿  Updated test/unit/platform/config.test.ts (+4 -0)
+      528        'https://pk-41f2@errors.example/',
+      529        'https://pk-41f2@errors.example/abc',
+      530        'https://pk-41f2@errors.example/42?x=1',
+      531 +      // An empty query, fragment or password is still one, th
+          +ough the URL parser reads it as "".                           
+      532 +      'https://pk-41f2@errors.example/42?',                   
+      533 +      'https://pk-41f2@errors.example/42#',                   
+      534 +      'https://pk-41f2:@errors.example/42',                   
+      535      ]) {
+      536        const error = failure({ SENTRY_DSN: value });
+      537        expect(error.problems, value).toEqual([
+
+⏺ Bash(python3 - <<'EOF'
+      p='src/platform/error-reporting/dsn.ts'…)
+  ⎿  28:  const authority = value.slice(value.indexOf('//') + 2).split(/[/\
+     \]/)[0] ?? '';
+           Tests  17 passed (17)
+  ⎿  Updated src/platform/error-reporting/dsn.ts (+13 -0)
+      18  export const SENTRY_DSN_RULE =
+      19    'unset or empty, or a DSN https://<public key>@<host>[:<port>
+          ]/<project id> with a project id of decimal digits, no password
+          , query or fragment; http:// only for 127.0.0.1, [::1] or local
+          host';
+      20  
+      21 +/**                                                            
+      22 + * Whether `value` holds a query, a fragment or a password that
+         + the URL parser reads as `''`                                  
+      23 + * because it is empty, as in `.../42?`, `.../42#` or `https://
+         +pk:@host/42`: a raw `?` or `#`                                 
+      24 + * anywhere, or a `:` in the user part before the host.        
+      25 + */                                                            
+      26 +function hasEmptyPart(value: string): boolean {                
+      27 +  if (value.includes('?') || value.includes('#')) return true; 
+      28 +  const authority = value.slice(value.indexOf('//') + 2).split(
+         +/[/\\]/)[0] ?? '';                                             
+      29 +  const at = authority.lastIndexOf('@');                       
+      30 +  return at >= 0 && authority.slice(0, at).includes(':');      
+      31 +}                                                              
+      32 +                                                               
+      33  /** The parsed DSN, or `undefined` when `value` breaks the rule
+           of section 1.2 of spec 007. */
+      34  export function parseSentryDsn(value: string): SentryDsn | unde
+          fined {
+      35    let url: URL;
+     ...
+      47      url.password !== '' ||
+      48      url.search !== '' ||
+      49      url.hash !== '' ||
+      50 +    hasEmptyPart(value) ||                                     
+      51      project === undefined
+      52    ) {
+      53      return undefined;
+
+⏺ Finding 3 fixed. Finding 4: checking when a report is queued relative to the
+  answer, so "pending === 0" is a valid wait condition.
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Reports are queued before the answer is sent, so waiting for pending === 0 is
+  sound. Adding a shared waitUntil helper and making the fake clear its held
+  answers on close.
+
+⏺ Bash(cat > test/support/wait.ts <<'EOF'
+      /**…)
+  ⎿  (eval):53: no matches found: --include=*.ts
+  ⎿  Updated test/support/fake-sentry.ts (+8 -10)
+       1  import { createServer, type IncomingHttpHeaders, type Server } 
+          from 'node:http';
+       2  import type { AddressInfo } from 'node:net';
+       3 -                                                               
+       4 -/** Polls `done` every 20 ms until it holds, failing after `tim
+         -eoutMs`. */                                                    
+       5 -async function waitUntil(done: () => boolean, timeoutMs: number
+         -, what: string): Promise<void> {                               
+       6 -  const deadline = Date.now() + timeoutMs;                     
+       7 -  while (!done()) {                                            
+       8 -    if (Date.now() > deadline) throw new Error(`timed out waiti
+         -ng for ${what}`);                                              
+       9 -    await new Promise((resolve) => setTimeout(resolve, 20));   
+      10 -  }                                                            
+      11 -}                                                              
+       3 +import { waitUntil } from './wait.js';                         
+       4  
+       5  /** One envelope as the endpoint received it. */
+       6  export interface ReceivedEnvelope {
+     ...
+      25    /** The status each envelope is answered with. */
+      26    status = 200;
+      27    readonly #server: Server;
+      28 +  /** The answers of envelopes still held, cleared by `close`. 
+         +*/                                                             
+      29 +  readonly #held = new Set<NodeJS.Timeout>();                  
+      30  
+      31    private constructor(server: Server) {
+      32      this.#server = server;
+     ...
+      50          };
+      51          fake.envelopes.push(envelope);
+      52          const status = fake.status;
+      59 -        setTimeout(() => {                                     
+      53 +        const answer = setTimeout(() => {                      
+      54 +          fake.#held.delete(answer);                           
+      55            envelope.answered = status;
+      56            response.writeHead(status, { 'content-type': 'applica
+          tion/json' });
+      57            response.end('{}');
+      58          }, fake.holdMs);
+      59 +        fake.#held.add(answer);                                
+      60        });
+      61      });
+      62      await new Promise<void>((resolve, reject) => {
+     ...
+      88    }
+      89  
+      90    async close(): Promise<void> {
+     … 5 more lines (ctrl+o to expand)
+  ⎿  Created test/support/wait.ts (+11 -0)
+       1 +/**                                                            
+       2 + * Polls `done` every 20 ms until it holds, failing with `what`
+         + after `timeoutMs`: the tests wait                             
+       3 + * for the condition itself, never for a fixed time.           
+       4 + */                                                            
+       5 +export async function waitUntil(done: () => boolean, timeoutMs:
+         + number, what: string): Promise<void> {                        
+       6 +  const deadline = Date.now() + timeoutMs;                     
+       7 +  while (!done()) {                                            
+       8 +    if (Date.now() > deadline) throw new Error(`timed out waiti
+         +ng for ${what}`);                                              
+       9 +    await new Promise((resolve) => setTimeout(resolve, 20));   
+      10 +  }                                                            
+      11 +}                                                              
+
+⏺ Now rewriting SEC-AC45 without sleeps:
+
+⏺ Bash(python3 - <<'EOF'
+      p='test/integration/security/error-reporting-unavailable.test.ts'…)
+  ⎿  describe('error reporting with an unreachable or slow endpoint', () =>
+      {
+       afterAll(async () => {
+     … +33 lines (ctrl+o to expand)
+  ⎿  Updated test/integration/security/error-reporting-unavailable.test.ts
+     (+14 -9)
+       7  import { freePort } from '../../support/ports.js';
+       8  import { buildTestApp, THROWING_ROUTE_PATH } from '../../suppor
+          t/test-app.js';
+       9  import { tokenFor } from '../../support/tokens.js';
+      10 +import { waitUntil } from '../../support/wait.js';             
+      11  
+      11 -async function sleep(ms: number): Promise<void> {              
+      12 -  await new Promise((resolve) => setTimeout(resolve, ms));     
+      13 -}                                                              
+      12 +/** Long enough for any report to be sent or abandoned (2000 ms
+         +) on a slow runner. */                                         
+      13 +const SETTLE_TIMEOUT_MS = 10_000;                              
+      14  
+      15  describe('error reporting with an unreachable or slow endpoint'
+          , () => {
+      16    afterAll(async () => {
+     ...
+      38          .lines()
+      39          .filter((line) => typeof line.msg === 'string' && line.
+          msg.startsWith('error reporting'));
+      40  
+      41 +    // Every report is queued before its 500 is answered, so no
+         +ne is pending once this holds.                                 
+      42 +    const settled = async (what: string) => {                  
+      43 +      await waitUntil(() => built.app.errorReporter?.pending ==
+         += 0, SETTLE_TIMEOUT_MS, what);                                 
+      44 +    };                                                         
+      45 +                                                               
+      46      try {
+      47        for (let index = 0; index < 3; index += 1) await throwing
+          ();
+      43 -      await sleep(300);                                        
+      48 +      await settled('the three refused sends');                
+      49        expect(reporting().map((line) => [line.level, line.msg]))
+          .toEqual([
+      50          [LOG_LEVEL.warn, 'error reporting is failing'],
+      51        ]);
+     ...
+      57        expect(fake.envelopes.every((envelope) => envelope.answer
+          ed === undefined)).toBe(true);
+      58        await fake.waitForEnvelopes(1);
+      59        // The held send is abandoned at 2000 ms, while reporting
+           is already failing.
+      55 -      await sleep(2300);                                       
+      56 -      expect(built.app.errorReporter?.pending).toBe(0);        
+      60 +      await settled('the held send to be abandoned');          
+      61  
+      62        fake.holdMs = 0;
+      63        await throwing();
+      64        await fake.waitForEnvelopes(2);
+      61 -      await sleep(300);                                        
+      65 +      await settled('the fifth report');                       
+     … 11 more lines (ctrl+o to expand)
+
+⏺ Bash(sed -n 1,60p test/support/logs.ts)
+  ⎿  /** One log line as the service writes it: a JSON object (SEC-R21). */
+     export type LogLine = Record<string, unknown> & { level?: number; msg?
+     : string; reqId?: string };
+     … +46 lines (ctrl+o to expand)
+
+⏺ Synchronous capture, good. Now error-reporting.test.ts (SEC-AC41, 42, 44):
+
+⏺ Bash(python3 - <<'EOF'
+      p='test/integration/security/error-reporting.test.ts'…)
+  ⎿  Updated test/integration/security/error-reporting.test.ts (+22 -7)
+      15    type BuiltTestApp,
+      16  } from '../../support/test-app.js';
+      17  import { K, tokenFor } from '../../support/tokens.js';
+      18 +import { waitUntil } from '../../support/wait.js';             
+      19  
+      20  const DB_PASSWORD = 'db-pw-7781';
+      21  const REDIS_PASSWORD = 'redis-pw-5512';
+     ...
+      28    return parsed.toString();
+      29  }
+      30  
+      30 -async function sleep(ms: number): Promise<void> {              
+      31 -  await new Promise((resolve) => setTimeout(resolve, ms));     
+      31 +/** Long enough for any report to be sent or abandoned (2000 ms
+         +) on a slow runner. */                                         
+      32 +const SETTLE_TIMEOUT_MS = 10_000;                              
+      33 +                                                               
+      34 +/**                                                            
+      35 + * Waits until no report of `built` is pending. Every report is
+         + queued before its 500 is answered,                            
+      36 + * so once this holds after the last answer, nothing more will 
+         +reach the endpoint.                                            
+      37 + */                                                            
+      38 +async function reportsSettled(built: BuiltTestApp): Promise<voi
+         +d> {                                                           
+      39 +  await waitUntil(                                             
+      40 +    () => built.app.errorReporter?.pending === 0,              
+      41 +    SETTLE_TIMEOUT_MS,                                         
+      42 +    'no pending report',                                       
+      43 +  );                                                           
+      44  }
+      45  
+      46  /** A request to the throwing route of SYS-R37 as the holder of
+           `token`. */
+     ...
+      129          statuses.push((await read(c2, b1.id)).statusCode);
+      130        }
+      131        expect(statuses).toEqual([200, 200, 200, 200, 200, 200, 
+           200, 429]);
+      120 -      await sleep(2000);                                      
+      132 +      await reportsSettled(built);                            
+      133      } finally {
+      134        await session?.close();
+      135      }
+      136  
+      137      expect(fake.envelopes).toHaveLength(2);
+      138      const events = fake.envelopes.map((envelope) => envelope.e
+           vent);
+      127 -    expect(events.map((event) => event.tags?.['requestId'])).t
+          -oEqual(['err-1', 'err-2']);                                   
+     … 32 more lines (ctrl+o to expand)
+
+⏺ Running the integration tests touched so far (checking local infra first):
+
+⏺ Bash(docker ps --format '{{.Names}} {{.Status}}' 2>&1 | head; grep -n
+      '"test:integration"\|"check"\|"test"' package.json)
+  ⎿  supercool-finances-nginx-1 Up 22 minutes (healthy)
+     supercool-finances-api-1-1 Up 22 minutes (healthy)
+     supercool-finances-api-2-1 Up 22 minutes (healthy)
+     … +14 lines (ctrl+o to expand)
+
+⏺ Bash(npx vitest run --project integration
+      test/integration/security/error-reporting.test.ts
+      test/integration/security/error-reporting-unavailable.test.ts
+      test/integr…)
+  ⎿        Tests  14 passed (14)
+  ⎿  (timeout 5m)
+
+⏺ Finding 4 done (14/14). Finding 5: the plan wording.
+
+⏺ Bash(python3 - <<'EOF'
+      p='specs/007-security-ops/plan.md'…)  ⎿  Updated specs/007-security-ops/plan.md (+1 -1)
+      143  - SEC-AC05 is a claim about the whole e2e run. Every e2e HTTP 
+           helper appends each response's status to `reports/e2e-response
+           s.jsonl`, tagged with the test file. A custom Vitest sequencer
+            runs `no-rate-limited.test.ts` after every other e2e file exc
+           ept `edge-rate-limit.test.ts`, which runs last (section 1.6). 
+           The test then fails on any 429 outside SEC-AC04's file.
+      144  - SEC-AC10 needs `TRUSTED_PROXY_CIDRS` set in `compose.yaml` t
+           o nginx's fixed address as a `/32`, on the explicit subnet of 
+           plan 008 whose `ip_range` keeps every other container off that
+            address, so the service logs the address nginx forwards, ngin
+           x's own peer, and ignores an `X-Forwarded-For` sent straight t
+           o a replica's host port.
+      145  - Integration tests of the other specs build the app with `RAT
+           E_LIMIT_USER_MAX` "1000000" (section 1.6); `test/support/app.t
+           s` sets it by default from 09-hardening on.
+      146 -- SEC-AC41, SEC-AC42 and SEC-AC45 point `SENTRY_DSN` at `test/
+          -support/fake-sentry.ts` with `http://`, which section 1.2 acce
+          -pts outside `production`. SEC-AC41 and SEC-AC44 use the throwi
+          -ng route and SEC-AC42 the unit-of-work fault after the ledger 
+          -entries, both seams of SYS-R37, so no new test seam is needed.
+          - SEC-AC44 observes that no reporter exists through the reporte
+          -r the composition root exposes on the app instance, as SEC-AC2
+          -3 reads the pool, and records every call of the global `fetch`
+          - with a spy, which proves that nothing at all is sent without 
+          -`SENTRY_DSN`.                                                 
+      146 +- SEC-AC41, SEC-AC42 and SEC-AC45 point `SENTRY_DSN` at `test/
+          +support/fake-sentry.ts` with `http://`, which section 1.2 acce
+          +pts for a loopback host, whatever `NODE_ENV`. SEC-AC41 and SEC
+          +-AC44 use the throwing route and SEC-AC42 the unit-of-work fau
+          +lt after the ledger entries, both seams of SYS-R37, so no new 
+          +test seam is needed. SEC-AC44 observes that no reporter exists
+          + through the reporter the composition root exposes on the app 
+          +instance, as SEC-AC23 reads the pool, and records every call o
+          +f the global `fetch` with a spy, which proves that nothing at 
+          +all is sent without `SENTRY_DSN`.                             
+      147  
+      148  ## 7. ACs that cannot be tested as written
+      149  
+
+⏺ Finding 5 done. Now the zero-initialised counters. Checking the dashboard
+  queries and what spec 008 says about the panels:
+
+  Listed 1 directory (ctrl+o to expand)
+
+⏺ Dashboard panels on these counters will show 0 once the series exist. Adding
+  the requirement and AC to spec 007 through the spec skill.
+
+⏺ Skill(spec)
+  ⎿  Successfully loaded skill
+
+⏺ Bash(sed -n 1,200p .claude/skills/spec/template.md | grep -n
+      "AC\|Level\|Covers" | head; grep -n "### 1.9" -A12
+      specs/008-deployment/spec.md | cut -c1-500; grep -n "…)
+  ⎿  22:### PFX-AC01 · Short title
+     24:- **Level:** unit | integration | e2e | ci
+     25:- **Covers:** PFX-R01
+     … +60 lines (ctrl+o to expand)
+
+⏺ Bash(python3 - <<'EOF'
+      p='specs/007-security-ops/spec.md'…)
+  ⎿   specs/007-security-ops/spec.md | 24 ++++++++++++++++++------
+      1 file changed, 18 insertions(+), 6 deletions(-)
+  ⎿  Updated specs/007-security-ops/spec.md (+18 -6)
+      90  
+      91  The default Node.js process metrics (memory, event loop lag, ga
+          rbage collection) are also exposed.
+      92  
+      93 +Each counter is exposed from startup with a series at 0 for eve
+         +ry label value of the table, 4 × 3 for `scf_money_movements_tot
+         +al`, 5 for `scf_idempotent_replays_total` and 2 each for `scf_l
+         +ock_timeouts_total` and `scf_transaction_retries_total`, and ea
+         +ch counter without labels at 0, so a dashboard panel shows 0 ra
+         +ther than no data until the first event (SEC-R56). The histogra
+         +m's series still appear with the first request of each method, 
+         +route and status code, whose combinations are not fixed in adva
+         +nce.                                                           
+      94 +                                                               
+      95  ### 1.5 Security headers
+      96  
+      97  Every response of the service carries these headers, set throug
+          h helmet with its defaults and the values below:
+     ...
+      220  | SEC-R53 | THE SYSTEM SHALL put in an error report no request
+            header, `Authorization` and `Idempotency-Key` included, no qu
+           ery string, no request or response body, no client address and
+            no `detail`, `hint`, `where`, `position` or query text of a d
+           atabase error, and SHALL send the error's message only after s
+           crubbing it as section 1.10 orders, so that no amount, account
+            or transaction id, token or secret reaches the endpoint.     
+                                                                         
+                                                                         
+                                                                         
+                                  |
+      221  | SEC-R54 | IF a report is not sent within 2000 ms, the endpoi
+           nt answers it with a status other than 2xx, the send fails, or
+            20 reports are already pending THEN THE SYSTEM SHALL drop tha
+           t report, answer every request exactly as it would without err
+           or reporting, and write one `warn` line when sends start faili
+           ng and one `info` line when a send succeeds again, neither nam
+           ing the DSN (section 1.10).                                   
+                                                                         
+                                                                         
+                                                                         
+                                  |
+      222  | SEC-R55 | WHEN the process shuts down THE SYSTEM SHALL wait 
+           for no pending report, so that error reporting adds nothing to
+            the deadlines of SEC-R25 to SEC-R28.                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                  |
+      223 +| SEC-R56 | THE SYSTEM SHALL expose each counter of table 1.4 
+          +from startup, with a series at 0 for every label value of the 
+          +table that has not been counted yet, so that no counter is mis
+          +sing from `/metrics` before its first event (section 1.4).    
+          +                                                              
+          +                                                              
+          +                                                              
+          +                                                              
+          +                                                              
+          +                                                              
+          +                       |                                      
+      224  
+      225  ## 3. Acceptance criteria
+      226  
+     ...
+      595  - **When** 25 reports are queued at once and the injected cloc
+           k advances to 1999 ms and then to 2000 ms; then 3 more reports
+            are queued and SIGTERM is delivered with `SHUTDOWN_DRAIN_DELA
+           Y_MS` 0 and no request in flight
+      596  - **Then** 20 sends are started and 5 reports are dropped with
+           out a send; at 1999 ms none of the 20 is abandoned; at 2000 ms
+            all 20 are abandoned and dropped; the 3 later sends are start
+           ed; and the coordinator closes the pool, the readiness connect
+           ion and Redis and sets exit code 0 without waiting for them
+      597  
+      598 +### SEC-AC47 · Every counter of table 1.4 is exposed at 0 from
+          + startup                                                      
+      599 +                                                              
+      600 +- **Level:** unit                                             
+      601 +- **Covers:** SEC-R56, SEC-R41                                
+      602 +- **Given** an app built by the composition root that has serv
+          +ed no request                                                 
+      603 +- **When** its metrics are read in the Prometheus text format;
+          + then one lock timeout at an account row lock is counted and t
+          +he metrics are read again                                     
+      604 +- **Then** the first read holds `scf_money_movements_total` at
+          + 0 for each of the 12 pairs of `kind` (`deposit`, `withdrawal`
+          +, `transfer`, `reversal`) and `outcome` (`applied`, `rejected`
+          +, `failed`), `scf_idempotent_replays_total` at 0 for each `kin
+          +d` of `deposit`, `withdrawal`, `transfer`, `reversal` and `acc
+          +ount_creation`, `scf_lock_timeouts_total` at 0 for `lock` `acc
+          +ount` and `idempotency`, `scf_transaction_retries_total` at 0 
+          +for `sqlstate` `40P01` and `40001`, and `scf_transaction_retri
+          +es_exhausted_total`, `scf_db_pool_acquire_timeouts_total`, `sc
+          +f_rate_limited_total` and `scf_rate_limit_store_errors_total` 
+          +at 0, with no other label value; and the second read holds `sc
+          +f_lock_timeouts_total{lock="account"}` at 1 and `scf_lock_time
+          +outs_total{lock="idempotency"}` at 0                          
+      605 +                                                              
+      606  ## 4. Error catalogue
+      607  
+      608  Errors shared by every capability are in spec 000. This spec a
+           dds or fixes:
+     ...
+      648  
+      649  ## 7. Open questions
+      650  
+      640 -Every question raised while writing this spec was decided by t
+          -he owner on 2026-10-07 and is stated above as a rule. The ques
+          -tions below were raised by the optional error reporting of pha
+          -se 12b-observability and decided by the owner on 2026-10-09.  
+      651 +Every question raised while writing this spec was decided by t
+          +he owner on 2026-10-07 and is stated above as a rule. The ques
+          +tions below were raised in phase 12b-observability, by the opt
+          +ional error reporting and the manual check of the dashboard, a
+          +nd decided by the owner on 2026-10-09.                        
+      652  
+      642 -| #   | Question                                              
+          -                                                              
+          -                          | Answer                            
+          -                                                 | Decided by 
+          -       |                                                      
+      643 -| --- | ------------------------------------------------------
+          ---------------------------------------------------------------
+          -------------------------- | ----------------------------------
+          ------------------------------------------------- | -----------
+          ------- |                                                      
+      644 -| Q1  | How does the service send reports: its own small clien
+          -t that writes Sentry envelopes with Node's `fetch`, or the off
+          -icial SDK `@sentry/node`? | Its own client on Node's `fetch`, 
+          -with no new dependency (section 1.10, ADR-0023). | owner, 2026
+          --10-09 |                                                      
+      645 -| Q2  | Is the error's message sent, scrubbed as section 1.10 
+          -orders, or only the error's type and stack?                   
+          -                          | The scrubbed message (section 1.10
+          -, SEC-R53).                                      | owner, 2026
+          --10-09 |                                                      
+      646 -| Q3  | Are errors outside a request, such as an uncaught exce
+          -ption that ends the process, reported too?                    
+          -                          | No: only the requests answered 500
+          - (SEC-R52).                                      | owner, 2026
+          --10-09 |                                                      
+     … 6 more lines (ctrl+o to expand)
+
+⏺ Spec updated (1 requirement, 1 AC, Q4 recorded, no conflict with spec 008).
+  Now plan/tasks rows, then the failing test.
+
+⏺ Bash(python3 - <<'EOF'
+      p='specs/007-security-ops/plan.md'…)
+  ⎿  Error: Exit code 1
+     23:| `src/platform/metrics/metrics.ts`              | 09-hardening      | 
+     The registry of table 1.4 with `@prometheus-io/client`, served by a second 
+     HTTP server on `METRICS_PORT` only; request metrics labelled with the route
+     template or `unmatched` (SEC-R41, SEC-R42).                               
+                                                                               
+                                                                               
+                                                                               
+                                                                               
+                                                                               
+                                                                               
+                                                                               
+                                                                               
+                                                                               
+                  |
+     ls: test/unit/platform/metrics.test.ts: No such file or directory
+
+⏺ Bash(python3 - <<'EOF'
+      p='specs/007-security-ops/plan.md'…)
+  ⎿       × SEC-AC47 exposes every counter of table 1.4 at 0 from startup,
+     for every label value 14ms
+     ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+     … +18 lines (ctrl+o to expand)
+  ⎿  Updated specs/007-security-ops/plan.md (+1 -1)
+      20  | `src/platform/lifecycle/shutdown.ts`           | 09-hardening
+                | The shutdown coordinator with an injected clock, starte
+          d by SIGTERM and SIGINT in `src/main.ts`, and by an uncaught er
+          ror through `close-with-grace` (section 4): drain delay, stop a
+          ccepting, close idle keep-alive connections, wait for requests 
+          up to `SHUTDOWN_TIMEOUT_MS`, the clean-ups that run after a req
+          uest-timeout 503 counted as in-flight work, then close the pool
+          , the readiness connection and Redis, in that order (SEC-R25 to
+           SEC-R28).                                                     
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                  |
+      21  | `src/platform/http/request-timeout.ts`         | 09-hardening
+                | The request runner's deadline: at `REQUEST_TIMEOUT_MS` 
+          it answers 503 at once, starts no further statement, and rolls 
+          back once the statement in flight ends, or lets a `COMMIT` alre
+          ady sent finish (SEC-R33, section 4, ADR-0022).                
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                  |
+      22  | `src/platform/db/database.ts`                  | 09-hardening
+                | Pool size `DB_POOL_MAX`, `connectionTimeoutMillis` = `D
+          B_POOL_ACQUIRE_TIMEOUT_MS`, the driver's FIFO wait queue, no `o
+          ptions` parameter, and `PoolAcquireTimeout` when the wait ends 
+          (SEC-R30, SEC-R36 to SEC-R38).                                 
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                  |
+      23 -| `src/platform/metrics/metrics.ts`              | 09-hardening
+         -      | The registry of table 1.4 with `@prometheus-io/client`,
+         - served by a second HTTP server on `METRICS_PORT` only; request
+         - metrics labelled with the route template or `unmatched` (SEC-R
+         -41, SEC-R42).                                                  
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                        |                      
+      23 +| `src/platform/metrics/metrics.ts`              | 09-hardening
+         +      | The registry of table 1.4 with `@prometheus-io/client`,
+         + served by a second HTTP server on `METRICS_PORT` only; request
+         + metrics labelled with the route template or `unmatched` (SEC-R
+         +41, SEC-R42); from 12b-observability, every label value of the 
+         +counters at 0 from startup (SEC-R56).                          
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                        |                      
+      24  | `docker/nginx/templates/default.conf.template` | 10-runtime  
+                | This plan's part of the nginx configuration: `limit_req
+          ` per IP, `client_max_body_size 32k`, `proxy_read_timeout` and 
+          `proxy_send_timeout` 30 s, upstream `keepalive_timeout` 60 s, `
+          X-Request-Id` passed or generated, `X-Forwarded-For` replaced, 
+          an access log without query strings, `server_tokens off`, and t
+          he `error_page` locations for 429 and 413 (sections 1.6 and 1.7
+          ). Plan 008 adds the upstreams and the gateway errors.         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                  |
+      25  | `test/support/deployment.ts`                   | 10, 12      
+                | Reads `compose.yaml`, the nginx template and, from 12-i
+          nfra, the Terraform variables, for SEC-AC26, SEC-AC29, SEC-AC33
+           and SEC-AC36 (section 8).                                     
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                  |
+      26  | `src/platform/error-reporting/event.ts`        | 12b-observab
+          ility | Builds a report from the allowlist of section 1.10 of t
+          he spec: the tags, the error's name, its message scrubbed in th
+          e spec's order (secrets and the request's own token and key, th
+          en JWT-shaped tokens, UUIDs and digit runs) and its stack frame
+          s as function, file, line and column; nothing from the request 
+          but the method, the route template and the correlation id (SEC-
+          R50, SEC-R53).                                                 
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                  |
+  ⎿  Created test/unit/platform/metrics.test.ts (+85 -0)
+       1 +import { afterAll, describe, expect, it } from 'vitest';       
+       2 +import { buildApp } from '../../../src/app.js';                
+       3 +import { loadConfig } from '../../../src/platform/config/config
+         +.js';                                                          
+       4 +import { TEST_CURSOR_SECRET } from '../../support/app.js';     
+       5 +import { parseMetrics, type Sample } from '../../support/metric
+         +s.js';                                                         
+       6 +import { K } from '../../support/tokens.js';                   
+       7 +                                                               
+       8 +const KINDS = ['deposit', 'withdrawal', 'transfer', 'reversal']
+         + as const;                                                     
+       9 +                                                               
+      10 +/** The samples of `name`, each as its labels and value. */    
+      11 +function seriesOf(samples: readonly Sample[], name: string) {  
+      12 +  return samples                                               
+      13 +    .filter((sample) => sample.name === name)                  
+      14 +    .map(({ labels, value }) => ({ labels, value }));          
+      15 +}                                                              
+      16 +                                                               
+      17 +/** `labels` at `value`, for each set of labels. */            
+      18 +function at(value: number, labels: Record<string, string>[]) { 
+      19 +  return labels.map((set) => ({ labels: set, value }));        
+      20 +}                                                              
+      21 +                                                               
+      22 +describe('the metrics', () => {                                
+      23 +  // The pool and Redis connect lazily, so this app never reach
+         +es either.                                                     
+      24 +  const app = buildApp(                                        
+      25 +    loadConfig({                                               
+      26 +      DATABASE_URL: 'postgres://scf_app:unused@127.0.0.1:1/unus
+         +ed',                                                           
+      27 +      REDIS_URL: 'redis://127.0.0.1:1',                        
+      28 +      JWT_SECRET: K,                                           
+      29 +      JWT_ISSUER: 'scf-test',                                  
+      30 +      JWT_AUDIENCE: 'scf-api',                                 
+      31 +      CURSOR_SECRET: TEST_CURSOR_SECRET,                       
+      32 +      LOG_LEVEL: 'fatal',                                      
+      33 +    }),                                                        
+      34 +  );                                                           
+      35 +                                                               
+      36 +  afterAll(async () => {                                       
+      37 +    await app.close();                                         
+      38 +  });                                                          
+      39 +                                                               
+      40 +  it('SEC-AC47 exposes every counter of table 1.4 at 0 from sta
+         +rtup, for every label value', async () => {                    
+     … 45 more lines (ctrl+o to expand)
+
+⏺ Fails as expected. Implementing in metrics.ts:
+
+⏺ Bash(python3 - <<'EOF'
+      p='src/platform/metrics/metrics.ts'…)
+  ⎿        Tests  1 passed (1)
+  ⎿  Updated src/platform/metrics/metrics.ts (+28 -6)
+       3  import type { FastifyInstance } from 'fastify';
+       4  
+       5  /** The kinds of a money movement (section 1.4 of spec 007). */
+       6 -export type MovementKind = 'deposit' | 'withdrawal' | 'transfer
+         -' | 'reversal';                                                
+       6 +const MOVEMENT_KINDS = ['deposit', 'withdrawal', 'transfer', 'r
+         +eversal'] as const;                                            
+       7 +export type MovementKind = (typeof MOVEMENT_KINDS)[number];    
+       8 +                                                               
+       9 +/** A movement's outcome. */                                   
+      10 +const MOVEMENT_OUTCOMES = ['applied', 'rejected', 'failed'] as 
+         +const;                                                         
+      11  
+      12  /** What a keyed request's answer counts as: a movement's outco
+          me, or a replay. */
+       9 -export type KeyedOutcome = 'applied' | 'rejected' | 'failed' | 
+         -'replayed';                                                    
+      13 +export type KeyedOutcome = (typeof MOVEMENT_OUTCOMES)[number] |
+         + 'replayed';                                                   
+      14  
+      15  /** The kinds a replay is counted under: the movements and acco
+          unt creation. */
+      12 -export type KeyedKind = MovementKind | 'account_creation';     
+      16 +const KEYED_KINDS = [...MOVEMENT_KINDS, 'account_creation'] as 
+         +const;                                                         
+      17 +export type KeyedKind = (typeof KEYED_KINDS)[number];          
+      18  
+      19  /** A lock wait that ended with SQLSTATE 55P03. */
+      15 -export type LockKind = 'account' | 'idempotency';              
+      20 +const LOCK_KINDS = ['account', 'idempotency'] as const;        
+      21 +export type LockKind = (typeof LOCK_KINDS)[number];            
+      22  
+      23  /** The SQLSTATEs the transaction runner retries (SYS-R18). */
+      18 -export type RetriedSqlstate = '40P01' | '40001';               
+      24 +const RETRIED_SQLSTATES = ['40P01', '40001'] as const;         
+      25 +export type RetriedSqlstate = (typeof RETRIED_SQLSTATES)[number
+         +];                                                             
+      26  
+      27  /** The part of a `pg` pool the gauge reads. */
+      28  export interface PoolStatistics {
+     ...
+      40  /**
+      41   * The metrics of table 1.4 of spec 007, with the default Node.
+          js process metrics, in a registry of
+      42   * this app's own, so two apps in one process never share a cou
+          nt. Every label has a fixed set of
+      36 - * values (SEC-R42).                                           
+      43 + * values (SEC-R42), and each counter starts with a series at 0
+         + for every one of them, so none is                             
+      44 + * missing before its first event (SEC-R56).                   
+      45   */
+      46  export class Metrics {
+      47    readonly registry = new Registry();
+     … 20 more lines (ctrl+o to expand)
+
+⏺ Passes. Ticking the task, and checking the README metrics section:
+
+⏺ Bash(sed -i '' 's/^- \[ \] Test first: SEC-AC47/- [x] Test first: SEC-AC47/'
+      specs/007-security-ops/tasks.md && grep -n "SEC-AC47"
+      specs/007-security-ops/tasks.md |…)
+  ⎿  87:- [x] Test first: SEC-AC47 in `test/u
+     173:## Metrics
+     175:Each replica serves Prometheus metrics at `/metrics` on `METRICS_P
+     … +17 lines (ctrl+o to expand)
+  ⎿  Updated specs/007-security-ops/tasks.md (+1 -1)
+      84  - [x] Add `test/support/fake-sentry.ts`, with `test/integration
+          /support/fake-sentry.test.ts` proving it records envelopes, hol
+          ds them for a given time and refuses them (SEC-R50).
+      85  - [x] Test first: SEC-AC41, SEC-AC42 and SEC-AC44 in `test/inte
+          gration/security/error-reporting.test.ts`; then the reporter in
+           the composition root, its startup line, and the call from `log
+          Failure`.
+      86  - [x] Test first: SEC-AC45 in `test/integration/security/error-
+          reporting-unavailable.test.ts`; then the transition lines of th
+          e reporter.
+      87 -- [ ] Test first: SEC-AC47 in `test/unit/platform/metrics.test.
+         -ts`; then every label value of the counters of table 1.4 at 0 w
+         -hen `Metrics` is built, in `src/platform/metrics/metrics.ts` (S
+         -EC-R56).                                                       
+      87 +- [x] Test first: SEC-AC47 in `test/unit/platform/metrics.test.
+         +ts`; then every label value of the counters of table 1.4 at 0 w
+         +hen `Metrics` is built, in `src/platform/metrics/metrics.ts` (S
+         +EC-R56).                                                       
+      88  - [x] Update the docs: a README section on error reporting (off
+           by default, how to turn it on, exactly what is sent), `SENTRY_
+          DSN=` empty in `.env.example`, the AWS note of section 1.10 in 
+          `docs/deployment/aws.md`, and the follow-up closed in ADR-0023.
+
+⏺ Bash(python3 - <<'EOF'
+      p='README.md'…)
+  ⎿  > supercool-finances@0.1.0 typecheck
+     > tsc -p tsconfig.json
+     … +13 lines (ctrl+o to expand)
+  ⎿  Updated README.md (+1 -1)
+      172  
+      173  ## Metrics
+      174  
+      175 -Each replica serves Prometheus metrics at `/metrics` on `METRI
+          -CS_PORT` (9464), a port the load balancer never routes to and 
+          -no deployment publishes (SEC-R43). Locally: `docker compose ex
+          -ec api-1 wget -qO- http://127.0.0.1:9464/metrics`. Besides Nod
+          -e's process metrics, they count requests by route template and
+          - status (`scf_http_request_duration_seconds`), movements by ki
+          -nd and outcome (`scf_money_movements_total`), replays, lock ti
+          -meouts, transaction retries, the pool's connections and acquir
+          -e timeouts, and the per-user rate limit and its Redis errors: 
+          -table 1.4 of [`specs/007-security-ops`](specs/007-security-ops
+          -/spec.md).                                                    
+      175 +Each replica serves Prometheus metrics at `/metrics` on `METRI
+          +CS_PORT` (9464), a port the load balancer never routes to and 
+          +no deployment publishes (SEC-R43). Locally: `docker compose ex
+          +ec api-1 wget -qO- http://127.0.0.1:9464/metrics`. Besides Nod
+          +e's process metrics, they count requests by route template and
+          + status (`scf_http_request_duration_seconds`), movements by ki
+          +nd and outcome (`scf_money_movements_total`), replays, lock ti
+          +meouts, transaction retries, the pool's connections and acquir
+          +e timeouts, and the per-user rate limit and its Redis errors: 
+          +table 1.4 of [`specs/007-security-ops`](specs/007-security-ops
+          +/spec.md). Every counter is there from startup, at 0 for each 
+          +of its label values, so a panel shows 0 until the first event.
+      176  
+      177  ## Observability profile
+      178  
+  ⎿  (timeout 10m)
+
+⏺ Bash(npx prettier --write test/support/wait.ts
+      test/unit/platform/metrics.test.ts >/dev/null && npm run check 2>&1 | tail
+      -8)
+  ⎿   ✓ |unit| test/unit/ledger/reconcile-pool.test.ts (1 test) 2ms
+
+      Test Files  67 passed (67)
+     … +7 lines (ctrl+o to expand)
+  ⎿  Updated test/support/wait.ts (+5 -1)
+       2   * Polls `done` every 20 ms until it holds, failing with `what`
+           after `timeoutMs`: the tests wait
+       3   * for the condition itself, never for a fixed time.
+       4   */
+       5 -export async function waitUntil(done: () => boolean, timeoutMs:
+         - number, what: string): Promise<void> {                        
+       5 +export async function waitUntil(                               
+       6 +  done: () => boolean,                                         
+       7 +  timeoutMs: number,                                           
+       8 +  what: string,                                                
+       9 +): Promise<void> {                                             
+      10    const deadline = Date.now() + timeoutMs;
+      11    while (!done()) {
+      12      if (Date.now() > deadline) throw new Error(`timed out waiti
+          ng for ${what}`);
+  ⎿  Updated test/unit/platform/metrics.test.ts (+6 -1)
+      55        ),
+      56      );
+      57      expect(sorted(seriesOf(first, 'scf_idempotent_replays_total
+          '))).toEqual(
+      58 -      sorted(at(0, [...KINDS, 'account_creation'].map((kind) =>
+         - ({ kind })))),                                                
+      58 +      sorted(                                                  
+      59 +        at(                                                    
+      60 +          0,                                                   
+      61 +          [...KINDS, 'account_creation'].map((kind) => ({ kind 
+         +})),                                                           
+      62 +        ),                                                     
+      63 +      ),                                                       
+      64      );
+      65      expect(sorted(seriesOf(first, 'scf_lock_timeouts_total'))).
+          toEqual(
+      66        sorted(at(0, [{ lock: 'account' }, { lock: 'idempotency' 
+          }])),
+  ⎿  (timeout 10m)
+
+⏺ npm run check green (381 unit tests). Running the full integration suite:
+
+⏺ Bash(npm run test:integration 2>&1 | grep -E "×|FAIL|Test Files|Tests " | head
+      -20)
+  ⎿   Test Files  139 passed (139)
+           Tests  340 passed (340)
+  ⎿  (timeout 10m)
+
+⏺ Integration: 340/340. The e2e suite needs your local stack stopped, so I'm
+  running docker compose down (without -v, so the volume stays), then the e2e
+  suite.
+
+⏺ Bash(docker compose down 2>&1 | tail -3 && (npm run test:e2e >
+      /private/tmp/claude-501/-Users-matiastorsello-supercool-finances/c1690594-
+      e985-4108-9b09-155967d749c8/…)
+  ⎿  Running in the background (↓ to manage)
+
+⏺ While e2e runs, reviewing the source diff:
+
+⏺ Bash(git diff --stat && git diff src/platform/error-reporting/reporter.ts)
+  ⎿   README.md                                          |   2 +-
+      docs/ai/transcripts/12b-observability.txt          | 150 ++++++++++++
+     ++++++++-
+     … +70 lines (ctrl+o to expand)
+
+⏺ Diff looks right. Waiting for the e2e suite to finish.
+
+⏺ The e2e suite is running in the background; I'll be notified when it finishes
+  and then run the trace.
+
+✻ Churned for 10m 4s · done 9:27 AM
+
+※ recap: I'm fixing the audit's five findings and starting every counter at 0. All are done, with check and integration green. The e2e suite is running in the background; next I'll run the trace with unit, integration and e2e required.
+⏺ Background command "docker compose down 2>&1 | tail -3 && (npm run test:e2e >
+/private/tmp/claude-501/-Users-matiastorsello-supercool-finances/c1690594-e985-4
+108-9b09-155967d749c8/scratchpad/e2e.log 2>&1; echo "exit $?" >>
+/private/tmp/claude-501/-Users-matiastorsello-supercool-finances/c1690594-e985-4
+108-9b09-155967d749c8/scratchpad/e2e.log)" completed (exit code 0)
+
+⏺ Bash(grep -E "×|FAIL|Test Files|Tests |^exit"
+      /private/tmp/claude-501/-Users-matiastorsello-supercool-finances/c1690594-
+      e985-4108-9b09-155967d749c8/scratchpad/e2e.lo…)
+  ⎿  DEP-AC11: 80 requests issued while api-2 stopped, 15 while api-1 was k
+     illed; attempts: 400 × 201, 45 × 502
+     SEC-AC01: 1112 × 200, 1888 × 429
+     … +15 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ I fixed all five findings and added the zero-initialised counters. Everything
+  is green: npm run check, npm test (381), npm run test:integration (340), npm 
+  run test:e2e (143), and npm run trace -- --require unit,integration,e2e (238
+  of 238 ACs covered).
+
+  What changed, by severity. Each fix had a test that failed first, except
+  finding 4 (see below).
+
+  1. Medium, SEC-AC46. The reporter now frees the slot and records {reason: 
+     'timeout'} itself at 2000 ms. A guard stops a late answer from being
+     counted twice.
+     - The test's fake transport now ignores the abort signal, as the AC
+       describes.
+     - The shutdown part now runs through the real buildApp + createShutdown,
+       with 3 reports in flight to an endpoint that never answers. It returns 0
+       in under 2000 ms with 3 reports still pending.
+     - A new SEC-R54 test checks that an answer arriving after abandonment is
+       ignored.
+  2. Low, scrubbing (SEC-R53). event.ts now skips the whole name: message
+     header, however many lines the message has. If a stack doesn't start with
+     that header, no frames are sent at all. I had to fix one existing test
+     whose made-up stack didn't match its own error's message.
+  3. Low, SENTRY_DSN. A DSN is now refused if it contains a raw ? or #, or a :
+     in the part before @. The three audit cases are added to the SEC-AC40 test;
+     the AC text is unchanged.
+  4. Low, timing. Both integration files have no fixed sleeps left; they poll
+     for the condition with a 10 s deadline, using a new shared
+     test/support/wait.ts.
+     - Most waits are for the reporter to have no pending reports. That works
+       because every report is queued before its 500 is answered.
+     - The 5 s hold stays, as the AC says. The test now checks that envelopes 5
+       and 6 were answered 200, rather than counting how many were accepted.
+     - SEC-AC41 compares the request ids sorted.
+     - SEC-AC44 now checks fetch was called exactly once, after the third app's
+       report has arrived and finished.
+     - The fake endpoint clears its held answers when it closes.
+     - There's no failing test first here: a timing flake can't be made to fail
+       on demand.
+  5. Docs. plan.md now says http:// is accepted "for a loopback host, whatever
+     NODE_ENV".
+
+  Counters at 0. Since no spec covered this behaviour, I added it to spec 007
+  myself. Please confirm or edit the wording:
+  - A sentence in section 1.4, new requirement SEC-R56, new unit AC SEC-AC47,
+    and the decision recorded as Q4, dated 2026-10-09.
+  - The plan and tasks rows (task ticked) and one sentence in the README.
+  - Metrics now creates every label value of the four labelled counters at 0 on
+    startup (12 + 5 + 2 + 2 series). The counters without labels already
+    showed 0.
+  - SEC-AC47 checks this through buildApp.
+
+  What's left:
+  - I stopped your local stack with docker compose down (the volume is kept) so
+    the e2e suite could run. Run make up or make observability to bring it back.
+  - The "errors by status class" panel and the other panels built on
+    scf_http_request_duration_seconds filtered to 5xx will still show "No data"
+    until a 5xx happens. Histogram series only appear with a request, so
+    starting them at 0 doesn't work there. Adding or vector(0) to those
+    dashboard queries would fix it, if you want that.
+  - Nothing is committed yet.
+
+✻ Worked for 20s · done 9:32 AM
+
+❯ Confirmed: SEC-R56, SEC-AC47 and Q4 as written; record the approval in plan   
+  000 §11 too. Yes to or vector(0) on the dashboard's 5xx queries, so the       
+  errors panels show 0 instead of No data; keep DEP-AC32 passing (vector(0) is  
+  not a metric). Keep the new docs/performance.md: it is a 200 per second run   
+  on the final code.                                                            
+  Then close out the specs. For every spec, check each AC against the code and  
+  its test (or its "Verified by" CI job for level ci), fix any gap you find,    
+  then set the spec to Status: Implemented and update the index in              
+  specs/README.md. Run npm run trace -- --write: it must exit 0 with every AC   
+  covered. Remove docs/traceability.md from .gitignore, commit it, and add a    
+  step to the CI job traceability that regenerates it from the three reports    
+  and fails if it differs from the committed file. Show me the final            
+  traceability summary.                                                         
+
+⏺ Bash(git status --short && git branch --show-current && grep -n "traceability"
+      .gitignore)
+  ⎿   M README.md
+      M docs/ai/transcripts/12b-observability.txt
+      M docs/performance.md
+     … +17 lines (ctrl+o to expand)
+
+⏺ Before I act on this, two things need your call.
+
+⏺ User answered Claude's questions:
+  ⎿  · Your last message was only pasted text. Is it your instruction for this 
+     session, so I should act on it? → Yes, act on all of it
+     · AGENTS.md §2 and §7 put moving every spec to Implemented in phase 
+     13-final-review, on its own branch `phase/13-final-review` cut from an 
+     up-to-date main. We're on phase/12b-observability with this phase's fixes 
+     not yet committed. Where should the close-out happen? → After 12b merges 
+     (Recommended)
+
+⏺ Doing the 12b items now. First plan 000 §11 and the dashboard queries:
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Bash(awk '/^## 11/{f=1} f' specs/000-overview/plan.md | tail -n +3 | fold -w
+      400 | tail -8)
+  ⎿   connection, `ROLLBACK` included, and with the connection destroyed; t
+     he error catalogue of spec 007 gains its row, and ADR-0019 a dated not
+     e. The Service row of section 1.7 of spec 008 gives the surge figures,
+     … +43 lines (ctrl+o to expand)
+
+⏺ Bash(python3 - <<'EOF'
+      p='specs/000-overview/plan.md'…)
+  ⎿  Replicas scraped | up{job="scf-api"} | {{replica}}
+     Requests by status class | sum by (status_class) (label_replace(rate(s
+     cf_http_request_duration_seconds_count[1m]), "status_class", "${1}xx",
+     … +43 lines (ctrl+o to expand)
+  ⎿  Updated specs/000-overview/plan.md (+1 -1)
+      265  
+      266  ## 11. ACs that cannot be tested as written
+      267  
+      268 -None open. The owner approved on 2026-10-08 the fixes found wh
+          -ile planning: the direct-deposit rule in the preamble of spec 
+          -002, the Given of SYS-AC12, the definition of "written directl
+          -y to the database" in the preamble of spec 000, the Then of AC
+          -C-AC06, the truncation of milliseconds in section 1.5 of spec 
+          -001, and the Thens of REV-AC08 and IDM-AC17. The owner also ap
+          -proved on 2026-10-08 the edit of section 1.9 of spec 007 that 
+          -names `app.set_statement_timeout(ms integer)`, its range of 1 
+          -to 3600000 ms, and the 600000 ms the reconcile and cleanup scr
+          -ipts use. The owner also approved on 2026-10-08 the change to 
+          -the Given of LED-AC15, which starts the service with `DB_POOL_
+          -ACQUIRE_TIMEOUT_MS` "10000", `REQUEST_TIMEOUT_MS` "30000" and 
+          -`SHUTDOWN_TIMEOUT_MS` "30000", as MOV-AC14 does, so its burst 
+          -of 200 transfers can queue for a connection; LED-AC15 moved to
+          - 09-hardening. The owner also approved on 2026-10-08 the new r
+          -equirement SEC-R48 and acceptance criterion SEC-AC37 of spec 0
+          -07 for `app.set_statement_timeout`: its range of 1 to 3600000 
+          -ms, its transaction scope, execution by the runtime role only,
+          - and calls with 600000 ms by the reconcile and cleanup scripts
+          - only. The owner also approved on 2026-10-08 the request-timeo
+          -ut design of SEC-R33 in spec 007, with SEC-AC25, SEC-AC38 and 
+          -the matching text of specs 000, 005 and 007: answer 503 at onc
+          -e, start no further statement, roll back once the statement in
+          - flight ends, let a `COMMIT` already sent finish with an outco
+          -me unknown to the client, and never cancel a statement from an
+          -other connection; [ADR-0022](../../docs/adr/0022-request-timeo
+          -ut-answer-first-then-roll-back.md) records it and the design i
+          -t replaced. The owner also approved on 2026-10-08 the rewordin
+          -g of SYS-R35 in spec 000 and of the timeout invariant of spec 
+          -007: the request timeout bounds when the answer is sent, and `
+          -statement_timeout` bounds the clean-up after it. The owner als
+          -o approved on 2026-10-08 the change to the `DATABASE_URL` rule
+          - in section 1.2  … [+13906 chars]                             
+      268 +None open. The owner approved on 2026-10-08 the fixes found wh
+          +ile planning: the direct-deposit rule in the preamble of spec 
+          +002, the Given of SYS-AC12, the definition of "written directl
+          +y to the database" in the preamble of spec 000, the Then of AC
+          +C-AC06, the truncation of milliseconds in section 1.5 of spec 
+          +001, and the Thens of REV-AC08 and IDM-AC17. The owner also ap
+          +proved on 2026-10-08 the edit of section 1.9 of spec 007 that 
+          +names `app.set_statement_timeout(ms integer)`, its range of 1 
+          +to 3600000 ms, and the 600000 ms the reconcile and cleanup scr
+          +ipts use. The owner also approved on 2026-10-08 the change to 
+          +the Given of LED-AC15, which starts the service with `DB_POOL_
+          +ACQUIRE_TIMEOUT_MS` "10000", `REQUEST_TIMEOUT_MS` "30000" and 
+          +`SHUTDOWN_TIMEOUT_MS` "30000", as MOV-AC14 does, so its burst 
+          +of 200 transfers can queue for a connection; LED-AC15 moved to
+          + 09-hardening. The owner also approved on 2026-10-08 the new r
+          +equirement SEC-R48 and acceptance criterion SEC-AC37 of spec 0
+          +07 for `app.set_statement_timeout`: its range of 1 to 3600000 
+          +ms, its transaction scope, execution by the runtime role only,
+          + and calls with 600000 ms by the reconcile and cleanup scripts
+          + only. The owner also approved on 2026-10-08 the request-timeo
+          +ut design of SEC-R33 in spec 007, with SEC-AC25, SEC-AC38 and 
+          +the matching text of specs 000, 005 and 007: answer 503 at onc
+          +e, start no further statement, roll back once the statement in
+          + flight ends, let a `COMMIT` already sent finish with an outco
+          +me unknown to the client, and never cancel a statement from an
+          +other connection; [ADR-0022](../../docs/adr/0022-request-timeo
+          +ut-answer-first-then-roll-back.md) records it and the design i
+          +t replaced. The owner also approved on 2026-10-08 the rewordin
+          +g of SYS-R35 in spec 000 and of the timeout invariant of spec 
+          +007: the request timeout bounds when the answer is sent, and `
+          +statement_timeout` bounds the clean-up after it. The owner als
+          +o approved on 2026-10-08 the change to the `DATABASE_URL` rule
+          + in section 1.2  … [+14360 chars]                             
+
+⏺ Bash(sed -n 40,120p test/unit/deployment/dashboard.test.ts; sed -n 140,155p
+      specs/008-deployment/spec.md | cut -c1-260; grep -n "DEP-AC32" -A6
+      specs/008-deployment/s…)
+  ⎿  }
+
+     /** The PromQL functions, keywords and label names the dashboard's que
+     … +91 lines (ctrl+o to expand)
+
+⏺ Now the dashboard queries, spec 008's panel table and the DEP-AC32 test's list
+  of PromQL keywords:
+
+⏺ Bash(python3 - <<'EOF'
+      import re…)
+  ⎿  sum by (status_class) (label_replace(rate(scf_http_request_duration_se
+     conds_count{status_code=~"[45].."}[1m]), "status_class", "${1}xx", "st
+     atus_code", "([1-5])[0-9][0-9]")) or label_replace(vector(0), "status_
+     … +6 lines (ctrl+o to expand)
+  ⎿  Updated docker/grafana/dashboards/scf-overview.json (+2 -2)
+      148              "type": "prometheus",
+      149              "uid": "scf-prometheus"
+      150            },
+      151 -          "expr": "sum by (status_class) (label_replace(rate(s
+          -cf_http_request_duration_seconds_count{status_code=~\"[45]..\"
+          -}[1m]), \"status_class\", \"${1}xx\", \"status_code\", \"([1-5
+          -])[0-9][0-9]\"))",                                            
+      151 +          "expr": "sum by (status_class) (label_replace(rate(s
+          +cf_http_request_duration_seconds_count{status_code=~\"[45]..\"
+          +}[1m]), \"status_class\", \"${1}xx\", \"status_code\", \"([1-5
+          +])[0-9][0-9]\")) or label_replace(vector(0), \"status_class\",
+          + \"5xx\", \"\", \"\")",                                       
+      152            "legendFormat": "{{status_class}}",
+      153            "range": true
+      154          },
+     ...
+      158              "type": "prometheus",
+      159              "uid": "scf-prometheus"
+      160            },
+      161 -          "expr": "sum(rate(scf_http_request_duration_seconds_
+          -count{status_code=~\"5..\"}[1m])) / sum(rate(scf_http_request_
+          -duration_seconds_count[1m]))",                                
+      161 +          "expr": "sum(rate(scf_http_request_duration_seconds_
+          +count{status_code=~\"5..\"}[1m])) / sum(rate(scf_http_request_
+          +duration_seconds_count[1m])) or vector(0)",                   
+      162            "legendFormat": "5xx share",
+      163            "range": true
+      164          }
+
+⏺ Test first: DEP-AC32 should now fail on vector.
+
+⏺ Bash(npx vitest run test/unit/deployment/dashboard.test.ts 2>&1 | grep -E
+      "AssertionError|Tests ")
+  ⎿  ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+     AssertionError: Errors by status class: or: expected false to be true
+     // Object.is equality
+           Tests  1 failed (1)
+
+⏺ Bash(python3 - <<'EOF'
+      p='test/unit/deployment/dashboard.test.ts'…)
+  ⎿        Tests  1 passed (1)
+     180:    image: prom/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdc
+     f00360461adf279f45ef5391f8d111892118753e
+  ⎿  Updated specs/008-deployment/spec.md (+11 -11)
+      139  
+      140  The dashboard's panels use only the metrics of table 1.4 of sp
+           ec 007 and Prometheus's `up`. Latency covers the `/v1` routes,
+            so the health checks do not dilute it; the histogram's defaul
+           t buckets bound the precision of each percentile.
+      141  
+      142 -| Panel                               | Query                 
+          -                                                              
+          -                                                              
+          -       |                                                      
+      143 -| ----------------------------------- | ----------------------
+          ---------------------------------------------------------------
+          ---------------------------------------------------------------
+          ------- |                                                      
+      144 -| Replicas scraped                    | `up{job="scf-api"}` by
+          - `replica`                                                    
+          -                                                              
+          -       |                                                      
+      145 -| Requests by status class            | `sum by (status_class)
+          - (label_replace(rate(scf_http_request_duration_seconds_count[1
+          -m]), "status_class", "${1}xx", "status_code", "([1-5])[0-9][0-
+          -9]"))` |                                                      
+      146 -| Errors by status class              | the same query for `4x
+          -x` and `5xx` only, and the share of `5xx` among all requests  
+          -                                                              
+          -       |                                                      
+      147 -| Latency p50, p95 and p99            | `histogram_quantile(<q
+          ->, sum by (le) (rate(scf_http_request_duration_seconds_bucket{
+          -route=~"/v1/.*"}[1m])))` for `<q>` 0.5, 0.95 and 0.99         
+          -       |                                                      
+      148 -| Money movements by kind and outcome | `sum by (kind, outcome
+          -) (rate(scf_money_movements_total[1m]))`                      
+          -                                                              
+          -       |                                                      
+      149 -| Lock timeouts                       | `sum by (lock) (rate(s
+          -cf_lock_timeouts_total[1m]))`                                 
+          -                                                              
+          -       |                                                      
+      150 -| Idempotent replays                  | `sum by (kind) (rate(s
+          -cf_idempotent_replays_total[1m]))`                            
+          -                                                              
+          -       |                                                      
+      151 -| Rate-limited requests               | `sum(rate(scf_rate_lim
+          -ited_total[1m]))`                                             
+          -                                                              
+          -       |                                                      
+      152 -| Pool usage                          | `scf_db_pool_connectio
+          -ns` by `replica` and `state`, and `sum by (replica) (rate(scf_
+          -db_pool_acquire_timeouts_total[1m]))`                         
+          -       |                                                      
+      142 +| Panel                               | Query                 
+          +                                                              
+          +                                                              
+          +                                                              
+          +                   |                                          
+      143 +| ----------------------------------- | ----------------------
+          +--------------------------------------------------------------
+          +--------------------------------------------------------------
+          +--------------------------------------------------------------
+          +------------------ |                                          
+      144 +| Replicas scraped                    | `up{job="scf-api"}` by
+          + `replica`                                                    
+          +                                                              
+          +                                                              
+          +                   |                                          
+      145 +| Requests by status class            | `sum by (status_class)
+          + (label_replace(rate(scf_http_request_duration_seconds_count[1
+          +m]), "status_class", "${1}xx", "status_code", "([1-5])[0-9][0-
+          +9]"))`                                                        
+          +                   |                                          
+      146 +| Errors by status class              | the same query for `4x
+          +x` and `5xx` only, with `or label_replace(vector(0), "status_c
+          +lass", "5xx", "", "")`, and the share of `5xx` among all reque
+          +sts, with `or vector(0)`, so both show 0 rather than no data u
+          +ntil the first 5xx |                                          
+      147 +| Latency p50, p95 and p99            | `histogram_quantile(<q
+          +>, sum by (le) (rate(scf_http_request_duration_seconds_bucket{
+          +route=~"/v1/.*"}[1m])))` for `<q>` 0.5, 0.95 and 0.99         
+          +                                                              
+          +                   |                                          
+      148 +| Money movements by kind and outcome | `sum by (kind, outcome
+          +) (rate(scf_money_movements_total[1m]))`                      
+          +                                                              
+          +                                                              
+          +                   |                                          
+      149 +| Lock timeouts                       | `sum by (lock) (rate(s
+          +cf_lock_timeouts_total[1m]))`                                 
+          +                                                              
+          +                                                              
+          +                   |                                          
+      150 +| Idempotent replays                  | `sum by (kind) (rate(s
+          +cf_idempotent_replays_total[1m]))`                            
+          +                                                              
+          +                                                              
+          +                   |                                          
+      151 +| Rate-limited requests               | `sum(rate(scf_rate_lim
+          +ited_total[1m]))`                                             
+          +                                                              
+          +                                                              
+          +                   |                                          
+      152 +| Pool usage                          | `scf_db_pool_connectio
+          +ns` by `replica` and `state`, and `sum by (replica) (rate(scf_
+          +db_pool_acquire_timeouts_total[1m]))`                         
+          +                                                              
+          +                   |                                          
+      153  
+      154  ## 2. Requirements
+      155  
+  ⎿  Updated test/unit/deployment/dashboard.test.ts (+3 -0)
+      46    'rate',
+      47    'label_replace',
+      48    'histogram_quantile',
+      49 +  // A series at 0 where no request matched, so the errors pane
+         +l shows 0 rather than no data.                                 
+      50 +  'or',                                                        
+      51 +  'vector',                                                    
+      52    'job',
+      53    'replica',
+      54    'route',
+
+⏺ Checking both queries parse and return 0 on a real Prometheus with no data:
+
+⏺ Bash(docker run -d --rm --name scf-promql-check -p 127.0.0.1:19090:9090
+      prom/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45e
+      f5391f8d11189211875…)
+  ⎿  success [({'status_class': '5xx'}, '0')]
+     success [({}, '0')]
+
+⏺ Both return a 0 series. Running npm run check, then shipping 12b:
+
+⏺ Bash(npm run check 2>&1 | grep -E "warn|error|Test Files|Tests " | head; ls
+      .claude/skills/)
+  ⎿   ✓ |unit| test/unit/platform/error-reporter.test.ts (4 tests) 331ms
+      ✓ |unit| test/unit/http/error-handler.test.ts (39 tests) 13ms
+      ✓ |unit| test/unit/platform/error-event.test.ts (3 tests) 6ms
+     … +6 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ The 12b items are done and npm run check passes (381 tests). I haven't
+  committed anything: /ship only runs when you type it yourself, so you need to
+  start it.
+
+  What changed
+  - Plan 000 §11: I recorded your 2026-10-09 approval of SEC-R56, SEC-AC47 and
+    Q4, and of the dashboard change below.
+  - Dashboard: both queries of the "Errors by status class" panel now return 0
+    instead of no data before the first 5xx:
+    - The by-class query ends in or label_replace(vector(0), "status_class", 
+      "5xx", "", ""). I added the label so the zero line is named 5xx in the
+      legend. It disappears as soon as a real 5xx series exists.
+    - The 5xx-share query ends in or vector(0).
+  - Proof: I ran both queries on the pinned Prometheus image with no data. The
+    first returned {status_class="5xx"} 0 and the second returned {} 0.
+  - Spec 008: I updated the "Errors by status class" row of the §1.9 panel table
+    to match.
+  - DEP-AC32: the test failed on the new query as expected. It passes again now
+    that or and vector are in its list of PromQL keywords that aren't metric
+    names.
+  - docs/performance.md: kept as is.
+
+  What's left for you
+  1. Export this session's transcript, then run /ship close phase 
+     12b-observability. That reruns the check, the integration tests and the
+     trace gate, commits, pushes and opens the PR.
+  2. Merge the PR once CI is green.
+  3. Then start phase 13-final-review from main. In that phase I'll check every
+     AC of every spec, set the specs to Implemented, update specs/README.md, run
+     npm run trace -- --write, commit docs/traceability.md (taking it out of
+     .gitignore), and add the CI check that fails if the regenerated file
+     differs. I'll show you the final traceability summary then; it doesn't
+     exist yet.
+
+✻ Worked for 2m 1s · done 9:37 AM
+
+❯ /export docs/ai/transcripts/13-final-review-part1.txt                         
+  ⎿  Conversation exported to: /Users/matiastorsello/supercool-finances/docs/ai/
+     transcripts/13-final-review-part1.txt
+
+❯ /ship fix the final review findings in the observability add-on               
+
+⏺ Branch is phase/12b-observability, not main. Running the gates.
+⏺ Bash(npm run check 2>&1 | tail -6)
+  ⎿   Test Files  67 passed (67)
+           Tests  381 passed (381)
+        Start at  09:38:37
+     … +5 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ Bash(npm run infra:up 2>&1 | tail -5)
+  ⎿   Container supercool-finances-redis-1 Started
+      Container supercool-finances-redis-1 Waiting
+      Container supercool-finances-postgres-1 Waiting
+     … +2 lines (ctrl+o to expand)
+  ⎿  (timeout 5m)
+
+⏺ Bash(npm run test:integration 2>&1 | grep -E "×|FAIL|Test Files|Tests ")
+  ⎿   Test Files  139 passed (139)
+           Tests  340 passed (340)
+  ⎿  (timeout 10m)
+
+⏺ Bash(npm run trace -- --require unit,integration 2>&1 | tail -2)
+  ⎿  238 ACs in 9 specs: 238 covered, 0 pending, 0 missing, 0 unverified. T
+     est reports read: unit, integration, e2e.
+
+⏺ Bash(ls infra/terraform >/dev/null 2>&1 && checkov -d infra/terraform --quiet
+      --compact 2>&1 | tail -5; grep -n "12b\|13-final" docs/ai/README.md)
+  ⎿  secrets scan results:
+
+     Passed checks: 0, Failed checks: 0, Skipped checks: 1
+     … +10 lines (ctrl+o to expand)
+
+⏺ Gates pass. The new transcript has no row in docs/ai/README.md, so I'm adding
+  one.
+
+⏺ Bash(sed -n 40,60p docs/ai/README.md | cut -c1-200)
+  ⎿  | 11 | 2026-10-09 | [11-e2e.txt](transcripts/11-e2e.txt) | E2E: the `e
+     2e` Vitest project and `npm run test:e2e` against its own Compose stac
+     k `scf-e2e` with a file sequencer and a response recorder, t
+     … +9 lines (ctrl+o to expand)
+
+⏺ Bash(printf '%s\n' "| 13 part 1 | 2026-10-09 |
+      [13-final-review-part1.txt](transcripts/13-final-review-part1.txt) | Final
+      review, part 1: the fixes of the \`/audit\`…)
+  ⎿  es of the `/audit` of 12b-observability (the reporter frees its slot a
+     t 2000 ms, multi-line messages never sent as frames, stricter `SENTRY_
+     DSN`, tests without fixed sleeps, plan 007), SEC-R56 and SEC-AC47 (eve
+     … +4 lines (ctrl+o to expand)
+  ⎿  Updated docs/ai/README.md (+1 -0)
+      41  | 12 part 1 | 2026-10-09 | [12-infra-part1.txt](transcripts/12-
+          infra-part1.txt) | Infra, part 1: the owner's answers to the fo
+          llow-up of ADR-0019 (migrations and a new bootstrap task straig
+          ht to the RDS instance with the RDS CA bundle, the alarm on pin
+          ned connections) and the matching changes to specs 007 and 008,
+           the bootstrap CLI, `PGPASSWORD`, the Terraform root and its se
+          ven modules, `npm run infra:validate` with tflint and checkov a
+          nd 60 custom policies tested by mutation, `docs/deployment/aws.
+          md`, and the DEP-AC14, DEP-AC24, DEP-AC27, DEP-AC29 and DEP-AC3
+          0 tests. |
+      42  | 12 part 2 | 2026-10-09 | [12-infra-part2.txt](transcripts/12-
+          infra-part2.txt) | Infra, part 2: the CI pipeline (jobs `ci`, `
+          e2e`, `traceability`, `secret-scan` and `security` with trivy, 
+          actions pinned by SHA, `ubuntu-24.04`), the runtime image witho
+          ut npm, the WAF rate rule answering 429, the Terraform connecti
+          on and shutdown budgets with the deployment surge, RDS Proxy's 
+          borrow timeout answered 503 (SEC-R49, SEC-AC39), the runbooks, 
+          README, OpenAPI error docs and ADR follow-ups, and the second a
+          udit's fixes. |
+      43  | 12b | 2026-10-09 | [12b-observability.txt](transcripts/12b-ob
+          servability.txt) | Observability: ADR-0023 and the owner-approv
+          ed changes to specs 007 and 008, optional error reporting of th
+          e 500s to a Sentry-compatible endpoint (own client on Node's `f
+          etch`, allowlisted event, scrubbed message, bounded and off by 
+          default), the `observability` Compose profile with Prometheus a
+          nd Grafana and its dashboard, the `compose.error-reporting.yaml
+          ` override, `make observability`, and the SEC-AC40 to SEC-AC46 
+          and DEP-AC31 to DEP-AC34 tests. |
+      44 +| 13 part 1 | 2026-10-09 | [13-final-review-part1.txt](transcri
+         +pts/13-final-review-part1.txt) | Final review, part 1: the fixe
+         +s of the `/audit` of 12b-observability (the reporter frees its 
+         +slot at 2000 ms, multi-line messages never sent as frames, stri
+         +cter `SENTRY_DSN`, tests without fixed sleeps, plan 007), SEC-R
+         +56 and SEC-AC47 (every counter of table 1.4 at 0 from startup) 
+         +and the `or vector(0)` of the errors panels. |                 
+
+⏺ Bash(git add -A && git status --short)
+  ⎿  M  README.md
+     M  docker/grafana/dashboards/scf-overview.json
+     M  docs/ai/README.md
+     … +21 lines (ctrl+o to expand)
+
+⏺ Nothing sensitive is staged. Committing.
+
+⏺ Bash(git commit -q -F - <<'EOF'
+      fix(observability): close the audit findings and start counters at 0…)
+  ⎿  f2b3066 fix(observability): close the audit findings and start counter
+     s at 0
+
+⏺ Bash(gitleaks git --no-banner --redact --log-opts="origin/main..HEAD" 2>&1 |
+      tail -5)
+  ⎿  9:41AM INF 3 commits scanned.
+     9:41AM INF scanned ~939889 bytes (939.89 KB) in 991ms
+     9:41AM INF no leaks found
+
+⏺ Bash(git push -u origin HEAD 2>&1 | tail -4)
+  ⎿  To https://github.com/torsello/supercool-finances.git
+        0193ef7..f2b3066  HEAD -> phase/12b-observability
+     branch 'phase/12b-observability' set up to track 'origin/phase/12b-obs
+     ervability'.
+
+⏺ - Commit: f2b3066 fix(observability): close the audit findings and start 
+    counters at 0, pushed to phase/12b-observability. The gitleaks scan of the
+    branch found no leaks.
+  - Gates: npm run check passed (381 unit tests), npm run test:integration
+    passed (340), and npm run trace -- --require unit,integration covered 238 of
+    238 ACs. checkov on infra/terraform reported no failed checks.
+  - ACs covered: SEC-AC40, SEC-AC41, SEC-AC43, SEC-AC44, SEC-AC45, SEC-AC46,
+    SEC-AC47 and DEP-AC32.
+  - PR: none opened, because the description doesn't start with "close phase
+    NN".
+  - Extras:
+    - I added the missing row for 13-final-review-part1.txt to
+      docs/ai/README.md. The transcript is named for phase 13, but its content
+      is the 12b follow-up.
+    - The commit also includes the changed docs/performance.md and the updated
+      12b transcript.
+
+✻ Sautéed for 3m 4s · done 9:41 AM

@@ -51,3 +51,14 @@ Tools CI runs outside `package.json`, each pinned by version and digest or check
 | Tool    | Purpose                                                                                                                                                                                                                                                                    | First used in |
 | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
 | `trivy` | The job `security` of `.github/workflows/ci.yml`: `trivy fs`, `trivy config` and `trivy image` of the runtime stage, failing on HIGH and CRITICAL, from the `aquasec/trivy` image pinned by version and digest. Approved by the owner on 2026-10-09 (plan 000 section 11). | 12-infra      |
+
+## Container images
+
+Images the repository runs besides those of table 1.1 of spec 008 (PostgreSQL, Redis, nginx and the Node base image), each pinned by version and digest (DEP-R22) and updated by Dependabot.
+
+| Image             | Purpose                                                                                                                                                                      | First used in     |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| `prom/prometheus` | Scrapes the replicas' metrics inside the compose network, in the Compose profile `observability` only (spec 008 section 1.9, ADR-0023). Approved by the owner on 2026-10-09. | 12b-observability |
+| `grafana/grafana` | The read-only dashboard over those metrics on `127.0.0.1:3030`, in the profile `observability` only (spec 008 section 1.9, ADR-0023). Approved by the owner on 2026-10-09.   | 12b-observability |
+
+Error reporting (spec 007 section 1.10) adds no package: the owner chose on 2026-10-09 the service's own envelope client on Node's `fetch` over `@sentry/node` (ADR-0023).

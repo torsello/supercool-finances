@@ -66,3 +66,12 @@ No task for this spec: `REPLICA_ID` and `MIGRATION_DATABASE_URL` are validated b
 - [x] Test first: DEP-AC24 in `test/unit/deployment/no-terraform-apply.test.ts`.
 - [x] Test first: DEP-AC14 in `test/unit/deployment/aws-doc.test.ts`; then `docs/deployment/aws.md`, with the bootstrap run, the two-pass apply and the refresh of the RDS CA bundle.
 - [x] Update the docs: in AGENTS.md, `npm run infra:validate` in the commands table, from 12-infra, and `infra/policies/`, `certs/` and `docs/deployment/` in the repository map; the README sections on running the stack, seeding, minting tokens with Docker only and the AWS architecture; a runbook `docs/runbooks/deploy-and-migrate.md`; and the follow-ups closed in ADR-0014, ADR-0015, ADR-0019 and ADR-0020.
+
+## 12b-observability
+
+- [x] Test first: DEP-AC31 in `test/unit/deployment/observability.test.ts`; then `prometheus` and `grafana` in `compose.yaml`, pinned by version and digest, `docker/prometheus/prometheus.yml`, `docker/grafana/provisioning/` and the `Makefile` target `observability`; and the DEP-R02 and DEP-R08 tests of `test/unit/deployment/compose.test.ts` updated to the two profile services and Grafana's port.
+- [x] Test first: DEP-AC34 in `test/unit/deployment/observability.test.ts`; then `compose.error-reporting.yaml`.
+- [x] Test first: DEP-AC32 in `test/unit/deployment/dashboard.test.ts`; then `docker/grafana/dashboards/scf-overview.json`.
+- [x] Add the profile's start and removal and port 3030 to `test/e2e/support/stack.ts`, with `test/e2e/stack-support.test.ts` proving them (DEP-R42); then test first: DEP-AC33 in `test/e2e/observability.test.ts`, in group 2 of the sequencer.
+- [x] Extend DEP-AC01 in `test/e2e/stack-start.test.ts`: `prometheus` and `grafana` were not started.
+- [x] Update the docs: a README section on the observability profile (command, URL, panels) and on the override `compose.error-reporting.yaml`, the profile's command in the commands table of AGENTS.md from 12b-observability and `docker/prometheus/` and `docker/grafana/` in its repository map, the two images in `docs/dependencies.md` marked approved, and the follow-up closed in ADR-0023.

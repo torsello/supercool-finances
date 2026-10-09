@@ -16,6 +16,7 @@ import {
   PROJECT,
   projectContainers,
   serviceStates,
+  stackHostPorts,
   startStack,
   SUBNET,
   SUBNET_PREFIX,
@@ -100,6 +101,25 @@ describe('the e2e stack harness (plan 008 section 5)', () => {
     });
     try {
       await expect(assertPortsFree()).rejects.toThrow(/port 3001 /);
+    } finally {
+      await new Promise<void>((resolve) =>
+        server.close(() => {
+          resolve();
+        }),
+      );
+    }
+    await expect(assertPortsFree()).resolves.toBeUndefined();
+  });
+
+  it('DEP-R42 checks that the observability profile can start too: refuses to start while Grafana’s port 3030 is taken', async () => {
+    expect(stackHostPorts()).toContain(3030);
+    const server: Server = createServer();
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(3030, '127.0.0.1', resolve);
+    });
+    try {
+      await expect(assertPortsFree()).rejects.toThrow(/port 3030 /);
     } finally {
       await new Promise<void>((resolve) =>
         server.close(() => {

@@ -1,0 +1,13 @@
+# The one datasource of the dashboard: the profile's Prometheus, not editable (DEP-R44).
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: scf-prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: 5s

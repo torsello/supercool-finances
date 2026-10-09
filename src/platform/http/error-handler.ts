@@ -29,6 +29,8 @@ import {
   StatementTimeout,
 } from '../db/errors.js';
 import { sqlstateOf } from '../db/sqlstate.js';
+// Declares `errorReporter` on the Fastify instance, which `logFailure` calls.
+import '../error-reporting/reporter.js';
 import {
   MalformedRequest,
   NotReady,
@@ -258,7 +260,8 @@ export async function handleError(
  * `reqId` (SYS-R22); a `LedgerWriteRejected` also names its constraint (LED-R28). A transient 503
  * is logged at `warn` with its cause and SQLSTATE, so a statement timeout (57014) is told apart
  * from the request timeout or an exhausted pool (SEC-R32, SEC-R33, SEC-R37). Every other answer
- * is not logged here.
+ * is not logged here. A 500 is also handed to the error reporter, when there is one (section 1.10
+ * of spec 007).
  */
 export function logFailure(request: FastifyRequest, error: unknown, problem: Problem): void {
   if (problem.type === '/problems/service-unavailable') {
@@ -279,5 +282,7 @@ export function logFailure(request: FastifyRequest, error: unknown, problem: Pro
         ? { err: error, sqlstate: error.sqlstate, constraint: error.constraint }
         : { err: error, ...(sqlstate === undefined ? {} : { sqlstate }) };
     request.log.error(fields, 'request failed');
+    // The one place every 500 passes, so each is reported exactly once (SEC-R50, SEC-R52).
+    request.server.errorReporter?.report(error, request);
   }
 }

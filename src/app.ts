@@ -80,7 +80,15 @@ import {
   ShutdownCoordinator,
   WorkTracker,
 } from './platform/lifecycle/shutdown.js';
-import { loggerOptions, replicaIdOf, type LogDestination } from './platform/logging/logger.js';
+import { parseSentryDsn } from './platform/error-reporting/dsn.js';
+import { applicationInfo, ErrorReporter } from './platform/error-reporting/reporter.js';
+import {
+  dsnSecrets,
+  loggerOptions,
+  replicaIdOf,
+  urlPasswords,
+  type LogDestination,
+} from './platform/logging/logger.js';
 import { Metrics, MetricsServer, registerRequestMetrics } from './platform/metrics/metrics.js';
 import {
   connectRedis,
@@ -166,6 +174,44 @@ export const KEEP_ALIVE_TIMEOUT_MS = 65_000;
 const API_PREFIX = '/v1';
 
 /**
+ * The error reporter of section 1.10 of spec 007 when `SENTRY_DSN` is set, and `undefined` when it
+ * is not (SEC-R51): then nothing is ever sent.
+ */
+function createErrorReporter(
+  config: Config,
+  log: { info(message: string): void; warn(fields: object, message: string): void },
+): ErrorReporter | undefined {
+  const dsn = config.sentryDsn === undefined ? undefined : parseSentryDsn(config.sentryDsn);
+  if (dsn === undefined) return undefined;
+  const { appRoot, release } = applicationInfo();
+  return new ErrorReporter({
+    dsn,
+    settings: {
+      environment: config.nodeEnv,
+      release,
+      replicaId: replicaIdOf(config.replicaId),
+      appRoot,
+      secrets: [
+        config.jwt.secret,
+        config.cursorSecret,
+        config.databasePassword ?? '',
+        ...urlPasswords(config.databaseUrl),
+        ...urlPasswords(config.redisUrl),
+        ...dsnSecrets(config.sentryDsn),
+      ],
+    },
+    logger: {
+      warn: (fields, message) => {
+        log.warn(fields, message);
+      },
+      info: (message) => {
+        log.info(message);
+      },
+    },
+  });
+}
+
+/**
  * The composition root (plan 000 section 2, ADR-0003): builds the app from a parsed configuration,
  * so an invalid one never builds an app, and wires the adapters. Every response carries the
  * security headers of spec 007 and, for configured origins only, CORS headers; bodies are limited
@@ -184,6 +230,7 @@ export function buildApp(config: Config, options: AppOptions = {}) {
         databaseUrl: config.databaseUrl,
         redisUrl: config.redisUrl,
         databasePassword: config.databasePassword,
+        sentryDsn: config.sentryDsn,
       },
       ...(options.logStream === undefined ? {} : { destination: options.logStream }),
     }),
@@ -198,6 +245,13 @@ export function buildApp(config: Config, options: AppOptions = {}) {
   }).withTypeProvider<ZodTypeProvider>();
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
+  const errorReporter = createErrorReporter(config, app.log);
+  app.decorate('errorReporter', errorReporter);
+  // Once the app is ready, so a build that fails still writes only its one startup line.
+  app.addHook('onReady', async () => {
+    if (errorReporter === undefined) app.log.info('error reporting is off');
+    await Promise.resolve();
+  });
   // First, so every request has its deadline and is tracked for the shutdown (SEC-R27, SEC-R33).
   const work = new WorkTracker();
   app.decorate('work', work);

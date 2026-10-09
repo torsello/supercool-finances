@@ -183,10 +183,23 @@ export async function containerOf(service: string): Promise<ContainerInspect> {
   return container;
 }
 
-/** Every host port the long-running services of `compose.yaml` publish. */
+/** The Compose profile of Prometheus and Grafana (section 1.9 of spec 008). */
+export const OBSERVABILITY_PROFILE = 'observability';
+
+/** The services of the observability profile, which `up` never starts (DEP-R42). */
+export const OBSERVABILITY = ['prometheus', 'grafana'] as const;
+
+/**
+ * Every host port the long-running services of `compose.yaml` publish, and those of the
+ * observability profile, Grafana's 3030, which DEP-AC33 starts on the same host (plan 008
+ * section 5).
+ */
 export function stackHostPorts(): number[] {
   return readCompose()
-    .services.filter((service) => service.profiles.length === 0)
+    .services.filter(
+      (service) =>
+        service.profiles.length === 0 || service.profiles.includes(OBSERVABILITY_PROFILE),
+    )
     .flatMap((service) => service.ports)
     .flatMap((port) => (port.hostPort === undefined ? [] : [Number(port.hostPort)]));
 }
@@ -296,15 +309,24 @@ export async function assertStackCanStart(): Promise<void> {
 }
 
 /**
- * Stops and removes the e2e stack with its volumes, the tools service included; `images` also
- * removes the images Compose built for it.
+ * Stops and removes the e2e stack with its volumes, the tools and observability services included;
+ * `images` also removes the images Compose built for it.
  */
 export async function downStack(
   options: ComposeOptions & { images?: boolean } = {},
 ): Promise<void> {
   const images = options.images === true ? ['--rmi', 'local'] : [];
   await composeOk(
-    ['--profile', 'tools', 'down', '--volumes', '--remove-orphans', ...images],
+    [
+      '--profile',
+      'tools',
+      '--profile',
+      OBSERVABILITY_PROFILE,
+      'down',
+      '--volumes',
+      '--remove-orphans',
+      ...images,
+    ],
     options,
   );
 }
@@ -335,6 +357,35 @@ export async function stackIsUp(): Promise<boolean> {
   return (nginx.Mounts ?? []).every((mount) =>
     mount.Source.startsWith(join(REPOSITORY_ROOT, 'docker')),
   );
+}
+
+/**
+ * Starts Prometheus and Grafana on the running stack, returning once both are healthy (DEP-AC33).
+ */
+export async function startObservability(): Promise<void> {
+  await composeOk([
+    '--profile',
+    OBSERVABILITY_PROFILE,
+    'up',
+    '--detach',
+    '--wait',
+    ...OBSERVABILITY,
+  ]);
+}
+
+/**
+ * Stops and removes Prometheus and Grafana, so no later e2e file, the load test included, runs
+ * beside them (Q3 of spec 008).
+ */
+export async function removeObservability(): Promise<void> {
+  await composeOk([
+    '--profile',
+    OBSERVABILITY_PROFILE,
+    'rm',
+    '--stop',
+    '--force',
+    ...OBSERVABILITY,
+  ]);
 }
 
 /** Starts the stack unless it already runs healthy from the working tree. */
