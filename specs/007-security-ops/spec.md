@@ -90,6 +90,8 @@ Served in the Prometheus text format at `/metrics` on `METRICS_PORT` (SYS-R30), 
 
 The default Node.js process metrics (memory, event loop lag, garbage collection) are also exposed.
 
+Each counter is exposed from startup with a series at 0 for every label value of the table, 4 × 3 for `scf_money_movements_total`, 5 for `scf_idempotent_replays_total` and 2 each for `scf_lock_timeouts_total` and `scf_transaction_retries_total`, and each counter without labels at 0, so a dashboard panel shows 0 rather than no data until the first event (SEC-R56). The histogram's series still appear with the first request of each method, route and status code, whose combinations are not fixed in advance.
+
 ### 1.5 Security headers
 
 Every response of the service carries these headers, set through helmet with its defaults and the values below:
@@ -218,6 +220,7 @@ In AWS the tasks have no outbound internet path (section 1.7 of spec 008), so th
 | SEC-R53 | THE SYSTEM SHALL put in an error report no request header, `Authorization` and `Idempotency-Key` included, no query string, no request or response body, no client address and no `detail`, `hint`, `where`, `position` or query text of a database error, and SHALL send the error's message only after scrubbing it as section 1.10 orders, so that no amount, account or transaction id, token or secret reaches the endpoint.                                                                                                                                                                                                                      |
 | SEC-R54 | IF a report is not sent within 2000 ms, the endpoint answers it with a status other than 2xx, the send fails, or 20 reports are already pending THEN THE SYSTEM SHALL drop that report, answer every request exactly as it would without error reporting, and write one `warn` line when sends start failing and one `info` line when a send succeeds again, neither naming the DSN (section 1.10).                                                                                                                                                                                                                                                    |
 | SEC-R55 | WHEN the process shuts down THE SYSTEM SHALL wait for no pending report, so that error reporting adds nothing to the deadlines of SEC-R25 to SEC-R28.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| SEC-R56 | THE SYSTEM SHALL expose each counter of table 1.4 from startup, with a series at 0 for every label value of the table that has not been counted yet, so that no counter is missing from `/metrics` before its first event (section 1.4).                                                                                                                                                                                                                                                                                                                                                                                                               |
 
 ## 3. Acceptance criteria
 
@@ -592,6 +595,14 @@ Unless stated otherwise: customer user C1 owns account A1 (EUR) and customer use
 - **When** 25 reports are queued at once and the injected clock advances to 1999 ms and then to 2000 ms; then 3 more reports are queued and SIGTERM is delivered with `SHUTDOWN_DRAIN_DELAY_MS` 0 and no request in flight
 - **Then** 20 sends are started and 5 reports are dropped without a send; at 1999 ms none of the 20 is abandoned; at 2000 ms all 20 are abandoned and dropped; the 3 later sends are started; and the coordinator closes the pool, the readiness connection and Redis and sets exit code 0 without waiting for them
 
+### SEC-AC47 · Every counter of table 1.4 is exposed at 0 from startup
+
+- **Level:** unit
+- **Covers:** SEC-R56, SEC-R41
+- **Given** an app built by the composition root that has served no request
+- **When** its metrics are read in the Prometheus text format; then one lock timeout at an account row lock is counted and the metrics are read again
+- **Then** the first read holds `scf_money_movements_total` at 0 for each of the 12 pairs of `kind` (`deposit`, `withdrawal`, `transfer`, `reversal`) and `outcome` (`applied`, `rejected`, `failed`), `scf_idempotent_replays_total` at 0 for each `kind` of `deposit`, `withdrawal`, `transfer`, `reversal` and `account_creation`, `scf_lock_timeouts_total` at 0 for `lock` `account` and `idempotency`, `scf_transaction_retries_total` at 0 for `sqlstate` `40P01` and `40001`, and `scf_transaction_retries_exhausted_total`, `scf_db_pool_acquire_timeouts_total`, `scf_rate_limited_total` and `scf_rate_limit_store_errors_total` at 0, with no other label value; and the second read holds `scf_lock_timeouts_total{lock="account"}` at 1 and `scf_lock_timeouts_total{lock="idempotency"}` at 0
+
 ## 4. Error catalogue
 
 Errors shared by every capability are in spec 000. This spec adds or fixes:
@@ -637,10 +648,11 @@ Errors shared by every capability are in spec 000. This spec adds or fixes:
 
 ## 7. Open questions
 
-Every question raised while writing this spec was decided by the owner on 2026-10-07 and is stated above as a rule. The questions below were raised by the optional error reporting of phase 12b-observability and decided by the owner on 2026-10-09.
+Every question raised while writing this spec was decided by the owner on 2026-10-07 and is stated above as a rule. The questions below were raised in phase 12b-observability, by the optional error reporting and the manual check of the dashboard, and decided by the owner on 2026-10-09.
 
-| #   | Question                                                                                                                                      | Answer                                                                             | Decided by        |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ----------------- |
-| Q1  | How does the service send reports: its own small client that writes Sentry envelopes with Node's `fetch`, or the official SDK `@sentry/node`? | Its own client on Node's `fetch`, with no new dependency (section 1.10, ADR-0023). | owner, 2026-10-09 |
-| Q2  | Is the error's message sent, scrubbed as section 1.10 orders, or only the error's type and stack?                                             | The scrubbed message (section 1.10, SEC-R53).                                      | owner, 2026-10-09 |
-| Q3  | Are errors outside a request, such as an uncaught exception that ends the process, reported too?                                              | No: only the requests answered 500 (SEC-R52).                                      | owner, 2026-10-09 |
+| #   | Question                                                                                                                                      | Answer                                                                                                                        | Decided by        |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| Q1  | How does the service send reports: its own small client that writes Sentry envelopes with Node's `fetch`, or the official SDK `@sentry/node`? | Its own client on Node's `fetch`, with no new dependency (section 1.10, ADR-0023).                                            | owner, 2026-10-09 |
+| Q2  | Is the error's message sent, scrubbed as section 1.10 orders, or only the error's type and stack?                                             | The scrubbed message (section 1.10, SEC-R53).                                                                                 | owner, 2026-10-09 |
+| Q3  | Are errors outside a request, such as an uncaught exception that ends the process, reported too?                                              | No: only the requests answered 500 (SEC-R52).                                                                                 | owner, 2026-10-09 |
+| Q4  | Does each counter show a series at 0 before its first event, so a Grafana panel shows 0 rather than "No data"?                                | Yes, for every label value of table 1.4; the histogram's series still appear with their first request (section 1.4, SEC-R56). | owner, 2026-10-09 |

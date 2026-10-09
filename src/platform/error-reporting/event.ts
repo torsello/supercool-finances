@@ -126,13 +126,26 @@ function filenameOf(location: string, appRoot: string): string {
 }
 
 /**
- * The frames of a V8 stack, oldest first as the Sentry format orders them, each with only its
- * function, file, line and column. The first line, which holds the message, is never read.
+ * The first lines of the error's V8 stack, which V8 writes as `Error.prototype.toString` does:
+ * the name and the message, which may span several lines.
  */
-function framesOf(stack: string | undefined, appRoot: string): StackFrame[] {
-  if (stack === undefined) return [];
+function stackHeaderOf(error: Error): string {
+  if (error.name === '') return error.message;
+  return error.message === '' ? error.name : `${error.name}: ${error.message}`;
+}
+
+/**
+ * The frames of a V8 stack, oldest first as the Sentry format orders them, each with only its
+ * function, file, line and column. The header, which holds the message on as many lines as it
+ * has, is never read; a stack that does not start with it, whose message cannot be told apart
+ * from its frames, gives no frames, so no line of a message is ever sent unscrubbed (SEC-R53).
+ */
+function framesOf(error: Error, appRoot: string): StackFrame[] {
+  const { stack } = error;
+  const header = stackHeaderOf(error);
+  if (stack === undefined || !(stack === header || stack.startsWith(`${header}\n`))) return [];
   const frames: StackFrame[] = [];
-  for (const line of stack.split('\n').slice(1)) {
+  for (const line of stack.slice(header.length).split('\n').slice(1)) {
     const match = FRAME.exec(line);
     if (match === null) continue;
     const [, name, location, lineno, colno] = match;
@@ -185,7 +198,7 @@ export function buildEvent(
           value: isError
             ? scrubMessage(error.message, [...settings.secrets, ...requestValues(request)])
             : '',
-          stacktrace: { frames: framesOf(isError ? error.stack : undefined, settings.appRoot) },
+          stacktrace: { frames: isError ? framesOf(error, settings.appRoot) : [] },
         },
       ],
     },

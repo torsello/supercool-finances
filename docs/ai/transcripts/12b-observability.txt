@@ -8028,3 +8028,151 @@ code 0)
   Grafana back.
 
 ✻ Cogitated for 3m 2s · done 9:03 AM
+
+❯ /export docs/ai/transcripts/12b-observability.txt                             
+  ⎿  Conversation exported to: /Users/matiastorsello/supercool-finances/docs/ai/
+     transcripts/12b-observability.txt
+
+❯ /ship 12b: optional dashboards and error reporting                            
+
+⏺ Bash(git branch --show-current)  ⎿  phase/12b-observability
+
+⏺ Bash(npm run check)
+  ⎿  > supercool-finances@0.1.0 check
+     > npm run typecheck && npm run lint && npm run format:check && npm run
+      test
+     … +98 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ Bash(npm run infra:up)
+  ⎿  > supercool-finances@0.1.0 infra:up
+     > docker compose up -d --wait postgres redis
+     … +6 lines (ctrl+o to expand)
+
+⏺ Bash(npm run test:integration)
+  ⎿  > supercool-finances@0.1.0 test:integration
+     > vitest run --project integration --reporter=default --reporter=json
+     --outputFile.json=reports/vitest-integration.json
+     … +245 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ Bash(npm run trace -- --require unit,integration)
+  ⎿  > supercool-finances@0.1.0 trace
+     > tsx scripts/trace.ts --require unit,integration
+     … +424 lines (ctrl+o to expand)
+
+⏺ Gates 1 to 3 pass (check, integration, trace). Step 4 of /ship says to run
+  checkov when infra/terraform exists, so I'm checking whether it's installed.
+
+⏺ Bash(checkov -d infra/terraform --quiet --compact)
+  ⎿  terraform scan results:
+
+     Passed checks: 334, Failed checks: 0, Skipped checks: 24
+     … +4 lines (ctrl+o to expand)
+  ⎿  (timeout 5m)
+
+⏺ Checkov is clean. Step 3: the transcript needs a row in docs/ai/README.md.
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Bash(cat >> docs/ai/README.md <<'EOF'
+      | 12b | 2026-10-09 |
+      [12b-observability.txt](transcripts/12b-observability.txt) |
+      Observability: ADR-0023 and the owner-approve…)
+  ⎿  t on Node's `fetch`, allowlisted event, scrubbed message, bounded and
+     off by default), the `observab
+  ⎿  Updated docs/ai/README.md (+1 -0)
+      40  | 11 | 2026-10-09 | [11-e2e.txt](transcripts/11-e2e.txt) | E2E:
+           the `e2e` Vitest project and `npm run test:e2e` against its ow
+          n Compose stack `scf-e2e` with a file sequencer and a response 
+          recorder, tests for every e2e AC (replicas, authorization matri
+          x on both replicas, edge, correlation id, rate limits, stack st
+          art, failed migration, seed, round robin, gateway errors, repli
+          ca loss, container), stress tests with no AC, the open-model lo
+          ad test `npm run load` with `docs/performance.md`, owner-approv
+          ed changes to DEP-AC10 and AUT-AC16, and an audit round with si
+          x fixes. |
+      41  | 12 part 1 | 2026-10-09 | [12-infra-part1.txt](transcripts/12-
+          infra-part1.txt) | Infra, part 1: the owner's answers to the fo
+          llow-up of ADR-0019 (migrations and a new bootstrap task straig
+          ht to the RDS instance with the RDS CA bundle, the alarm on pin
+          ned connections) and the matching changes to specs 007 and 008,
+           the bootstrap CLI, `PGPASSWORD`, the Terraform root and its se
+          ven modules, `npm run infra:validate` with tflint and checkov a
+          nd 60 custom policies tested by mutation, `docs/deployment/aws.
+          md`, and the DEP-AC14, DEP-AC24, DEP-AC27, DEP-AC29 and DEP-AC3
+          0 tests. |
+      42  | 12 part 2 | 2026-10-09 | [12-infra-part2.txt](transcripts/12-
+          infra-part2.txt) | Infra, part 2: the CI pipeline (jobs `ci`, `
+          e2e`, `traceability`, `secret-scan` and `security` with trivy, 
+          actions pinned by SHA, `ubuntu-24.04`), the runtime image witho
+          ut npm, the WAF rate rule answering 429, the Terraform connecti
+          on and shutdown budgets with the deployment surge, RDS Proxy's 
+          borrow timeout answered 503 (SEC-R49, SEC-AC39), the runbooks, 
+          README, OpenAPI error docs and ADR follow-ups, and the second a
+          udit's fixes. |
+      43 +| 12b | 2026-10-09 | [12b-observability.txt](transcripts/12b-ob
+         +servability.txt) | Observability: ADR-0023 and the owner-approv
+         +ed changes to specs 007 and 008, optional error reporting of th
+         +e 500s to a Sentry-compatible endpoint (own client on Node's `f
+         +etch`, allowlisted event, scrubbed message, bounded and off by 
+         +default), the `observability` Compose profile with Prometheus a
+         +nd Grafana and its dashboard, the `compose.error-reporting.yaml
+         +` override, `make observability`, and the SEC-AC40 to SEC-AC46 
+         +and DEP-AC31 to DEP-AC34 tests. |                              
+
+⏺ Bash(npx prettier --check docs/ai/README.md)
+  ⎿  Checking formatting...
+     All matched files use Prettier code style!
+
+⏺ Step 4: stage everything.
+
+⏺ Bash(git add -A)
+  ⎿  (No output)
+
+⏺ Bash(git status --short)
+  ⎿  M  .env.example
+     M  AGENTS.md
+     M  Makefile
+     … +46 lines (ctrl+o to expand)
+
+⏺ Nothing sensitive is staged (reports/ and .env are not in the list). Step 5:
+  commit.
+
+⏺ Bash(git commit -F - <<'EOF'
+      feat(observability): optional dashboards and error reporting…)
+  ⎿  [phase/12b-observability 0193ef7] feat(observability): optional dashbo
+     ards and error reporting
+      49 files changed, 11094 insertions(+), 235 deletions(-)
+     … +18 lines (ctrl+o to expand)
+
+⏺ Step 6: secret scan of the branch.
+
+⏺ Bash(gitleaks git --no-banner --redact --log-opts="origin/main..HEAD")
+  ⎿  9:06AM INF 2 commits scanned.
+     9:06AM INF scanned ~781393 bytes (781.39 KB) in 975ms
+     9:06AM INF no leaks found
+
+⏺ Clean. Step 7: push.
+
+⏺ Bash(git push -u origin HEAD)
+  ⎿  remote:
+     remote: Create a pull request for 'phase/12b-observability' on GitHub
+     by visiting:
+     … +7 lines (ctrl+o to expand)
+
+⏺ 0193ef7 feat(observability): optional dashboards and error reporting is pushed
+  on phase/12b-observability. The branch also carries the earlier ci: run once 
+  per pull request commit (c2e8874), which now goes out with it.
+
+  - Gates: npm run check (378 unit tests), npm run test:integration (340), npm 
+    run trace -- --require unit,integration, checkov (0 failed) and the gitleaks
+    branch scan (no leaks) all passed.
+  - ACs covered: SEC-AC40 to SEC-AC46 and DEP-AC31 to DEP-AC34.
+    docs/ai/README.md has the new row for 12b-observability.txt.
+  - Pull request: none opened, since the description doesn't start with "close
+    phase NN".
+  - Skipped: nothing. The e2e suite isn't one of the /ship gates; I ran it
+    separately earlier, and all 143 tests passed.
+
+✻ Cooked for 3m 4s · done 9:06 AM

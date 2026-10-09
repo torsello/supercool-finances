@@ -104,7 +104,7 @@ describe('the error event', () => {
   });
 
   it('SEC-R53 sends the stack frames oldest first, with paths inside the application relative to it', () => {
-    const error = new Error('boom');
+    const error = new Error('boom 0192f0a0-0000-7000-8000-00000000a001');
     error.stack = [
       'Error: boom 0192f0a0-0000-7000-8000-00000000a001',
       '    at inner (file:///app/dist/modules/x.js:10:5)',
@@ -138,5 +138,38 @@ describe('the error event', () => {
       { function: 'inner', filename: 'dist/modules/x.js', lineno: 10, colno: 5 },
     ]);
     expect(JSON.stringify(event)).not.toContain('0192f0a0');
+  });
+
+  it('SEC-R53 never sends a line of a multi-line message as a stack frame', () => {
+    const settings = {
+      environment: 'test',
+      release: '0.1.0',
+      replicaId: 'api-1',
+      secrets: [],
+      appRoot: '/app',
+      eventId: 'c'.repeat(32),
+      timestamp: 1,
+    };
+    const request = { id: 'r', method: 'GET', is404: true, routeOptions: {}, headers: {} };
+    const multiLine = new Error(`x\n    at 4321 ${ACCOUNT} (k-77:1:2)`);
+
+    const event = buildEvent(multiLine, request, settings);
+
+    const [exception] = event.exception.values;
+    expect(exception.value).toBe('x\n    at <n> <uuid> (k-<n>:<n>:<n>)');
+    expect(exception.stacktrace.frames.length).toBeGreaterThan(0);
+    const frames = JSON.stringify(exception.stacktrace.frames);
+    for (const forbidden of [ACCOUNT, '4321', 'k-77']) expect(frames).not.toContain(forbidden);
+
+    // A stack whose first lines are not the error's name and message cannot be told apart from
+    // its message, so none of its frames is sent.
+    const renamed = new Error('first');
+    renamed.stack = [
+      `Error: second\n    at 4321 ${ACCOUNT} (k-77:1:2)`,
+      '    at inner (/app/dist/modules/x.js:10:5)',
+    ].join('\n');
+    expect(buildEvent(renamed, request, settings).exception.values[0].stacktrace.frames).toEqual(
+      [],
+    );
   });
 });

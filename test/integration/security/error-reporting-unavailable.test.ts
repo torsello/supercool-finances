@@ -7,10 +7,10 @@ import { LOG_LEVEL } from '../../support/logs.js';
 import { freePort } from '../../support/ports.js';
 import { buildTestApp, THROWING_ROUTE_PATH } from '../../support/test-app.js';
 import { tokenFor } from '../../support/tokens.js';
+import { waitUntil } from '../../support/wait.js';
 
-async function sleep(ms: number): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, ms));
-}
+/** Long enough for any report to be sent or abandoned (2000 ms) on a slow runner. */
+const SETTLE_TIMEOUT_MS = 10_000;
 
 describe('error reporting with an unreachable or slow endpoint', () => {
   afterAll(async () => {
@@ -38,9 +38,14 @@ describe('error reporting with an unreachable or slow endpoint', () => {
         .lines()
         .filter((line) => typeof line.msg === 'string' && line.msg.startsWith('error reporting'));
 
+    // Every report is queued before its 500 is answered, so none is pending once this holds.
+    const settled = async (what: string) => {
+      await waitUntil(() => built.app.errorReporter?.pending === 0, SETTLE_TIMEOUT_MS, what);
+    };
+
     try {
       for (let index = 0; index < 3; index += 1) await throwing();
-      await sleep(300);
+      await settled('the three refused sends');
       expect(reporting().map((line) => [line.level, line.msg])).toEqual([
         [LOG_LEVEL.warn, 'error reporting is failing'],
       ]);
@@ -52,18 +57,18 @@ describe('error reporting with an unreachable or slow endpoint', () => {
       expect(fake.envelopes.every((envelope) => envelope.answered === undefined)).toBe(true);
       await fake.waitForEnvelopes(1);
       // The held send is abandoned at 2000 ms, while reporting is already failing.
-      await sleep(2300);
-      expect(built.app.errorReporter?.pending).toBe(0);
+      await settled('the held send to be abandoned');
 
       fake.holdMs = 0;
       await throwing();
       await fake.waitForEnvelopes(2);
-      await sleep(300);
+      await settled('the fifth report');
       await throwing();
       await fake.waitForEnvelopes(3);
-      await sleep(300);
+      await settled('the sixth report');
 
-      expect(fake.accepted()).toHaveLength(2);
+      const [, fifth, sixth] = fake.envelopes;
+      expect([fifth?.answered, sixth?.answered]).toEqual([200, 200]);
       expect(reporting().map((line) => [line.level, line.msg])).toEqual([
         [LOG_LEVEL.warn, 'error reporting is failing'],
         [LOG_LEVEL.info, 'error reporting works again'],

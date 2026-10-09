@@ -1,14 +1,6 @@
 import { createServer, type IncomingHttpHeaders, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-
-/** Polls `done` every 20 ms until it holds, failing after `timeoutMs`. */
-async function waitUntil(done: () => boolean, timeoutMs: number, what: string): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (!done()) {
-    if (Date.now() > deadline) throw new Error(`timed out waiting for ${what}`);
-    await new Promise((resolve) => setTimeout(resolve, 20));
-  }
-}
+import { waitUntil } from './wait.js';
 
 /** One envelope as the endpoint received it. */
 export interface ReceivedEnvelope {
@@ -33,6 +25,8 @@ export class FakeSentry {
   /** The status each envelope is answered with. */
   status = 200;
   readonly #server: Server;
+  /** The answers of envelopes still held, cleared by `close`. */
+  readonly #held = new Set<NodeJS.Timeout>();
 
   private constructor(server: Server) {
     this.#server = server;
@@ -56,11 +50,13 @@ export class FakeSentry {
         };
         fake.envelopes.push(envelope);
         const status = fake.status;
-        setTimeout(() => {
+        const answer = setTimeout(() => {
+          fake.#held.delete(answer);
           envelope.answered = status;
           response.writeHead(status, { 'content-type': 'application/json' });
           response.end('{}');
         }, fake.holdMs);
+        fake.#held.add(answer);
       });
     });
     await new Promise<void>((resolve, reject) => {
@@ -92,6 +88,8 @@ export class FakeSentry {
   }
 
   async close(): Promise<void> {
+    for (const answer of this.#held) clearTimeout(answer);
+    this.#held.clear();
     this.#server.closeAllConnections();
     await new Promise<void>((resolve) => {
       this.#server.close(() => {

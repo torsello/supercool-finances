@@ -148,7 +148,7 @@
             "type": "prometheus",
             "uid": "scf-prometheus"
           },
-          "expr": "sum by (status_class) (label_replace(rate(scf_http_request_duration_seconds_count{status_code=~\"[45]..\"}[1m]), \"status_class\", \"${1}xx\", \"status_code\", \"([1-5])[0-9][0-9]\"))",
+          "expr": "sum by (status_class) (label_replace(rate(scf_http_request_duration_seconds_count{status_code=~\"[45]..\"}[1m]), \"status_class\", \"${1}xx\", \"status_code\", \"([1-5])[0-9][0-9]\")) or label_replace(vector(0), \"status_class\", \"5xx\", \"\", \"\")",
           "legendFormat": "{{status_class}}",
           "range": true
         },
@@ -158,7 +158,7 @@
             "type": "prometheus",
             "uid": "scf-prometheus"
           },
-          "expr": "sum(rate(scf_http_request_duration_seconds_count{status_code=~\"5..\"}[1m])) / sum(rate(scf_http_request_duration_seconds_count[1m]))",
+          "expr": "sum(rate(scf_http_request_duration_seconds_count{status_code=~\"5..\"}[1m])) / sum(rate(scf_http_request_duration_seconds_count[1m])) or vector(0)",
           "legendFormat": "5xx share",
           "range": true
         }

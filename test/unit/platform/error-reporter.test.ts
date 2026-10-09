@@ -1,4 +1,7 @@
+import { createServer, type AddressInfo, type Socket } from 'node:net';
 import { describe, expect, it } from 'vitest';
+import { buildApp, createShutdown } from '../../../src/app.js';
+import { loadConfig } from '../../../src/platform/config/config.js';
 import { parseSentryDsn, type SentryDsn } from '../../../src/platform/error-reporting/dsn.js';
 import {
   ErrorReporter,
@@ -8,8 +11,9 @@ import {
   type TransportRequest,
 } from '../../../src/platform/error-reporting/reporter.js';
 import type { ReportedRequest } from '../../../src/platform/error-reporting/event.js';
-import { ShutdownCoordinator, WorkTracker } from '../../../src/platform/lifecycle/shutdown.js';
 import { FakeClock, settle } from '../../support/clock.js';
+import { TEST_CURSOR_SECRET } from '../../support/app.js';
+import { K } from '../../support/tokens.js';
 
 const DSN = parseSentryDsn('https://pk-unit-7781@errors.example/42') as SentryDsn;
 
@@ -21,7 +25,7 @@ const REQUEST: ReportedRequest = {
   headers: {},
 };
 
-/** A transport that records each send and answers only when told, or never. */
+/** A transport that records each send and answers only when told: it never rejects on abort. */
 class RecordingTransport implements Transport {
   readonly sends: { request: TransportRequest; aborted: boolean }[] = [];
   readonly #answers: ((status: number) => void)[] = [];
@@ -29,13 +33,12 @@ class RecordingTransport implements Transport {
   async send(request: TransportRequest): Promise<{ status: number }> {
     const record = { request, aborted: false };
     this.sends.push(record);
-    return await new Promise((resolve, reject) => {
+    request.signal.addEventListener('abort', () => {
+      record.aborted = true;
+    });
+    return await new Promise((resolve) => {
       this.#answers.push((status) => {
         resolve({ status });
-      });
-      request.signal.addEventListener('abort', () => {
-        record.aborted = true;
-        reject(new Error('aborted'));
       });
     });
   }
@@ -43,6 +46,26 @@ class RecordingTransport implements Transport {
   answerAll(status: number): void {
     for (const answer of this.#answers.splice(0)) answer(status);
   }
+}
+
+/**
+ * A TCP server on the loopback that accepts every connection and never answers, so each envelope
+ * sent to it stays in flight until the reporter abandons it.
+ */
+async function silentEndpoint(): Promise<{ port: number; close(): Promise<void> }> {
+  const sockets = new Set<Socket>();
+  const server = createServer((socket) => {
+    sockets.add(socket);
+    socket.on('close', () => sockets.delete(socket));
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  return {
+    port: (server.address() as AddressInfo).port,
+    close: async () => {
+      for (const socket of sockets) socket.destroy();
+      await new Promise((resolve) => server.close(resolve));
+    },
+  };
 }
 
 interface LoggedLine {
@@ -71,12 +94,13 @@ function reporterWith(clock: FakeClock, transport: Transport, lines: LoggedLine[
 }
 
 describe('the error reporter', () => {
-  it('SEC-AC46 keeps at most 20 reports pending, abandons each send at 2000 ms, and the shutdown never waits for one', async () => {
+  it('SEC-AC46 keeps at most 20 reports pending, abandons each send at 2000 ms even when the transport never answers, and the shutdown never waits for one', async () => {
     expect(MAX_PENDING_REPORTS).toBe(20);
     expect(SEND_TIMEOUT_MS).toBe(2000);
     const clock = new FakeClock();
     const transport = new RecordingTransport();
-    const reporter = reporterWith(clock, transport, []);
+    const lines: LoggedLine[] = [];
+    const reporter = reporterWith(clock, transport, lines);
 
     for (let index = 0; index < 25; index += 1) reporter.report(new Error('boom'), REQUEST);
 
@@ -86,42 +110,67 @@ describe('the error reporter', () => {
     expect(transport.sends.filter((send) => send.aborted)).toHaveLength(0);
     expect(reporter.pending).toBe(20);
     await clock.advanceTo(2000);
+    // The transport ignored the abort and will never answer: the reporter frees the slots itself.
     expect(transport.sends.every((send) => send.aborted)).toBe(true);
     expect(reporter.pending).toBe(0);
+    expect(lines).toEqual([
+      { level: 'warn', message: 'error reporting is failing', fields: { reason: 'timeout' } },
+    ]);
 
     for (let index = 0; index < 3; index += 1) reporter.report(new Error('boom'), REQUEST);
     expect(transport.sends).toHaveLength(23);
     expect(reporter.pending).toBe(3);
 
-    const calls: string[] = [];
-    const closer = (name: string) => async () => {
-      calls.push(`${name} closed`);
-      await Promise.resolve();
-    };
-    const shutdown = new ShutdownCoordinator({
-      timers: clock,
-      drainDelayMs: 0,
-      timeoutMs: 30000,
-      work: new WorkTracker(),
-      readiness: { stop: () => calls.push('readiness 503') },
-      server: {
-        stopAccepting: () => calls.push('stopped accepting'),
-        closeIdleConnections: () => calls.push('idle connections closed'),
-      },
-      resources: [
-        ['pool', closer('pool')],
-        ['readiness connection', closer('readiness connection')],
-        ['redis', closer('redis')],
-      ],
-      logger: { info: () => undefined, warn: () => undefined },
+    // The shutdown of the composition root, with the reporter main.ts builds, three of its
+    // reports in flight to an endpoint that never answers.
+    const endpoint = await silentEndpoint();
+    const config = loadConfig({
+      // The pool and Redis connect lazily, so this app never reaches either.
+      DATABASE_URL: 'postgres://scf_app:unused@127.0.0.1:1/unused',
+      REDIS_URL: 'redis://127.0.0.1:1',
+      JWT_SECRET: K,
+      JWT_ISSUER: 'scf-test',
+      JWT_AUDIENCE: 'scf-api',
+      CURSOR_SECRET: TEST_CURSOR_SECRET,
+      LOG_LEVEL: 'fatal',
+      SHUTDOWN_DRAIN_DELAY_MS: '0',
+      SENTRY_DSN: `http://pk-unit-7781@127.0.0.1:${String(endpoint.port)}/42`,
     });
-    let code: number | undefined;
-    void shutdown.shutdown('SIGTERM').then((value) => (code = value));
-    await clock.advanceTo(2001);
+    const app = buildApp(config);
+    try {
+      const composed = app.errorReporter;
+      expect(composed).toBeDefined();
+      for (let index = 0; index < 3; index += 1) composed?.report(new Error('boom'), REQUEST);
+      expect(composed?.pending).toBe(3);
 
-    expect(calls.slice(-3)).toEqual(['pool closed', 'readiness connection closed', 'redis closed']);
-    expect(code).toBe(0);
-    expect(reporter.pending).toBe(3);
+      const started = Date.now();
+      const code = await createShutdown(app, config).shutdown('SIGTERM');
+
+      expect(code).toBe(0);
+      expect(Date.now() - started).toBeLessThan(SEND_TIMEOUT_MS);
+      expect(composed?.pending).toBe(3);
+    } finally {
+      await app.close();
+      await endpoint.close();
+    }
+  });
+
+  it('SEC-R54 ignores an answer that arrives after its send was abandoned', async () => {
+    const clock = new FakeClock();
+    const transport = new RecordingTransport();
+    const lines: LoggedLine[] = [];
+    const reporter = reporterWith(clock, transport, lines);
+
+    reporter.report(new Error('boom'), REQUEST);
+    await clock.advanceTo(2000);
+    expect(reporter.pending).toBe(0);
+    transport.answerAll(200);
+    await settle();
+
+    expect(reporter.pending).toBe(0);
+    expect(lines).toEqual([
+      { level: 'warn', message: 'error reporting is failing', fields: { reason: 'timeout' } },
+    ]);
   });
 
   it('SEC-R54 posts one envelope per report to the DSN with its key, and logs one warn line when sends start failing and one info line when one succeeds again', async () => {

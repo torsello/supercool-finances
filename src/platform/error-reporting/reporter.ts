@@ -43,6 +43,9 @@ export const FETCH_TRANSPORT: Transport = {
   },
 };
 
+/** How a send ended: sent, or the fields of the line that says why it failed. */
+type Outcome = 'sent' | { status: number } | { reason: 'timeout' | 'unreachable' };
+
 /** The two lines the reporter writes: never one per report, never the DSN (SEC-R54). */
 export interface ReporterLogger {
   warn(fields: Record<string, unknown>, message: string): void;
@@ -109,13 +112,22 @@ export class ErrorReporter {
     }
     this.#pending += 1;
     const controller = new AbortController();
+    // Whichever comes first, the answer or the timeout, settles the report; the other is ignored,
+    // so a transport that never answers still frees its slot at SEND_TIMEOUT_MS.
+    let settled = false;
+    const settle = (outcome: Outcome): void => {
+      if (settled) return;
+      settled = true;
+      this.#pending -= 1;
+      this.#record(outcome);
+    };
     const timer = this.#timers.setTimeout(() => {
       controller.abort();
+      settle({ reason: 'timeout' });
     }, SEND_TIMEOUT_MS);
     void this.#send(body, controller.signal).then((outcome) => {
       this.#timers.clearTimeout(timer);
-      this.#pending -= 1;
-      this.#record(outcome);
+      settle(outcome);
     });
   }
 
@@ -130,7 +142,7 @@ export class ErrorReporter {
     return `${JSON.stringify(header)}\n${JSON.stringify(item)}\n${JSON.stringify(event)}\n`;
   }
 
-  async #send(body: string, signal: AbortSignal): Promise<Record<string, unknown> | 'sent'> {
+  async #send(body: string, signal: AbortSignal): Promise<Outcome> {
     try {
       const { status } = await this.#transport.send({
         url: this.#dsn.envelopeUrl,
@@ -148,7 +160,7 @@ export class ErrorReporter {
   }
 
   /** One line when sends start failing and one when one succeeds again (SEC-R54). */
-  #record(outcome: Record<string, unknown> | 'sent'): void {
+  #record(outcome: Outcome): void {
     if (outcome === 'sent') {
       if (this.#failing) this.#logger.info('error reporting works again');
       this.#failing = false;

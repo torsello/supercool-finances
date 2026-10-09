@@ -15,6 +15,7 @@ import {
   type BuiltTestApp,
 } from '../../support/test-app.js';
 import { K, tokenFor } from '../../support/tokens.js';
+import { waitUntil } from '../../support/wait.js';
 
 const DB_PASSWORD = 'db-pw-7781';
 const REDIS_PASSWORD = 'redis-pw-5512';
@@ -27,8 +28,19 @@ function withCredentials(url: string, user: string, password: string): string {
   return parsed.toString();
 }
 
-async function sleep(ms: number): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, ms));
+/** Long enough for any report to be sent or abandoned (2000 ms) on a slow runner. */
+const SETTLE_TIMEOUT_MS = 10_000;
+
+/**
+ * Waits until no report of `built` is pending. Every report is queued before its 500 is answered,
+ * so once this holds after the last answer, nothing more will reach the endpoint.
+ */
+async function reportsSettled(built: BuiltTestApp): Promise<void> {
+  await waitUntil(
+    () => built.app.errorReporter?.pending === 0,
+    SETTLE_TIMEOUT_MS,
+    'no pending report',
+  );
 }
 
 /** A request to the throwing route of SYS-R37 as the holder of `token`. */
@@ -117,14 +129,15 @@ describe('error reporting', () => {
         statuses.push((await read(c2, b1.id)).statusCode);
       }
       expect(statuses).toEqual([200, 200, 200, 200, 200, 200, 200, 429]);
-      await sleep(2000);
+      await reportsSettled(built);
     } finally {
       await session?.close();
     }
 
     expect(fake.envelopes).toHaveLength(2);
     const events = fake.envelopes.map((envelope) => envelope.event);
-    expect(events.map((event) => event.tags?.['requestId'])).toEqual(['err-1', 'err-2']);
+    // Sent concurrently, so they may arrive in either order.
+    expect(events.map((event) => event.tags?.['requestId']).sort()).toEqual(['err-1', 'err-2']);
     for (const event of events) {
       expect(event.tags).toMatchObject({ route: '/v1/test/throw', method: 'GET' });
       expect(event['exception']).toMatchObject({
@@ -180,7 +193,7 @@ describe('error reporting', () => {
       });
       expect(account.json<{ balance: string }>().balance).toBe('10000');
       await fake.waitForEnvelopes(1);
-      await sleep(500);
+      await reportsSettled(built);
       expect(fake.envelopes).toHaveLength(1);
       const [envelope] = fake.envelopes;
       const event = envelope?.event ?? {};
@@ -240,15 +253,17 @@ describe('error reporting', () => {
         built.logs.lines().filter((line) => line.msg === 'error reporting is off'),
       ).toHaveLength(1);
     }
-    await sleep(2000);
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(fake.envelopes).toHaveLength(0);
 
     const on = appWith({ SENTRY_DSN: fake.dsn() });
     expect(on.app.errorReporter).toBeDefined();
     answers.push(await throwing(on, tokenFor(randomUUID(), 'customer'), 'err-4'));
     expect(on.logs.lines().filter((line) => line.msg === 'error reporting is off')).toHaveLength(0);
     await fake.waitForEnvelopes(1);
+    await reportsSettled(on);
+    // By the time the third app's report has arrived and settled, a send from the first two would
+    // have arrived as well: the one fetch and the one envelope are the third app's.
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(fake.envelopes.map((envelope) => envelope.event.tags?.['requestId'])).toEqual(['err-4']);
 
     const [first, ...others] = answers;

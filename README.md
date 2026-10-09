@@ -172,7 +172,7 @@ Both are outside `/v1` and need no token. On SIGTERM a replica drains for `SHUTD
 
 ## Metrics
 
-Each replica serves Prometheus metrics at `/metrics` on `METRICS_PORT` (9464), a port the load balancer never routes to and no deployment publishes (SEC-R43). Locally: `docker compose exec api-1 wget -qO- http://127.0.0.1:9464/metrics`. Besides Node's process metrics, they count requests by route template and status (`scf_http_request_duration_seconds`), movements by kind and outcome (`scf_money_movements_total`), replays, lock timeouts, transaction retries, the pool's connections and acquire timeouts, and the per-user rate limit and its Redis errors: table 1.4 of [`specs/007-security-ops`](specs/007-security-ops/spec.md).
+Each replica serves Prometheus metrics at `/metrics` on `METRICS_PORT` (9464), a port the load balancer never routes to and no deployment publishes (SEC-R43). Locally: `docker compose exec api-1 wget -qO- http://127.0.0.1:9464/metrics`. Besides Node's process metrics, they count requests by route template and status (`scf_http_request_duration_seconds`), movements by kind and outcome (`scf_money_movements_total`), replays, lock timeouts, transaction retries, the pool's connections and acquire timeouts, and the per-user rate limit and its Redis errors: table 1.4 of [`specs/007-security-ops`](specs/007-security-ops/spec.md). Every counter is there from startup, at 0 for each of its label values, so a panel shows 0 until the first event.
 
 ## Observability profile
 

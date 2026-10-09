@@ -46,6 +46,9 @@ const NOT_METRICS = new Set([
   'rate',
   'label_replace',
   'histogram_quantile',
+  // A series at 0 where no request matched, so the errors panel shows 0 rather than no data.
+  'or',
+  'vector',
   'job',
   'replica',
   'route',

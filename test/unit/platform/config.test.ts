@@ -528,6 +528,10 @@ describe('the configuration of spec 007', () => {
       'https://pk-41f2@errors.example/',
       'https://pk-41f2@errors.example/abc',
       'https://pk-41f2@errors.example/42?x=1',
+      // An empty query, fragment or password is still one, though the URL parser reads it as "".
+      'https://pk-41f2@errors.example/42?',
+      'https://pk-41f2@errors.example/42#',
+      'https://pk-41f2:@errors.example/42',
     ]) {
       const error = failure({ SENTRY_DSN: value });
       expect(error.problems, value).toEqual([

@@ -139,17 +139,17 @@ An optional add-on for watching the local stack, off by default ([ADR-0023](../.
 
 The dashboard's panels use only the metrics of table 1.4 of spec 007 and Prometheus's `up`. Latency covers the `/v1` routes, so the health checks do not dilute it; the histogram's default buckets bound the precision of each percentile.
 
-| Panel                               | Query                                                                                                                                                    |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Replicas scraped                    | `up{job="scf-api"}` by `replica`                                                                                                                         |
-| Requests by status class            | `sum by (status_class) (label_replace(rate(scf_http_request_duration_seconds_count[1m]), "status_class", "${1}xx", "status_code", "([1-5])[0-9][0-9]"))` |
-| Errors by status class              | the same query for `4xx` and `5xx` only, and the share of `5xx` among all requests                                                                       |
-| Latency p50, p95 and p99            | `histogram_quantile(<q>, sum by (le) (rate(scf_http_request_duration_seconds_bucket{route=~"/v1/.*"}[1m])))` for `<q>` 0.5, 0.95 and 0.99                |
-| Money movements by kind and outcome | `sum by (kind, outcome) (rate(scf_money_movements_total[1m]))`                                                                                           |
-| Lock timeouts                       | `sum by (lock) (rate(scf_lock_timeouts_total[1m]))`                                                                                                      |
-| Idempotent replays                  | `sum by (kind) (rate(scf_idempotent_replays_total[1m]))`                                                                                                 |
-| Rate-limited requests               | `sum(rate(scf_rate_limited_total[1m]))`                                                                                                                  |
-| Pool usage                          | `scf_db_pool_connections` by `replica` and `state`, and `sum by (replica) (rate(scf_db_pool_acquire_timeouts_total[1m]))`                                |
+| Panel                               | Query                                                                                                                                                                                                                              |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Replicas scraped                    | `up{job="scf-api"}` by `replica`                                                                                                                                                                                                   |
+| Requests by status class            | `sum by (status_class) (label_replace(rate(scf_http_request_duration_seconds_count[1m]), "status_class", "${1}xx", "status_code", "([1-5])[0-9][0-9]"))`                                                                           |
+| Errors by status class              | the same query for `4xx` and `5xx` only, with `or label_replace(vector(0), "status_class", "5xx", "", "")`, and the share of `5xx` among all requests, with `or vector(0)`, so both show 0 rather than no data until the first 5xx |
+| Latency p50, p95 and p99            | `histogram_quantile(<q>, sum by (le) (rate(scf_http_request_duration_seconds_bucket{route=~"/v1/.*"}[1m])))` for `<q>` 0.5, 0.95 and 0.99                                                                                          |
+| Money movements by kind and outcome | `sum by (kind, outcome) (rate(scf_money_movements_total[1m]))`                                                                                                                                                                     |
+| Lock timeouts                       | `sum by (lock) (rate(scf_lock_timeouts_total[1m]))`                                                                                                                                                                                |
+| Idempotent replays                  | `sum by (kind) (rate(scf_idempotent_replays_total[1m]))`                                                                                                                                                                           |
+| Rate-limited requests               | `sum(rate(scf_rate_limited_total[1m]))`                                                                                                                                                                                            |
+| Pool usage                          | `scf_db_pool_connections` by `replica` and `state`, and `sum by (replica) (rate(scf_db_pool_acquire_timeouts_total[1m]))`                                                                                                          |
 
 ## 2. Requirements
 
