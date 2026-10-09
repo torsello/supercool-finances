@@ -6502,3 +6502,135 @@
   reads, not jobs GitHub runs.
 
 ✻ Baked for 9s · done 7:38 AM
+
+❯ /export docs/ai/transcripts/12-infra-part2.txt                                
+  ⎿  Conversation exported to: /Users/matiastorsello/supercool-finances/docs/ai/
+     transcripts/12-infra-part2.txt
+
+❯ /ship close phase 12                                                          
+
+⏺ Bash(git branch --show-current)
+  ⎿  phase/12-infra
+
+⏺ Bash(npm run check)
+  ⎿  > supercool-finances@0.1.0 check
+     > npm run typecheck && npm run lint && npm run format:check && npm run
+      test
+     … +95 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ Bash(npm run infra:up)
+  ⎿  > supercool-finances@0.1.0 infra:up
+     > docker compose up -d --wait postgres redis
+     … +6 lines (ctrl+o to expand)
+
+⏺ Bash(npm run test:integration 2>&1 | tail -8)
+  ⎿   ✓ |integration| test/integration/platform/runtime-role.test.ts (1 tes
+     t) 13ms
+     … +7 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ Bash(npm run trace -- --require unit,integration 2>&1 | tail -2)
+  ⎿  226 ACs in 9 specs: 226 covered, 0 pending, 0 missing, 0 unverified. T
+     est reports read: unit, integration, e2e.
+
+⏺ Bash(checkov -d infra/terraform --quiet --compact)
+  ⎿  terraform scan results:
+
+     Passed checks: 334, Failed checks: 0, Skipped checks: 24
+     … +4 lines (ctrl+o to expand)
+  ⎿  (timeout 5m)
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Part 2 has no row in the AI log yet. Adding it, since step 3 requires one.
+
+⏺ Update(docs/ai/README.md)
+  ⎿  Added 1 line
+      39  | 10 | 2026-10-08 | [10-runtime.txt](transcripts/10-runtime.txt
+          ) | Runtime: the migrate command, the three-stage Dockerfile, `
+          compose.yaml` with two replicas behind nginx at fixed addresses
+          , the seed, the Makefile and `make test`, replica ids in the lo
+          gs, demo secrets refused in production, Dependabot, owner-appro
+          ved spec changes, two audit rounds with their fixes, and a manu
+          al test whose failed step found the nginx retry defect. |
+      40  | 11 | 2026-10-09 | [11-e2e.txt](transcripts/11-e2e.txt) | E2E:
+           the `e2e` Vitest project and `npm run test:e2e` against its ow
+          n Compose stack `scf-e2e` with a file sequencer and a response 
+          recorder, tests for every e2e AC (replicas, authorization matri
+          x on both replicas, edge, correlation id, rate limits, stack st
+          art, failed migration, seed, round robin, gateway errors, repli
+          ca loss, container), stress tests with no AC, the open-model lo
+          ad test `npm run load` with `docs/performance.md`, owner-approv
+          ed changes to DEP-AC10 and AUT-AC16, and an audit round with si
+          x fixes. |
+      41  | 12 part 1 | 2026-10-09 | [12-infra-part1.txt](transcripts/12-
+          infra-part1.txt) | Infra, part 1: the owner's answers to the fo
+          llow-up of ADR-0019 (migrations and a new bootstrap task straig
+          ht to the RDS instance with the RDS CA bundle, the alarm on pin
+          ned connections) and the matching changes to specs 007 and 008,
+           the bootstrap CLI, `PGPASSWORD`, the Terraform root and its se
+          ven modules, `npm run infra:validate` with tflint and checkov a
+          nd 60 custom policies tested by mutation, `docs/deployment/aws.
+          md`, and the DEP-AC14, DEP-AC24, DEP-AC27, DEP-AC29 and DEP-AC3
+          0 tests. |
+      42 +| 12 part 2 | 2026-10-09 | [12-infra-part2.txt](transcripts/12-
+         +infra-part2.txt) | Infra, part 2: the CI pipeline (jobs `ci`, `
+         +e2e`, `traceability`, `secret-scan` and `security` with trivy, 
+         +actions pinned by SHA, `ubuntu-24.04`), the runtime image witho
+         +ut npm, the WAF rate rule answering 429, the Terraform connecti
+         +on and shutdown budgets with the deployment surge, RDS Proxy's 
+         +borrow timeout answered 503 (SEC-R49, SEC-AC39), the runbooks, 
+         +README, OpenAPI error docs and ADR follow-ups, and the second a
+         +udit's fixes. |                                                
+
+⏺ Bash(npx prettier --check docs/ai/README.md)
+  ⎿  Checking formatting...
+     All matched files use Prettier code style!
+
+⏺ Bash(git add -A)
+  ⎿  (No output)
+
+⏺ Bash(git status --short)
+  ⎿  M  .github/workflows/ci.yml
+     M  docs/ai/README.md
+     A  docs/ai/transcripts/12-infra-part2.txt
+
+⏺ Bash(git commit -m "ci: pin runners to ubuntu-24.04 and add the phase 12
+      transcript" -m "Every job runs on the image the pipeline was verified on,
+      since ubuntu-lates…)
+  ⎿  [phase/12-infra dfb96c2] ci: pin runners to ubuntu-24.04 and add the p
+     hase 12 transcript
+      3 files changed, 6510 insertions(+), 5 deletions(-)
+      create mode 100644 docs/ai/transcripts/12-infra-part2.txt
+
+⏺ Bash(gitleaks git --no-banner --redact --log-opts="origin/main..HEAD")
+  ⎿  7:40AM INF 3 commits scanned.
+     7:40AM INF scanned ~1948048 bytes (1.95 MB) in 1.87s
+     7:40AM INF no leaks found
+⏺ Bash(git push -u origin HEAD)
+  ⎿  To https://github.com/torsello/supercool-finances.git
+        33710ce..dfb96c2  HEAD -> phase/12-infra
+     branch 'phase/12-infra' set up to track 'origin/phase/12-infra'.
+
+⏺ Bash(gh pr view --json url)
+  ⎿  Error: Exit code 1
+     no pull requests found for branch "phase/12-infra"
+
+⏺ Bash(gh pr create --base main --title "Phase 12-infra: Terraform for AWS and
+      the full CI pipeline" --body-file - <<'EOF'
+      ## What the phase delivered…)
+  ⎿  https://github.com/torsello/supercool-finances/pull/14
+
+⏺ - Commit: dfb96c2 "ci: pin runners to ubuntu-24.04 and add the phase 12
+    transcript", pushed to phase/12-infra. It includes a new row for part 2 in
+    docs/ai/README.md, which was missing.
+  - Gates: npm run check (366 unit tests), npm run test:integration (335), npm 
+    run trace -- --require unit,integration (226 of 226 ACs covered), checkov (0
+    failed) and the gitleaks scan of the branch (no leaks) all pass.
+  - ACs covered: none changed in this commit.
+  - Pull request: https://github.com/torsello/supercool-finances/pull/14, not
+    merged. Merge it once CI is green.
+  - Skipped: nothing.
+
+✻ Cogitated for 2m 31s · done 7:41 AM
