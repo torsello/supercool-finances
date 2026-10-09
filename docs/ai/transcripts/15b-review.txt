@@ -1067,3 +1067,240 @@
     docs/ai/transcripts/15b-review.txt and a row in docs/ai/README.md.
 
 ✻ Cooked for 2m 32s · done 1:35 PM
+
+❯ /export docs/ai/transcripts/15b-review.txt                                    
+  ⎿  Conversation exported to:
+     /Users/matiastorsello/supercool-finances/docs/ai/transcripts/15b-review.txt
+
+❯ /ship close phase 15b: review against the challenge                           
+
+⏺ Step 3 needs a row for the new transcript in docs/ai/README.md, so I'm adding
+  it first.
+
+⏺ Bash(python3 - <<'EOF'
+      p='docs/ai/README.md'…)
+  ⎿  ved update notes on ADR-0013, 0014, 0016 and 0018, the three findings
+     of the `/audit` (the 503 after a lost connection in the OpenAPI docume
+     nt, the `docs:check` anchor crash, UUID-only ids in `demo-env`), the o
+     … +7 lines (ctrl+o to expand)
+  ⎿  Updated docs/ai/README.md (+1 -0)
+      81  | 13 part 2 | 2026-10-09 | [13-final-review-part2.txt](transcri
+          pts/13-final-review-part2.txt) | Final review, part 2: a check 
+          of all 238 ACs against their code and tests by six parallel rev
+          iewers, the weak assertions and unset Givens they found fixed (
+          SYS, ACC, LED, REV, IDM, SEC and DEP ACs), the DEP-AC26 checkov
+           policies tightened and mutation-tested, spec 007 run with its 
+          default rate limit, the owner-approved rewordings of sections 1
+          .6 and 1.9 of spec 007, every spec set to `Implemented`, and `d
+          ocs/traceability.md` committed with a freshness check in the CI
+           job `traceability`. |
+      82  | 14 part 1 | 2026-10-09 | [14-docs-part1.txt](transcripts/14-d
+          ocs-part1.txt) | Docs, part 1: the README rewritten as the proj
+          ect's front page with diagrams and a Quickstart run against the
+           stack, the architecture, API guide (with `requests.http` and a
+           Postman collection), observability, security, development and 
+          limitations docs and the CHANGELOG, `make demo-env`, `npm run d
+          ocs:check` and its CI job, a lost database connection answered 
+          503 instead of 500 (SEC-AC48, SEC-AC49), the owner-approved DEP
+          -AC36 to DEP-AC38, and `/ship`. |
+      83  | 14 part 2 | 2026-10-09 | [14-docs-part2.txt](transcripts/14-d
+          ocs-part2.txt) | Docs, part 2: the twelve runbooks with one str
+          ucture and the alerts without an alarm in `docs/observability.m
+          d`, a review of the README and every doc against the code by fo
+          ur parallel reviewers and their fixes, the API guide's outputs 
+          regenerated from one run, the owner-approved update notes on AD
+          R-0013, 0014, 0016 and 0018, the three findings of the `/audit`
+           (the 503 after a lost connection in the OpenAPI document, the 
+          `docs:check` anchor crash, UUID-only ids in `demo-env`), the ow
+          ner's texts in the README and this log, and `/ship` closing the
+           phase. |
+      84 +| 15b | 2026-10-09 | [15b-review.txt](transcripts/15b-review.tx
+         +t) | Review against the challenge: a requirement-by-requirement
+         + table with the gaps, then the README sections on the modular m
+         +onolith and the thinking process, the advisor chat summary, wha
+         +t the exports contain and the redactions, and the phase list. |
+
+⏺ Bash(npm run check 2>&1 | tail -6)
+  ⎿   Test Files  70 passed (70)
+           Tests  394 passed (394)
+        Start at  13:36:32
+     … +5 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ Bash(npm run infra:up 2>&1 | tail -5)
+  ⎿   Container supercool-finances-postgres-1 Running
+      Container supercool-finances-redis-1 Waiting
+      Container supercool-finances-postgres-1 Waiting
+     … +2 lines (ctrl+o to expand)
+
+⏺ Bash(npm run test:integration 2>&1 | tail -8)
+  ⎿   ✓ |integration| test/integration/platform/runtime-role.test.ts (1 tes
+     t) 13ms
+     … +7 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ Bash(npm run trace -- --require unit,integration 2>&1 | tail -4)
+  ⎿  | DEP-AC37 | 008-deployment | Implemented, task ticked | unit | covere
+     d | test/unit/deployment/postman.test.ts |
+     | DEP-AC38 | 008-deployment | Implemented, task ticked | e2e | covered
+     … +4 lines (ctrl+o to expand)
+
+⏺ Bash(npm run infra:validate 2>&1 | tail -5)
+  ⎿  Passed checks: 537, Failed checks: 0, Skipped checks: 38
+     … +2 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ Bash(git add -A)
+  ⎿  (No output)
+
+⏺ Bash(git status --short)
+  ⎿  M  AGENTS.md
+     M  README.md
+     M  docs/ai/README.md
+     … +2 lines (ctrl+o to expand)
+
+⏺ The gates passed and the files are staged. I'm committing now, then running
+  the secret scan.
+
+⏺ Bash(git commit -q -F - <<'EOF'
+      docs: close the gaps of the review against the challenge…)
+  ⎿  158f97d docs: close the gaps of the review against the challenge
+
+⏺ Bash(gitleaks git --no-banner --redact --log-opts="origin/main..HEAD")
+  ⎿  Error: Exit code 1
+     1:38PM INF 1 commits scanned.
+     1:38PM INF scanned ~69744 bytes (69.74 KB) in 94ms
+     1:38PM WRN leaks found: 1
+
+⏺ Bash(gitleaks git --no-banner --redact --verbose
+      --log-opts="origin/main..HEAD" 2>&1 | grep -E 'RuleID|File|Line|Entropy')
+  ⎿  RuleID:      generic-api-key
+     Entropy:     3.616875
+     File:        docs/ai/README.md
+     Line:        48
+
+⏺ Bash(sed -n 48p docs/ai/README.md | cut -c1-80)
+  ⎿  | `14-docs-part1.txt` | 4744 | `Idempotency-Key: <redacted>` |
+     An example
+
+⏺ Bash(git reset --soft HEAD~1)
+  ⎿  (No output)
+
+⏺ I stopped before pushing: gitleaks flagged the new commit, so I undid it with
+  git reset --soft HEAD~1. Nothing was pushed, and the changes are still staged.
+
+  The finding
+  - It's rule generic-api-key in docs/ai/README.md, line 48 (entropy 3.6).
+  - That line is the new row in "What the exports contain" that quotes
+    Idempotency-Key: <redacted>.
+  - This is the same false positive that was redacted in 14-docs-part1.txt. It's
+    an example key from the API guide, not a secret.
+  - It isn't a transcript, so I can't apply the skill's <redacted> rule to it.
+
+  Gates before the scan
+  - npm run check passed (394 tests).
+  - npm run test:integration passed (341 tests).
+  - npm run trace -- --require unit,integration covered 244 of 244 ACs.
+  - npm run infra:validate found nothing.
+
+  Fix, for you to pick
+  1. Reword the row (my suggestion). Change the "What it hid" cell on line 48 to
+     "the example Idempotency-Key of the API guide" without the literal value.
+     Then I re-stage, commit and scan again. This is a documentation edit.
+  2. Allowlist the value in .gitleaks.toml.
+
+  Say which one and I'll finish the /ship: commit, scan again, push and open the
+  PR.
+
+✻ Baked for 2m 40s · done 1:38 PM
+
+❯ Option 1: describe the value without quoting it, and do the same for any      
+  other row of that table that quotes a literal value. Then finish the /ship.   
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Line 48 is the only row that quotes a literal value. The other rows name
+  constants or fields, not the values they held.
+
+⏺ Update(docs/ai/README.md)
+  ⎿  Added 1 line, removed 1 line
+      45  | `10-runtime.txt` | 1156 | `OTHER_CURSOR_SECRET` | A fabricate
+          d 48-byte test constant of the same file. |
+      46  | `10-runtime.txt` | 4067, 6398 | `OPENAPI_EXAMPLE_KEY` | The e
+          xample `Idempotency-Key` of `docs/api/openapi.yaml`, copied int
+          o `test/integration/deployment/gitleaks.test.ts`. |
+      47  | `12-infra-part1.txt` | 166 | An `auth_token` | The placeholde
+          r of an example in the AWS provider's documentation, fetched wi
+          th curl; it is still visible in the diff of the redaction later
+           in that transcript and in `12-infra-part2.txt`. |
+      48 -| `14-docs-part1.txt` | 4744 | `Idempotency-Key: docs-withdrawa
+         -l-1` | An example key of the API guide, `docs/api/README.md`. |
+      48 +| `14-docs-part1.txt` | 4744 | The value of an `Idempotency-Key
+         +` header | An example key of the withdrawal request in the API 
+         +guide, `docs/api/README.md`. |                                 
+      49  
+      50  Every other `<redacted>` in the transcripts is the rule itself 
+          being quoted, not a replaced value.
+      51  
+
+⏺ Bash(npm run check 2>&1 | tail -5)
+  ⎿        Tests  394 passed (394)
+        Start at  13:39:46
+        Duration  2.53s (import 44%, tests 31%, transform 20%, setup 3%, wo
+     … +4 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ Bash(npm run docs:check 2>&1 | tail -1)
+  ⎿  docs:check: 106 Markdown files, 20 mermaid diagrams, 0 failures
+  ⎿  (timeout 10m)
+
+⏺ Bash(git add -A)
+  ⎿  (No output)
+
+⏺ Bash(git status --short)
+  ⎿  M  AGENTS.md
+     M  README.md
+     M  docs/ai/README.md
+     … +2 lines (ctrl+o to expand)
+
+⏺ Bash(git commit -q -F - <<'EOF'
+      docs: close the gaps of the review against the challenge…)
+  ⎿  5a0bdf2 docs: close the gaps of the review against the challenge
+
+⏺ Bash(gitleaks git --no-banner --redact --log-opts="origin/main..HEAD")
+  ⎿  1:40PM INF 1 commits scanned.
+     1:40PM INF scanned ~69774 bytes (69.77 KB) in 87.8ms
+     1:40PM INF no leaks found
+
+⏺ Bash(git push -u origin HEAD 2>&1 | tail -3)
+  ⎿  To https://github.com/torsello/supercool-finances.git
+      * [new branch]      HEAD -> phase/15b-review
+     branch 'phase/15b-review' set up to track 'origin/phase/15b-review'.
+
+⏺ Bash(gh pr view 2>&1 | head -2)
+  ⎿  no pull requests found for branch "phase/15b-review"
+
+⏺ Bash(gh pr create --base main --title "Phase 15b-review: close the gaps of the
+      review against the challenge" --body-file - <<'EOF'
+      ## What the phase delivered…)
+  ⎿  https://github.com/torsello/supercool-finances/pull/18
+
+⏺ The phase is shipped and PR #18 is open for you to merge once CI is green.
+
+  - Commit: 5a0bdf2 "docs: close the gaps of the review against the challenge",
+    pushed to phase/15b-review.
+  - Gates: npm run check passed (394 tests) and npm run test:integration passed
+    (341 tests). The trace gate with --require unit,integration covers 244 of
+    244 ACs, npm run infra:validate found nothing, and npm run docs:check had 0
+    failures. The gitleaks rescan is clean.
+  - Secret-scan fix: row 48 of the redactions table in docs/ai/README.md now
+    describes the key without quoting it. It was the only row with a literal
+    value; the others name constants or fields.
+  - ACs: none, because the changes are documentation only.
+  - PR: https://github.com/torsello/supercool-finances/pull/18
+  - Not done:
+    - No /audit was run, since the phase changes no code.
+    - 15b-review.txt was exported before this /ship, so it doesn't include this
+      fix. Export again and amend in a follow-up commit if you want it complete.
+    - The repository is still private.
+
+✻ Cogitated for 1m 12s · done 1:40 PM
