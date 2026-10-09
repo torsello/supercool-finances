@@ -321,6 +321,7 @@ describe('the configuration of spec 007', () => {
       corsOrigins: [],
       replicaId: undefined,
       migrationDatabaseUrl: undefined,
+      databasePassword: undefined,
       jwt: { secret: VALID['JWT_SECRET'], issuer: 'scf-test', audience: 'scf-api' },
     });
 
@@ -343,6 +344,7 @@ describe('the configuration of spec 007', () => {
         'whose only query parameters are sslmode, sslrootcert, application_name and connect_timeout',
       ],
       [{ PGOPTIONS: '-c statement_timeout=0' }, 'PGOPTIONS', 'unset'],
+      [{ PGPASSWORD: '' }, 'PGPASSWORD', 'unset, or a non-empty value'],
       [{ REDIS_URL: 'http://x' }, 'REDIS_URL', 'a redis:// or rediss:// URL'],
       [{ CURSOR_SECRET: 'c'.repeat(31) }, 'CURSOR_SECRET', 'at least 32 bytes in UTF-8'],
       [{ CURSOR_SECRET: VALID['JWT_SECRET'] }, 'CURSOR_SECRET', 'different from JWT_SECRET'],
@@ -389,6 +391,23 @@ describe('the configuration of spec 007', () => {
       migrationDatabaseUrl: undefined,
     });
     expect(load({ MIGRATION_DATABASE_URL: migrationUrl }).migrationDatabaseUrl).toBe(migrationUrl);
+
+    // URLs without a password, which pg completes from PGPASSWORD, as the tasks in AWS get them
+    // (section 1.7 of spec 008).
+    const withoutPassword = {
+      DATABASE_URL: 'postgres://scf_app@proxy.example:5432/supercool?sslmode=verify-full',
+      MIGRATION_DATABASE_URL:
+        'postgres://scf_owner@db.example:5432/supercool?sslmode=verify-full&sslrootcert=/app/dist/certs/rds-global-bundle.pem',
+      PGPASSWORD: 'pg-pw-4417',
+    };
+    expect(load(withoutPassword)).toMatchObject({
+      databaseUrl: withoutPassword.DATABASE_URL,
+      migrationDatabaseUrl: withoutPassword.MIGRATION_DATABASE_URL,
+      databasePassword: 'pg-pw-4417',
+    });
+    const withPgPassword = failure({ ...withoutPassword, DB_POOL_MAX: '0' });
+    expect(withPgPassword.problems.map((problem) => problem.variable)).toEqual(['DB_POOL_MAX']);
+    expect(withPgPassword.message).not.toContain('pg-pw-4417');
 
     const both = failure({ PORT: '0', DB_POOL_MAX: 'abc' });
     expect(both.problems.map((problem) => problem.variable).sort()).toEqual([

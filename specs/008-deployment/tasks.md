@@ -54,13 +54,15 @@ No task for this spec: `REPLICA_ID` and `MIGRATION_DATABASE_URL` are validated b
 
 ## 12-infra
 
-- [ ] Write `infra/terraform/` (root configuration with an empty `backend` block, and the `network` module), and `npm run infra:validate` with `scripts/infra-validate.sh` running each tool from a pinned image.
-- [ ] Document in `docs/deployment/aws.md` the one-time bootstrap step, run before the first migration task: with the RDS master credentials from Secrets Manager, create `scf_owner` (`LOGIN CREATEROLE`) and `scf_app` (`LOGIN`), each with the password of its own secret, and `GRANT scf_app TO scf_owner WITH ADMIN TRUE, INHERIT FALSE, SET FALSE`, the same as `docker/postgres/init/01-databases.sql` (DEP-R05, DEP-R28, ADR-0018); the master credentials are used for nothing else.
-- [ ] Write the `edge` module with the WAF web ACL, and its policies in `infra/policies/`.
-- [ ] Write the `service` module (service, migration and cleanup task definitions, autoscaling, the hourly schedule) and its policies.
-- [ ] Write the `database`, `cache` and `secrets` modules and their policies.
-- [ ] Write the `observability` module with the log groups and the alarms of section 1.8, and its policies.
-- [ ] Add the CI step `npm run infra:validate` to the `ci` job, passing on the modules above: DEP-AC15, DEP-AC16, DEP-AC17, DEP-AC18, DEP-AC19, DEP-AC20, DEP-AC21, DEP-AC22, DEP-AC23 and DEP-AC26.
-- [ ] Test first: DEP-AC24 in `test/unit/deployment/no-terraform-apply.test.ts`.
-- [ ] Test first: DEP-AC14 in `test/unit/deployment/aws-doc.test.ts`; then `docs/deployment/aws.md`.
-- [ ] Update the docs: in AGENTS.md, `npm run infra:validate` in the commands table, from 12-infra, and `infra/policies/` and `docs/deployment/` in the repository map; the README sections on running the stack, seeding, minting tokens with Docker only and the AWS architecture; a runbook `docs/runbooks/deploy-and-migrate.md`; and the follow-ups closed in ADR-0014, ADR-0015, ADR-0019 and ADR-0020.
+- [x] Write `infra/terraform/` (root configuration with an empty `backend` block, and the `network` module), and `npm run infra:validate` with `scripts/infra-validate.sh` running each tool from a pinned image.
+- [x] Test first: DEP-AC29 in `test/unit/deployment/build-assets.test.ts`; then `certs/rds-global-bundle.pem` and `scripts/copy-build-assets.ts`, replacing `scripts/copy-migrations.ts` in `npm run build`.
+- [x] Test first: DEP-AC30 in `test/unit/deployment/bootstrap-roles.test.ts`; then the role declaration of `src/platform/db/bootstrap-roles.ts`, and the comment in `docker/postgres/init/01-databases.sql` explaining the local-only `CREATEDB`.
+- [x] Test first: DEP-AC27 in `test/integration/deployment/bootstrap-roles.test.ts`; then `bootstrapRoles`, `runBootstrapCommand` and `src/cli/bootstrap-roles.ts`.
+- [x] Write the `edge` module with the WAF web ACL, and its policies in `infra/policies/`.
+- [x] Write the `service` module (service, migration, bootstrap and cleanup task definitions, autoscaling, the hourly schedule) and its policies.
+- [x] Write the `database`, `cache` and `secrets` modules and their policies.
+- [x] Write the `observability` module with the log groups and the alarms of section 1.8, and its policies.
+- [x] Add the CI step `npm run infra:validate` to the `ci` job, passing on the modules above: DEP-AC15, DEP-AC16, DEP-AC17, DEP-AC18, DEP-AC19, DEP-AC20, DEP-AC21, DEP-AC22, DEP-AC23, DEP-AC26 and DEP-AC28.
+- [x] Test first: DEP-AC24 in `test/unit/deployment/no-terraform-apply.test.ts`.
+- [x] Test first: DEP-AC14 in `test/unit/deployment/aws-doc.test.ts`; then `docs/deployment/aws.md`, with the bootstrap run, the two-pass apply and the refresh of the RDS CA bundle.
+- [x] Update the docs: in AGENTS.md, `npm run infra:validate` in the commands table, from 12-infra, and `infra/policies/`, `certs/` and `docs/deployment/` in the repository map; the README sections on running the stack, seeding, minting tokens with Docker only and the AWS architecture; a runbook `docs/runbooks/deploy-and-migrate.md`; and the follow-ups closed in ADR-0014, ADR-0015, ADR-0019 and ADR-0020.

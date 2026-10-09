@@ -95,11 +95,7 @@ const STATUS_BODY = {
   required: false,
 };
 
-const STATUS_PROBLEMS = [
-  '/problems/malformed-request',
-  '/problems/forbidden',
-  '/problems/not-found',
-] as const;
+const STATUS_PROBLEMS = [...BODY_PROBLEMS, '/problems/forbidden', '/problems/not-found'] as const;
 
 /** The examples, parameters and problem types of each account operation, by operation id. */
 export const ACCOUNT_OPERATION_DOCS: Readonly<Record<string, OperationDocs>> = {

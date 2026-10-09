@@ -75,6 +75,19 @@ export class PoolAcquireTimeout extends Error {
 }
 
 /**
+ * SQLSTATE 08000, which RDS Proxy answers when it finds no database connection for a statement
+ * within its `connection_borrow_timeout` (SEC-R49): 503 like an exhausted pool, and the connection
+ * is destroyed, never used again, not even for ROLLBACK.
+ */
+export class ProxyBorrowTimeout extends Error {
+  override readonly name = 'ProxyBorrowTimeout';
+
+  constructor(options: { cause: unknown }) {
+    super('the database proxy found no connection in time', options);
+  }
+}
+
+/**
  * The request pool was already closed by the shutdown (SEC-R27): a transient condition, 503 like
  * an exhausted pool, never 500 (SYS-R34).
  */

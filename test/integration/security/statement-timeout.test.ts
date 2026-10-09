@@ -16,7 +16,16 @@ describe('statement_timeout', () => {
 
       const built = buildProductionApp({ env: { DATABASE_URL: scratch.runtimeUrl } });
       const session = new pg.Client({ connectionString: scratch.ownerUrl });
+      const clock = new pg.Client({ connectionString: scratch.ownerUrl });
       await session.connect();
+      await clock.connect();
+      /** The database server's own time, in milliseconds, from a session outside the test's lock. */
+      const databaseNow = async (): Promise<number> => {
+        const result = await clock.query<{ now: string }>(
+          'SELECT (extract(epoch FROM clock_timestamp()) * 1000)::text AS now',
+        );
+        return Number(result.rows[0]?.now);
+      };
       try {
         await built.app.ready();
         await session.query('BEGIN');
@@ -28,19 +37,19 @@ describe('statement_timeout', () => {
             headers: { ...bearer(tokenFor(c1Id, 'customer')), 'x-request-id': reqId },
           });
 
-        const started = performance.now();
+        const started = await databaseNow();
         const blocked = await read('statement-timeout-read');
-        const elapsed = performance.now() - started;
+        const elapsed = (await databaseNow()) - started;
         await session.query('ROLLBACK');
 
         expect(blocked.statusCode).toBe(503);
         expect(problemOf(blocked).type).toBe('/problems/service-unavailable');
         expect(blocked.headers['retry-after']).toBe('1');
-        // statement_timeout runs on the database server's clock. Under Docker Desktop, Postgres runs
-        // in a Linux VM whose clock can run slightly fast against the host's, so the host measures
-        // up to a few tens of milliseconds less than 5 s. The 50 ms tolerance absorbs that drift;
-        // the log line with SQLSTATE 57014 below proves it was statement_timeout that answered.
-        expect(elapsed).toBeGreaterThanOrEqual(5000 - 50);
+        // statement_timeout runs on the database server's clock, which in a Docker VM can drift from
+        // the host's, so the elapsed time is measured on that clock, with clock_timestamp() read
+        // from a separate session just before the read and just after its 503. The log line with
+        // SQLSTATE 57014 below proves it was statement_timeout that answered.
+        expect(elapsed).toBeGreaterThanOrEqual(5000);
         const unavailable = built.logs
           .linesOf('statement-timeout-read')
           .filter((line) => line.msg === 'service unavailable');
@@ -50,6 +59,7 @@ describe('statement_timeout', () => {
         expect((await read('statement-timeout-after')).statusCode).toBe(200);
       } finally {
         await session.end();
+        await clock.end();
         await built.app.close();
       }
     });

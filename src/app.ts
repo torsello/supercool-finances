@@ -183,6 +183,7 @@ export function buildApp(config: Config, options: AppOptions = {}) {
         cursorSecret: config.cursorSecret,
         databaseUrl: config.databaseUrl,
         redisUrl: config.redisUrl,
+        databasePassword: config.databasePassword,
       },
       ...(options.logStream === undefined ? {} : { destination: options.logStream }),
     }),

@@ -1,0 +1,10 @@
+metadata:
+  id: 'SCF_DEP_AC16_DATA_SUBNETS'
+  name: 'DEP-AC16: RDS and ElastiCache live in the isolated subnets'
+  category: 'NETWORKING'
+definition:
+  cond_type: 'attribute'
+  resource_types: ['aws_db_subnet_group', 'aws_elasticache_subnet_group']
+  attribute: '$.subnet_ids'
+  operator: 'jsonpath_equals'
+  value: 'aws_subnet.isolated[*].id'

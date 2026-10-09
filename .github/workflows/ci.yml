@@ -14,10 +14,14 @@ concurrency:
   # Superseded runs on a branch or pull request are cancelled; runs on main always finish.
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
+# No deploy job: the pipeline that builds, pushes and deploys the image lives outside this
+# repository (section 6 of spec 008), as docs/deployment/aws.md describes.
+
 jobs:
+  # The "Verified by" lines of the specs name steps of this job, each run exactly as written.
   ci:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
 
     services:
       # Same image tags as compose.yaml.
@@ -63,6 +67,12 @@ jobs:
 
       - run: npm run openapi:lint
 
+      # DEP-R33: terraform fmt, validate, tflint and checkov with infra/policies, each from an image
+      # pinned by digest. The token, read-only, only lifts GitHub's rate limit on tflint's plugin.
+      - run: npm run infra:validate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
       - name: Create the roles and databases (same SQL as local Docker Compose)
         run: docker exec -i ${{ job.services.postgres.id }} psql -v ON_ERROR_STOP=1 -U postgres < docker/postgres/init/01-databases.sql
 
@@ -77,10 +87,97 @@ jobs:
       # After both test runs, so their JSON reports exist; a missing one fails the gate.
       - run: npm run trace -- --require unit,integration
 
+      # For the job traceability, which adds the e2e report.
+      - name: Upload the unit and integration reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vitest-unit-integration
+          path: |
+            reports/vitest-unit.json
+            reports/vitest-integration.json
+          if-no-files-found: error
+          retention-days: 14
+
       - run: npm run build
 
+  e2e:
+    runs-on: ubuntu-24.04
+    # About 5 minutes locally, the 60 s load test included; the rest covers cold image builds.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      # The suite builds, starts and removes its own Compose project, scf-e2e, and refuses to run
+      # while its host ports or subnet are taken, so no other stack is started here.
+      - run: npm run test:e2e
+        env:
+          # Keeps the stack when the suite ends, so a failure's logs can still be printed.
+          E2E_KEEP_STACK: '1'
+          # SYS-R20: the runner has 2 CPUs for the whole stack and the load generator, so the load
+          # test runs at 100 requests per second here, against 200 on a laptop.
+          LOAD_RATE_PER_SECOND: '100'
+
+      - name: Print the scf-e2e stack's state and logs
+        if: failure()
+        run: |
+          docker compose -p scf-e2e --profile tools ps --all
+          docker compose -p scf-e2e --profile tools logs --no-color --timestamps > reports/e2e-stack.log
+          cat reports/e2e-stack.log
+
+      - name: Upload the load test result and the stack's logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-failure
+          path: |
+            reports/load-test.json
+            reports/e2e-stack.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload the e2e report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vitest-e2e
+          path: reports/vitest-e2e.json
+          if-no-files-found: error
+          retention-days: 14
+
+  # The trace gate over all three levels, so the e2e ACs are enforced too (SYS-AC14, SYS-AC17).
+  traceability:
+    needs: [ci, e2e]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Download the reports of the jobs ci and e2e
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: vitest-*
+          path: reports
+          merge-multiple: true
+
+      - run: npm run trace -- --require unit,integration,e2e
+
   secret-scan:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       GITLEAKS_VERSION: 8.30.1
@@ -101,3 +198,47 @@ jobs:
 
       - name: Scan the full git history
         run: ./gitleaks git --no-banner --redact --verbose .
+
+  # Known vulnerabilities and misconfigurations; any HIGH or CRITICAL finding fails the job.
+  security:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      # trivy runs from its official image, pinned by version and digest like the tools of
+      # npm run infra:validate, sharing one vulnerability database across the three scans.
+      TRIVY_IMAGE: aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      # Reads package-lock.json; nothing is installed, so no install script runs.
+      - name: Audit the npm dependencies
+        run: npm audit --audit-level=high
+
+      - name: Scan the dependencies and files of the repository (trivy fs)
+        run: >-
+          docker run --rm --volume "${PWD}:/repo:ro" --volume "${RUNNER_TEMP}/trivy:/cache"
+          --workdir /repo "${TRIVY_IMAGE}"
+          fs --cache-dir /cache --severity HIGH,CRITICAL --exit-code 1 --no-progress .
+
+      # The Dockerfile and infra/terraform; inline #trivy:ignore comments give their reasons.
+      - name: Scan the configuration files (trivy config)
+        run: >-
+          docker run --rm --volume "${PWD}:/repo:ro" --volume "${RUNNER_TEMP}/trivy:/cache"
+          --workdir /repo "${TRIVY_IMAGE}"
+          config --cache-dir /cache --severity HIGH,CRITICAL --exit-code 1 .
+
+      - name: Build the runtime image
+        run: |
+          docker build --target runtime --tag scf-api:security-scan .
+          docker save --output "${RUNNER_TEMP}/scf-api.tar" scf-api:security-scan
+
+      # From the saved image, so the Docker socket is never given to the scanner.
+      - name: Scan the runtime image (trivy image)
+        run: >-
+          docker run --rm --volume "${RUNNER_TEMP}/scf-api.tar:/scan/scf-api.tar:ro"
+          --volume "${RUNNER_TEMP}/trivy:/cache" "${TRIVY_IMAGE}"
+          image --cache-dir /cache --severity HIGH,CRITICAL --exit-code 1 --no-progress --input /scan/scf-api.tar

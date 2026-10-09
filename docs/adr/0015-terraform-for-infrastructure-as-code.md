@@ -68,3 +68,4 @@ Chosen option: **Option A**, because Terraform is widely known, has a plan and r
 ### Follow-ups
 
 - Phase 12-infra: the modules, the policies in `infra/policies/`, `npm run infra:validate` and its CI step.
+  - Done in phase 12-infra on 2026-10-09.

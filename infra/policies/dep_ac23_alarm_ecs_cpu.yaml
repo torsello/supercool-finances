@@ -1,0 +1,34 @@
+metadata:
+  id: 'SCF_DEP_AC23_ALARM_ECS_CPU'
+  name: 'DEP-AC23: the alarm ECS CPU above 80% exists'
+  category: 'GENERAL_SECURITY'
+definition:
+  and:
+    - cond_type: 'filter'
+      attribute: 'resource_type'
+      operator: 'within'
+      value: ['aws_sns_topic']
+    - cond_type: 'connection'
+      resource_types: ['aws_sns_topic']
+      connected_resource_types: ['aws_cloudwatch_metric_alarm']
+      operator: 'one_exists'
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_metric_alarm']
+      attribute: 'namespace'
+      operator: 'equals'
+      value: 'AWS/ECS'
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_metric_alarm']
+      attribute: 'metric_name'
+      operator: 'equals'
+      value: 'CPUUtilization'
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_metric_alarm']
+      attribute: 'comparison_operator'
+      operator: 'equals'
+      value: 'GreaterThanThreshold'
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_metric_alarm']
+      attribute: 'threshold'
+      operator: 'equals'
+      value: 80

@@ -72,5 +72,5 @@ No task for this spec.
 
 ## 12-infra
 
-- [ ] Make CI run `npm run test:e2e` and `npm run trace -- --require unit,integration,e2e`, so SYS-AC14 and SYS-AC17 are enforced in CI.
-- [ ] Update the docs: README sections on the request pipeline, the error model and the test seams; the OpenAPI error descriptions; the Related ADRs of this spec; and the ADR follow-ups this plan closed (ADR-0003, ADR-0008, ADR-0016, ADR-0018, ADR-0019).
+- [x] Make CI run `npm run test:e2e` and `npm run trace -- --require unit,integration,e2e`, so SYS-AC14 and SYS-AC17 are enforced in CI.
+- [x] Update the docs: README sections on the request pipeline, the error model and the test seams; the OpenAPI error descriptions; the Related ADRs of this spec; and the ADR follow-ups this plan closed (ADR-0003, ADR-0008, ADR-0016, ADR-0018, ADR-0019).

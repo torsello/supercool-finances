@@ -1,0 +1,9 @@
+metadata:
+  id: 'SCF_DEP_AC16_ECS_NO_PUBLIC_IP'
+  name: 'DEP-AC16: the ECS service gives its tasks no public IP'
+  category: 'NETWORKING'
+definition:
+  cond_type: 'attribute'
+  resource_types: ['aws_ecs_service']
+  attribute: 'network_configuration.assign_public_ip'
+  operator: 'is_false'

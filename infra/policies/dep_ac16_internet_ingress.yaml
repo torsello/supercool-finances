@@ -1,0 +1,169 @@
+# The tasks admit PORT, 3000, from the ALB only, so METRICS_PORT from nothing (SEC-R43); the
+# migration and bootstrap group, one_off_db, admits nothing.
+metadata:
+  id: 'SCF_DEP_AC16_INGRESS'
+  name: 'DEP-AC16: every ingress rule matches its layer: the internet reaches only the ALB on 443 and 80, and every other group admits only the group in front of it'
+  category: 'NETWORKING'
+definition:
+  or:
+    - and:
+        - cond_type: 'attribute'
+          resource_types: ['aws_vpc_security_group_ingress_rule']
+          attribute: '$.security_group_id'
+          operator: 'jsonpath_equals'
+          value: 'aws_security_group.alb.id'
+        - cond_type: 'attribute'
+          resource_types: ['aws_vpc_security_group_ingress_rule']
+          attribute: 'cidr_ipv4'
+          operator: 'equals'
+          value: '0.0.0.0/0'
+        - cond_type: 'attribute'
+          resource_types: ['aws_vpc_security_group_ingress_rule']
+          attribute: 'ip_protocol'
+          operator: 'equals'
+          value: 'tcp'
+        - or:
+            - and:
+                - cond_type: 'attribute'
+                  resource_types: ['aws_vpc_security_group_ingress_rule']
+                  attribute: 'from_port'
+                  operator: 'equals'
+                  value: 443
+                - cond_type: 'attribute'
+                  resource_types: ['aws_vpc_security_group_ingress_rule']
+                  attribute: 'to_port'
+                  operator: 'equals'
+                  value: 443
+            - and:
+                - cond_type: 'attribute'
+                  resource_types: ['aws_vpc_security_group_ingress_rule']
+                  attribute: 'from_port'
+                  operator: 'equals'
+                  value: 80
+                - cond_type: 'attribute'
+                  resource_types: ['aws_vpc_security_group_ingress_rule']
+                  attribute: 'to_port'
+                  operator: 'equals'
+                  value: 80
+    - and:
+        - cond_type: 'attribute'
+          resource_types: ['aws_vpc_security_group_ingress_rule']
+          attribute: '$.security_group_id'
+          operator: 'jsonpath_equals'
+          value: 'aws_security_group.tasks.id'
+        - cond_type: 'attribute'
+          resource_types: ['aws_vpc_security_group_ingress_rule']
+          attribute: '$.referenced_security_group_id'
+          operator: 'jsonpath_equals'
+          value: 'aws_security_group.alb.id'
+        - and:
+            - cond_type: 'attribute'
+              resource_types: ['aws_vpc_security_group_ingress_rule']
+              attribute: 'from_port'
+              operator: 'equals'
+              value: 3000
+            - cond_type: 'attribute'
+              resource_types: ['aws_vpc_security_group_ingress_rule']
+              attribute: 'to_port'
+              operator: 'equals'
+              value: 3000
+    - and:
+        - cond_type: 'attribute'
+          resource_types: ['aws_vpc_security_group_ingress_rule']
+          attribute: '$.security_group_id'
+          operator: 'jsonpath_equals'
+          value: 'aws_security_group.endpoints.id'
+        - or:
+            - cond_type: 'attribute'
+              resource_types: ['aws_vpc_security_group_ingress_rule']
+              attribute: '$.referenced_security_group_id'
+              operator: 'jsonpath_equals'
+              value: 'aws_security_group.tasks.id'
+            - cond_type: 'attribute'
+              resource_types: ['aws_vpc_security_group_ingress_rule']
+              attribute: '$.referenced_security_group_id'
+              operator: 'jsonpath_equals'
+              value: 'aws_security_group.one_off_db.id'
+        - and:
+            - cond_type: 'attribute'
+              resource_types: ['aws_vpc_security_group_ingress_rule']
+              attribute: 'from_port'
+              operator: 'equals'
+              value: 443
+            - cond_type: 'attribute'
+              resource_types: ['aws_vpc_security_group_ingress_rule']
+              attribute: 'to_port'
+              operator: 'equals'
+              value: 443
+    - and:
+        - cond_type: 'attribute'
+          resource_types: ['aws_vpc_security_group_ingress_rule']
+          attribute: '$.security_group_id'
+          operator: 'jsonpath_equals'
+          value: 'aws_security_group.proxy.id'
+        - cond_type: 'attribute'
+          resource_types: ['aws_vpc_security_group_ingress_rule']
+          attribute: '$.referenced_security_group_id'
+          operator: 'jsonpath_equals'
+          value: 'aws_security_group.tasks.id'
+        - and:
+            - cond_type: 'attribute'
+              resource_types: ['aws_vpc_security_group_ingress_rule']
+              attribute: 'from_port'
+              operator: 'equals'
+              value: 5432
+            - cond_type: 'attribute'
+              resource_types: ['aws_vpc_security_group_ingress_rule']
+              attribute: 'to_port'
+              operator: 'equals'
+              value: 5432
+    - and:
+        - cond_type: 'attribute'
+          resource_types: ['aws_vpc_security_group_ingress_rule']
+          attribute: '$.security_group_id'
+          operator: 'jsonpath_equals'
+          value: 'aws_security_group.database.id'
+        - or:
+            - cond_type: 'attribute'
+              resource_types: ['aws_vpc_security_group_ingress_rule']
+              attribute: '$.referenced_security_group_id'
+              operator: 'jsonpath_equals'
+              value: 'aws_security_group.proxy.id'
+            - cond_type: 'attribute'
+              resource_types: ['aws_vpc_security_group_ingress_rule']
+              attribute: '$.referenced_security_group_id'
+              operator: 'jsonpath_equals'
+              value: 'aws_security_group.one_off_db.id'
+        - and:
+            - cond_type: 'attribute'
+              resource_types: ['aws_vpc_security_group_ingress_rule']
+              attribute: 'from_port'
+              operator: 'equals'
+              value: 5432
+            - cond_type: 'attribute'
+              resource_types: ['aws_vpc_security_group_ingress_rule']
+              attribute: 'to_port'
+              operator: 'equals'
+              value: 5432
+    - and:
+        - cond_type: 'attribute'
+          resource_types: ['aws_vpc_security_group_ingress_rule']
+          attribute: '$.security_group_id'
+          operator: 'jsonpath_equals'
+          value: 'aws_security_group.cache.id'
+        - cond_type: 'attribute'
+          resource_types: ['aws_vpc_security_group_ingress_rule']
+          attribute: '$.referenced_security_group_id'
+          operator: 'jsonpath_equals'
+          value: 'aws_security_group.tasks.id'
+        - and:
+            - cond_type: 'attribute'
+              resource_types: ['aws_vpc_security_group_ingress_rule']
+              attribute: 'from_port'
+              operator: 'equals'
+              value: 6379
+            - cond_type: 'attribute'
+              resource_types: ['aws_vpc_security_group_ingress_rule']
+              attribute: 'to_port'
+              operator: 'equals'
+              value: 6379

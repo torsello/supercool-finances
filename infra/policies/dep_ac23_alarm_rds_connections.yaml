@@ -1,0 +1,39 @@
+metadata:
+  id: 'SCF_DEP_AC23_ALARM_RDS_CONNECTIONS'
+  name: "DEP-AC23: the alarm RDS connections above 80% of RDS Proxy's connection limit exists"
+  category: 'GENERAL_SECURITY'
+definition:
+  and:
+    - cond_type: 'filter'
+      attribute: 'resource_type'
+      operator: 'within'
+      value: ['aws_sns_topic']
+    - cond_type: 'connection'
+      resource_types: ['aws_sns_topic']
+      connected_resource_types: ['aws_cloudwatch_metric_alarm']
+      operator: 'one_exists'
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_metric_alarm']
+      attribute: 'threshold'
+      operator: 'equals'
+      value: 80
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_metric_alarm']
+      attribute: 'comparison_operator'
+      operator: 'equals'
+      value: 'GreaterThanThreshold'
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_metric_alarm']
+      attribute: "metric_query[?(@.id == 'percent')].expression"
+      operator: 'jsonpath_equals'
+      value: '100 * connections / allowed'
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_metric_alarm']
+      attribute: "metric_query[?(@.id == 'connections')].metric.metric_name"
+      operator: 'jsonpath_equals'
+      value: 'DatabaseConnections'
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_metric_alarm']
+      attribute: "metric_query[?(@.id == 'allowed')].metric.metric_name"
+      operator: 'jsonpath_equals'
+      value: 'MaxDatabaseConnectionsAllowed'

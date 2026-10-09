@@ -1,0 +1,29 @@
+metadata:
+  id: 'SCF_DEP_AC17_WAF_RULES'
+  name: 'DEP-AC17: the web ACL is associated, holds a rate-based rule aggregated by IP and the managed rule groups of section 1.7'
+  category: 'NETWORKING'
+definition:
+  and:
+    - cond_type: 'filter'
+      attribute: 'resource_type'
+      operator: 'within'
+      value: ['aws_wafv2_web_acl']
+    - cond_type: 'connection'
+      resource_types: ['aws_wafv2_web_acl']
+      connected_resource_types: ['aws_wafv2_web_acl_association']
+      operator: 'one_exists'
+    - cond_type: 'attribute'
+      resource_types: ['aws_wafv2_web_acl']
+      attribute: 'rule.*.statement.rate_based_statement.aggregate_key_type'
+      operator: 'contains'
+      value: 'IP'
+    - cond_type: 'attribute'
+      resource_types: ['aws_wafv2_web_acl']
+      attribute: 'rule.*.statement.managed_rule_group_statement.name'
+      operator: 'contains'
+      value: 'AWSManagedRulesCommonRuleSet'
+    - cond_type: 'attribute'
+      resource_types: ['aws_wafv2_web_acl']
+      attribute: 'rule.*.statement.managed_rule_group_statement.name'
+      operator: 'contains'
+      value: 'AWSManagedRulesKnownBadInputsRuleSet'

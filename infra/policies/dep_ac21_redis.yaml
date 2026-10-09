@@ -1,0 +1,48 @@
+# The token goes to the write-only auth_token_wo from an ephemeral read, never to auth_token,
+# which would keep it in the state (DEP-R31).
+metadata:
+  id: 'SCF_DEP_AC21_REDIS'
+  name: 'DEP-AC21: Redis 7 with at least 2 nodes in two zones, automatic failover, encryption in transit and at rest, and an AUTH token from Secrets Manager'
+  category: 'GENERAL_SECURITY'
+definition:
+  and:
+    - cond_type: 'attribute'
+      resource_types: ['aws_elasticache_replication_group']
+      attribute: 'engine'
+      operator: 'equals'
+      value: 'redis'
+    - cond_type: 'attribute'
+      resource_types: ['aws_elasticache_replication_group']
+      attribute: 'engine_version'
+      operator: 'starting_with'
+      value: '7'
+    - cond_type: 'attribute'
+      resource_types: ['aws_elasticache_replication_group']
+      attribute: 'num_cache_clusters'
+      operator: 'greater_than_or_equal'
+      value: 2
+    - cond_type: 'attribute'
+      resource_types: ['aws_elasticache_replication_group']
+      attribute: 'automatic_failover_enabled'
+      operator: 'is_true'
+    - cond_type: 'attribute'
+      resource_types: ['aws_elasticache_replication_group']
+      attribute: 'multi_az_enabled'
+      operator: 'is_true'
+    - cond_type: 'attribute'
+      resource_types: ['aws_elasticache_replication_group']
+      attribute: 'at_rest_encryption_enabled'
+      operator: 'is_true'
+    - cond_type: 'attribute'
+      resource_types: ['aws_elasticache_replication_group']
+      attribute: 'transit_encryption_enabled'
+      operator: 'is_true'
+    - cond_type: 'attribute'
+      resource_types: ['aws_elasticache_replication_group']
+      attribute: 'auth_token'
+      operator: 'not_exists'
+    - cond_type: 'attribute'
+      resource_types: ['aws_elasticache_replication_group']
+      attribute: 'auth_token_wo'
+      operator: 'regex_match'
+      value: '.*ephemeral\.aws_secretsmanager_secret_version\..*'

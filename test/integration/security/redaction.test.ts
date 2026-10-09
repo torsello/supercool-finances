@@ -9,6 +9,7 @@ import { K, nowSeconds, tokenFor, variantToken } from '../../support/tokens.js';
 
 const DB_PASSWORD = 'db-pw-7781';
 const REDIS_PASSWORD = 'redis-pw-5512';
+const PG_PASSWORD = 'pg-pw-4417';
 
 /** `url` with its user and password replaced. */
 function withCredentials(url: string, user: string, password: string): string {
@@ -146,6 +147,35 @@ describe('log redaction', () => {
       await restarted.app.close();
     }
 
+    // A URL without a password, completed from PGPASSWORD as in AWS (section 1.7 of spec 008),
+    // against a port where nothing listens. pg reads PGPASSWORD from the process's environment.
+    const withoutPassword = new URL(unreachable);
+    withoutPassword.password = '';
+    const previous = process.env['PGPASSWORD'];
+    process.env['PGPASSWORD'] = PG_PASSWORD;
+    const third = appWith({ DATABASE_URL: withoutPassword.toString(), PGPASSWORD: PG_PASSWORD });
+    try {
+      await third.app.ready();
+      // A line that holds PGPASSWORD, as a driver error built from the connection settings could:
+      // only the redaction keeps it out of the captured logs.
+      third.app.log.error(
+        { detail: `password ${PG_PASSWORD} rejected` },
+        `PGPASSWORD ${PG_PASSWORD}`,
+      );
+      const failed = await third.app.inject({
+        method: 'GET',
+        url: `/v1/accounts/${a1Id}`,
+        headers: bearer(v),
+      });
+      expect(failed.statusCode).toBe(500);
+      expect(third.logs.lines().some((line) => line.level === 50)).toBe(true);
+      text += third.logs.text();
+    } finally {
+      await third.app.close();
+      if (previous === undefined) delete process.env['PGPASSWORD'];
+      else process.env['PGPASSWORD'] = previous;
+    }
+
     for (const secret of [
       v,
       expired,
@@ -158,6 +188,7 @@ describe('log redaction', () => {
       TEST_CURSOR_SECRET,
       DB_PASSWORD,
       REDIS_PASSWORD,
+      PG_PASSWORD,
     ]) {
       expect(text.includes(secret), `the logs hold ${secret}`).toBe(false);
     }

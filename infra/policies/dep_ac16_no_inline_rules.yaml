@@ -1,0 +1,14 @@
+metadata:
+  id: 'SCF_DEP_AC16_NO_INLINE_RULES'
+  name: 'DEP-AC16: security groups hold no inline rule, so every rule is one the other policies check'
+  category: 'NETWORKING'
+definition:
+  and:
+    - cond_type: 'attribute'
+      resource_types: ['aws_security_group', 'aws_default_security_group']
+      attribute: 'ingress'
+      operator: 'not_exists'
+    - cond_type: 'attribute'
+      resource_types: ['aws_security_group', 'aws_default_security_group']
+      attribute: 'egress'
+      operator: 'not_exists'

@@ -1,0 +1,57 @@
+metadata:
+  id: 'SCF_DEP_AC16_ROUTE_ASSOCIATIONS'
+  name: 'DEP-AC16: each subnet uses the route table of its tier, so only the public subnets reach the internet gateway'
+  category: 'NETWORKING'
+definition:
+  or:
+    - and:
+        - cond_type: 'attribute'
+          resource_types: ['aws_route_table_association']
+          attribute: '$.route_table_id'
+          operator: 'jsonpath_equals'
+          value: 'aws_route_table.public.id'
+        - or:
+            - cond_type: 'attribute'
+              resource_types: ['aws_route_table_association']
+              attribute: '$.subnet_id'
+              operator: 'jsonpath_equals'
+              value: 'aws_subnet.public["0"].id'
+            - cond_type: 'attribute'
+              resource_types: ['aws_route_table_association']
+              attribute: '$.subnet_id'
+              operator: 'jsonpath_equals'
+              value: 'aws_subnet.public["1"].id'
+    - and:
+        - cond_type: 'attribute'
+          resource_types: ['aws_route_table_association']
+          attribute: '$.route_table_id'
+          operator: 'jsonpath_equals'
+          value: 'aws_route_table.private.id'
+        - or:
+            - cond_type: 'attribute'
+              resource_types: ['aws_route_table_association']
+              attribute: '$.subnet_id'
+              operator: 'jsonpath_equals'
+              value: 'aws_subnet.private["0"].id'
+            - cond_type: 'attribute'
+              resource_types: ['aws_route_table_association']
+              attribute: '$.subnet_id'
+              operator: 'jsonpath_equals'
+              value: 'aws_subnet.private["1"].id'
+    - and:
+        - cond_type: 'attribute'
+          resource_types: ['aws_route_table_association']
+          attribute: '$.route_table_id'
+          operator: 'jsonpath_equals'
+          value: 'aws_route_table.isolated.id'
+        - or:
+            - cond_type: 'attribute'
+              resource_types: ['aws_route_table_association']
+              attribute: '$.subnet_id'
+              operator: 'jsonpath_equals'
+              value: 'aws_subnet.isolated["0"].id'
+            - cond_type: 'attribute'
+              resource_types: ['aws_route_table_association']
+              attribute: '$.subnet_id'
+              operator: 'jsonpath_equals'
+              value: 'aws_subnet.isolated["1"].id'

@@ -1,0 +1,41 @@
+# No other task is scheduled (DEP-R37): every schedule must target the cleanup.
+metadata:
+  id: 'SCF_DEP_AC26_SCHEDULE'
+  name: 'DEP-AC26: every schedule runs the cleanup task definition every hour on Fargate, in the private subnets, without a public IP, with its own role'
+  category: 'GENERAL_SECURITY'
+definition:
+  and:
+    - cond_type: 'attribute'
+      resource_types: ['aws_scheduler_schedule']
+      attribute: 'schedule_expression'
+      operator: 'equals'
+      value: 'rate(1 hour)'
+    - cond_type: 'attribute'
+      resource_types: ['aws_scheduler_schedule']
+      attribute: 'target.ecs_parameters.launch_type'
+      operator: 'equals'
+      value: 'FARGATE'
+    - cond_type: 'attribute'
+      resource_types: ['aws_scheduler_schedule']
+      attribute: 'target.ecs_parameters.network_configuration.assign_public_ip'
+      operator: 'is_false'
+    - cond_type: 'attribute'
+      resource_types: ['aws_scheduler_schedule']
+      attribute: '$.target.ecs_parameters.network_configuration.subnets'
+      operator: 'jsonpath_equals'
+      value: 'aws_subnet.private[*].id'
+    - cond_type: 'attribute'
+      resource_types: ['aws_scheduler_schedule']
+      attribute: '$.target.ecs_parameters.task_definition_arn'
+      operator: 'jsonpath_equals'
+      value: 'aws_ecs_task_definition.cleanup.arn'
+    - cond_type: 'attribute'
+      resource_types: ['aws_scheduler_schedule']
+      attribute: '$.target.arn'
+      operator: 'jsonpath_equals'
+      value: 'aws_ecs_cluster.this.arn'
+    - cond_type: 'attribute'
+      resource_types: ['aws_scheduler_schedule']
+      attribute: '$.target.role_arn'
+      operator: 'jsonpath_equals'
+      value: 'aws_iam_role.scheduler.arn'

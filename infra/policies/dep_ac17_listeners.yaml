@@ -1,0 +1,56 @@
+# Checkov renders aws_acm_certificate_validation.this.certificate_arn, the listener's certificate,
+# as the certificate it validates, aws_acm_certificate.this.arn.
+# Every ELBSecurityPolicy-TLS13-* policy accepts TLS 1.2 or later only.
+metadata:
+  id: 'SCF_DEP_AC17_LISTENERS'
+  name: 'DEP-AC17: the ALB listens only on 443, with HTTPS, the ACM certificate and a TLS 1.2 or later policy, and on 80, only to redirect to HTTPS'
+  category: 'NETWORKING'
+definition:
+  or:
+    - and:
+        - cond_type: 'attribute'
+          resource_types: ['aws_lb_listener']
+          attribute: 'port'
+          operator: 'equals'
+          value: 443
+        - cond_type: 'attribute'
+          resource_types: ['aws_lb_listener']
+          attribute: 'protocol'
+          operator: 'equals'
+          value: 'HTTPS'
+        - cond_type: 'attribute'
+          resource_types: ['aws_lb_listener']
+          attribute: 'ssl_policy'
+          operator: 'starting_with'
+          value: 'ELBSecurityPolicy-TLS13-'
+        - cond_type: 'attribute'
+          resource_types: ['aws_lb_listener']
+          attribute: '$.certificate_arn'
+          operator: 'jsonpath_equals'
+          value: 'aws_acm_certificate.this.arn'
+    - and:
+        - cond_type: 'attribute'
+          resource_types: ['aws_lb_listener']
+          attribute: 'port'
+          operator: 'equals'
+          value: 80
+        - cond_type: 'attribute'
+          resource_types: ['aws_lb_listener']
+          attribute: 'protocol'
+          operator: 'equals'
+          value: 'HTTP'
+        - cond_type: 'attribute'
+          resource_types: ['aws_lb_listener']
+          attribute: 'default_action.type'
+          operator: 'equals'
+          value: 'redirect'
+        - cond_type: 'attribute'
+          resource_types: ['aws_lb_listener']
+          attribute: 'default_action.redirect.protocol'
+          operator: 'equals'
+          value: 'HTTPS'
+        - cond_type: 'attribute'
+          resource_types: ['aws_lb_listener']
+          attribute: 'default_action.redirect.status_code'
+          operator: 'equals'
+          value: 'HTTP_301'

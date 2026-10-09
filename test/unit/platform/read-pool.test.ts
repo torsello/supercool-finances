@@ -2,7 +2,11 @@ import { sql } from 'kysely';
 import pg from 'pg';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { acquiringPool, createDatabase } from '../../../src/platform/db/database.js';
-import { PoolClosed, StatementTimeout } from '../../../src/platform/db/errors.js';
+import {
+  PoolClosed,
+  ProxyBorrowTimeout,
+  StatementTimeout,
+} from '../../../src/platform/db/errors.js';
 import { toProblem } from '../../../src/platform/http/error-handler.js';
 import {
   CLIENT_SIDE_LIMIT_MS,
@@ -190,6 +194,28 @@ describe('the read pool', () => {
     await clock.advanceTo(10);
     expect(state.error).toBeInstanceOf(StatementTimeout);
     expect(client.releases).toEqual([{ error: undefined, at: 10 }]);
+  });
+
+  it("SEC-AC39 a read that meets RDS Proxy's borrow timeout (08000) answers 503 with Retry-After: 1 and destroys its connection", async () => {
+    const clock = new FakeClock();
+    const borrowTimeout = databaseError('08000');
+    borrowTimeout.message = 'Timed-out waiting to acquire database connection';
+    const client = new ReadClient(clock, () => ({ ms: 5000, outcome: borrowTimeout }));
+    const pool = {
+      connect: () => Promise.resolve(client as unknown as pg.PoolClient),
+      end: () => Promise.resolve(),
+    };
+    const state = outcome(sql`SELECT 1 AS n`.execute(createDatabase(pool)), clock);
+    await clock.advanceTo(5000);
+
+    expect(state.error).toBeInstanceOf(ProxyBorrowTimeout);
+    const problem = toProblem(state.error);
+    expect(problem.status).toBe(503);
+    expect(problem.type).toBe('/problems/service-unavailable');
+    expect(problem.headers['retry-after']).toBe('1');
+    expect(client.statements).toHaveLength(1);
+    expect(client.releases).toHaveLength(1);
+    expect(client.releases[0]?.error).toBeInstanceOf(Error);
   });
 
   it('SYS-R34 a connection asked of a pool the shutdown already ended answers 503 with Retry-After, never 500', async () => {

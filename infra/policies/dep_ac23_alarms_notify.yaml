@@ -1,0 +1,15 @@
+metadata:
+  id: 'SCF_DEP_AC23_ALARMS_NOTIFY'
+  name: 'DEP-AC23: every alarm notifies the one SNS topic, and only it'
+  category: 'GENERAL_SECURITY'
+definition:
+  and:
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_metric_alarm']
+      attribute: '$.alarm_actions[0]'
+      operator: 'jsonpath_equals'
+      value: 'aws_sns_topic.alarms.arn'
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_metric_alarm']
+      attribute: '$.alarm_actions[1]'
+      operator: 'jsonpath_not_exists'

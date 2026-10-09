@@ -57,6 +57,11 @@ export interface Config {
   replicaId: string | undefined;
   /** The owner role's URL, read only by the migrations, validated where it is set (spec 008). */
   migrationDatabaseUrl: string | undefined;
+  /**
+   * `PGPASSWORD`, which `pg` itself reads for a database URL that holds no password, as the tasks
+   * in AWS receive it (section 1.7 of spec 008); read here only so the logs never hold it (SEC-R22).
+   */
+  databasePassword: string | undefined;
   jwt: JwtConfig;
 }
 
@@ -417,6 +422,11 @@ export function loadConfig(env: Environment): Config {
         const url = urlOf(value);
         return url !== undefined && isPostgresProtocol(url);
       },
+    ),
+    databasePassword: reader.optional(
+      'PGPASSWORD',
+      'unset, or a non-empty value',
+      (value) => value !== '',
     ),
     jwt,
   };

@@ -3,6 +3,9 @@
 # the GitHub Actions of the workflows (pinned by commit). Images stay on the major versions the
 # stack specifies (Node 24, PostgreSQL 16, Redis 7, AGENTS.md section 4), and nginx on the 1.28
 # stable branch (plan 008 section 3), so a major or mainline bump is a decision, not an update.
+# Likewise no semver-major update of an npm package or a GitHub Action is proposed, so TypeScript,
+# @types/node and the actions move to a new major only on purpose; @types/node also stays on the
+# major of the Node version in .nvmrc (24).
 version: 2
 updates:
   - package-ecosystem: docker
@@ -27,8 +30,17 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+      # Node 24, the version of .nvmrc.
+      - dependency-name: '@types/node'
+        versions: ['>= 25']
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']

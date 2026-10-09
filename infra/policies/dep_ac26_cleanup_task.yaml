@@ -1,0 +1,22 @@
+metadata:
+  id: 'SCF_DEP_AC26_CLEANUP_TASK'
+  name: "DEP-AC26: the cleanup task definition reads only the runtime role's password and reaches PostgreSQL through RDS Proxy"
+  category: 'GENERAL_SECURITY'
+definition:
+  or:
+    - cond_type: 'attribute'
+      resource_types: ['aws_ecs_task_definition']
+      attribute: 'container_definitions'
+      operator: 'not_regex_match'
+      value: '.*dist/cli/idempotency-cleanup\.js.*'
+    - and:
+        - cond_type: 'attribute'
+          resource_types: ['aws_ecs_task_definition']
+          attribute: 'container_definitions'
+          operator: 'regex_match'
+          value: '.*''secrets'': (\{''name'': ''PGPASSWORD'', ''valueFrom'': ''aws_secretsmanager_secret\.db_runtime\.arn:password::''\}|\[\{''name'': ''PGPASSWORD'', ''valueFrom'': ''aws_secretsmanager_secret\.db_runtime\.arn:password::''\}\]), .*'
+        - cond_type: 'attribute'
+          resource_types: ['aws_ecs_task_definition']
+          attribute: 'container_definitions'
+          operator: 'regex_match'
+          value: '.*''name'': ''DATABASE_URL'', ''value'': ''postgres://scf_app@aws_db_proxy\.this\.endpoint:5432/.*'

@@ -1,0 +1,19 @@
+metadata:
+  id: 'SCF_DEP_AC28_BOOTSTRAP_TASK_EXISTS'
+  name: 'DEP-AC28: a task definition of the service image runs the bootstrap'
+  category: 'GENERAL_SECURITY'
+definition:
+  and:
+    - cond_type: 'filter'
+      attribute: 'resource_type'
+      operator: 'within'
+      value: ['aws_ecr_repository']
+    - cond_type: 'connection'
+      resource_types: ['aws_ecr_repository']
+      connected_resource_types: ['aws_ecs_task_definition']
+      operator: 'one_exists'
+    - cond_type: 'attribute'
+      resource_types: ['aws_ecs_task_definition']
+      attribute: 'container_definitions'
+      operator: 'regex_match'
+      value: '.*dist/cli/bootstrap-roles\.js.*'

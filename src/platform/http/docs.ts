@@ -32,10 +32,14 @@ const ALL_PROBLEM_TYPES = Object.keys(PROBLEM_REFERENCE) as DocumentedProblemTyp
 /** The table of every problem type in the document's description. */
 function problemTypesTable(): string {
   const rows = ALL_PROBLEM_TYPES.map((type) => {
-    const { statuses, title, when } = PROBLEM_REFERENCE[type];
-    return `| \`${type}\` | ${statuses.join(', ')} | ${title} | ${when} |`;
+    const { statuses, title, when, replay } = PROBLEM_REFERENCE[type];
+    return `| \`${type}\` | ${statuses.join(', ')} | ${title} | ${when} | ${replay} |`;
   });
-  return ['| Type | Status | Title | When |', '| --- | --- | --- | --- |', ...rows].join('\n');
+  return [
+    '| Type | Status | Title | When | Stored for replay |',
+    '| --- | --- | --- | --- | --- |',
+    ...rows,
+  ].join('\n');
 }
 
 function description(ttlSeconds: number): string {
@@ -52,7 +56,7 @@ function description(ttlSeconds: number): string {
     '',
     "**Correlation.** Every response carries `X-Request-Id`: the client's value when it is 1 to 128 characters of `A-Z a-z 0-9 . _ : -`, a generated UUIDv7 otherwise.",
     '',
-    `**Errors.** Every error answer is \`${PROBLEM_CONTENT_TYPE}\` (RFC 9457), with one of these types:`,
+    `**Errors.** Every error answer is \`${PROBLEM_CONTENT_TYPE}\` (RFC 9457) with \`type\`, \`title\`, \`status\`, \`detail\` and \`requestId\`, and \`errors\` for a validation error; \`title\` and \`detail\` are fixed per type, and no body holds a stack trace, SQL or an underlying error's message. Checks run in this order and the first failure answers: route (404), authentication (401), per-user rate limit (429), role (403), media type (415), body size (413), malformed request (400), idempotency (a stored response, 422 or 409), validation (422), lookup (404), business rules (409, 422). A stored answer is replayed with \`Idempotent-Replayed: true\`; one not stored committed nothing, so a retry with the same key runs the request again, except a 503 at the request timeout after the \`COMMIT\` was sent and a gateway error (502, 503 or 504 from the load balancer), whose outcome a retry with the same key reveals: the stored response if the movement committed, a new run otherwise. The types:`,
     '',
     problemTypesTable(),
   ].join('\n');
@@ -162,10 +166,12 @@ function sharedComponents(ttlSeconds: number) {
   };
 }
 
-/** The types answered with `Retry-After`, which the client retries with the same key. */
+/** The types answered with `Retry-After`, the seconds to wait before sending the request again. */
 const RETRIED: ReadonlySet<DocumentedProblemType> = new Set([
   '/problems/request-in-progress',
+  '/problems/rate-limited',
   '/problems/service-unavailable',
+  '/problems/upstream-unavailable',
 ]);
 
 /**

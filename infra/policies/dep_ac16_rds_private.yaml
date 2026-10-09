@@ -1,0 +1,9 @@
+metadata:
+  id: 'SCF_DEP_AC16_RDS_PRIVATE'
+  name: 'DEP-AC16: RDS is not publicly accessible'
+  category: 'NETWORKING'
+definition:
+  cond_type: 'attribute'
+  resource_types: ['aws_db_instance']
+  attribute: 'publicly_accessible'
+  operator: 'is_false'

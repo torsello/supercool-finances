@@ -1,0 +1,10 @@
+metadata:
+  id: 'SCF_DEP_AC18_AUTOSCALING'
+  name: 'DEP-AC18: autoscaling never goes below 2 tasks'
+  category: 'GENERAL_SECURITY'
+definition:
+  cond_type: 'attribute'
+  resource_types: ['aws_appautoscaling_target']
+  attribute: 'min_capacity'
+  operator: 'greater_than_or_equal'
+  value: 2

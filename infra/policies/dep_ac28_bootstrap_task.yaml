@@ -1,0 +1,22 @@
+metadata:
+  id: 'SCF_DEP_AC28_BOOTSTRAP_TASK'
+  name: 'DEP-AC28: the bootstrap task definition reads only the master password and both role passwords, and reaches the instance with verify-full and the RDS CA bundle'
+  category: 'GENERAL_SECURITY'
+definition:
+  or:
+    - cond_type: 'attribute'
+      resource_types: ['aws_ecs_task_definition']
+      attribute: 'container_definitions'
+      operator: 'not_regex_match'
+      value: '.*dist/cli/bootstrap-roles\.js.*'
+    - and:
+        - cond_type: 'attribute'
+          resource_types: ['aws_ecs_task_definition']
+          attribute: 'container_definitions'
+          operator: 'regex_match'
+          value: '.*''name'': ''BOOTSTRAP_DATABASE_URL'', ''value'': ''postgres://[a-z_]+@aws_db_instance\.this\.address:5432/[a-z_]+\?sslmode[=:]verify-full&sslrootcert[=:]/app/dist/certs/rds-global-bundle\.pem''.*'
+        - cond_type: 'attribute'
+          resource_types: ['aws_ecs_task_definition']
+          attribute: 'container_definitions'
+          operator: 'regex_match'
+          value: '.*''secrets'': \[\{''name'': ''PGPASSWORD'', ''valueFrom'': ''[^'']*aws_db_instance\.this\.master_user_secret[^'']*:password::''\}, \{''name'': ''OWNER_ROLE_PASSWORD'', ''valueFrom'': ''aws_secretsmanager_secret\.db_owner\.arn:password::''\}, \{''name'': ''RUNTIME_ROLE_PASSWORD'', ''valueFrom'': ''aws_secretsmanager_secret\.db_runtime\.arn:password::''\}\].*'

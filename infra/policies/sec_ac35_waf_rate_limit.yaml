@@ -1,0 +1,64 @@
+# Section 1.6 of spec 007: WAF counts over fixed windows and allows no burst, so the limit is
+# 60 x RATE_LIMIT_IP_RPS over a 1-minute window; RATE_LIMIT_IP_RPS defaults to 500. Its block
+# answers 429, Retry-After: 60 and the JSON body of SEC-R01 without requestId.
+metadata:
+  id: 'SCF_SEC_AC35_WAF_RATE_LIMIT'
+  name: 'SEC-AC35: the per-IP rule blocks, aggregated by IP, over 60 seconds, at 60 x RATE_LIMIT_IP_RPS (500) = 30000 requests, answering 429 with Retry-After: 60 and a JSON problem body of type /problems/rate-limited'
+  category: 'NETWORKING'
+definition:
+  and:
+    - cond_type: 'attribute'
+      resource_types: ['aws_wafv2_web_acl']
+      attribute: "rule[?(@.name == 'per-ip-rate-limit')].statement.rate_based_statement.aggregate_key_type"
+      operator: 'jsonpath_equals'
+      value: 'IP'
+    - cond_type: 'attribute'
+      resource_types: ['aws_wafv2_web_acl']
+      attribute: "rule[?(@.name == 'per-ip-rate-limit')].statement.rate_based_statement.evaluation_window_sec"
+      operator: 'jsonpath_equals'
+      value: 60
+    - cond_type: 'attribute'
+      resource_types: ['aws_wafv2_web_acl']
+      attribute: "rule[?(@.name == 'per-ip-rate-limit')].statement.rate_based_statement.limit"
+      operator: 'jsonpath_equals'
+      value: 30000
+    - cond_type: 'attribute'
+      resource_types: ['aws_wafv2_web_acl']
+      attribute: "rule[?(@.name == 'per-ip-rate-limit')].action.block"
+      operator: 'jsonpath_exists'
+    - cond_type: 'attribute'
+      resource_types: ['aws_wafv2_web_acl']
+      attribute: "rule[?(@.name == 'per-ip-rate-limit')].action.block.custom_response.response_code"
+      operator: 'jsonpath_equals'
+      value: 429
+    - cond_type: 'attribute'
+      resource_types: ['aws_wafv2_web_acl']
+      attribute: "rule[?(@.name == 'per-ip-rate-limit')].action.block.custom_response.response_header[?(@.name == 'Retry-After')].value"
+      operator: 'jsonpath_equals'
+      value: '60'
+    - cond_type: 'attribute'
+      resource_types: ['aws_wafv2_web_acl']
+      attribute: "rule[?(@.name == 'per-ip-rate-limit')].action.block.custom_response.custom_response_body_key"
+      operator: 'jsonpath_equals'
+      value: 'rate-limited'
+    - cond_type: 'attribute'
+      resource_types: ['aws_wafv2_web_acl']
+      attribute: "custom_response_body[?(@.key == 'rate-limited')].content_type"
+      operator: 'jsonpath_equals'
+      value: 'APPLICATION_JSON'
+    # checkov renders the JSON content as an object.
+    - cond_type: 'attribute'
+      resource_types: ['aws_wafv2_web_acl']
+      attribute: "custom_response_body[?(@.key == 'rate-limited')].content.type"
+      operator: 'jsonpath_equals'
+      value: '/problems/rate-limited'
+    - cond_type: 'attribute'
+      resource_types: ['aws_wafv2_web_acl']
+      attribute: "custom_response_body[?(@.key == 'rate-limited')].content.title"
+      operator: 'jsonpath_equals'
+      value: 'Rate Limited'
+    - cond_type: 'attribute'
+      resource_types: ['aws_wafv2_web_acl']
+      attribute: "custom_response_body[?(@.key == 'rate-limited')].content.status"
+      operator: 'jsonpath_equals'
+      value: 429

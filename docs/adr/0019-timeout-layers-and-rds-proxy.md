@@ -21,7 +21,7 @@ A request passes through the load balancer, a service replica, the connection po
 ### Option A: Ordered layers, timeouts on the role, lock timeouts through a transaction-local SQL function
 
 - **Pros:**
-  - Each layer gives up before the layer outside it: lock waits < statement timeout < request timeout < load balancer (section 1.1 of spec 007), and the service refuses to start with a configuration that breaks that budget (SEC-R35).
+  - Each layer gives up before the layer outside it: lock waits < statement timeout < request timeout < load balancer (section 1.1 of spec 007), and the service refuses to start with a configuration that breaks that budget (SEC-R35). (Update 2026-10-09, phase 12-infra: in AWS one more layer waits between the pool and PostgreSQL, RDS Proxy's `connection_borrow_timeout`, set to 5 s instead of its default of 120 s; its SQLSTATE 08000 is answered 503 and its connection destroyed, SEC-R49, section 1.1 of spec 007.)
   - `statement_timeout` and `idle_in_transaction_session_timeout` are set on the runtime role with `ALTER ROLE ... SET` from a migration (SEC-R29), so every session starts with them and the service sends no `SET`.
   - The lock timeouts go through a small SQL function, `app.set_lock_timeout(ms)`, that calls `set_config('lock_timeout', ..., true)` (SEC-R31): the value is transaction-local, so it ends with the transaction and never reaches another request.
   - According to AWS, calling a stored function does not pin (see Decision).
@@ -74,4 +74,7 @@ Values fixed by spec 007 (section 1.1): account lock 2000 ms and key wait 2000 m
 ### Follow-ups
 
 - Phase 05-schema: the role settings migration and `app.set_lock_timeout`.
+  - Done in phase 05-schema on 2026-10-08.
 - Phase 12-infra: re-check the AWS page; if the documented behaviour changed, write a new ADR. Decide whether the migration task connects through RDS Proxy or to the instance directly (node-pg-migrate's session advisory lock pins its connection through the proxy), and whether to alarm on `DatabaseConnectionsCurrentlySessionPinned`; either one is a change to spec 008 for its owner to approve.
+  - (Update 2026-10-09, phase 12-infra.) The AWS page, re-read on 2026-10-09, still lists `SET` commands and `set_config` among the PostgreSQL pinning conditions and still says that calling stored procedures and functions does not pin, so the decision above stands and no new ADR is needed. It now also names `DEALLOCATE` and `EXECUTE` beside `PREPARE`, loading a library module such as `auto_explain`, and `DISCARD ALL` as a pool's reset query, none of which the service sends, and notes that transaction-level advisory locks (`pg_advisory_xact_lock` and its variants) do not pin. The owner decided that the migration task, and the one-off bootstrap task that creates the roles, connect to the RDS instance directly, not through RDS Proxy, so node-pg-migrate's session advisory lock never pins a proxy connection; and that a CloudWatch alarm fires when `DatabaseConnectionsCurrentlySessionPinned` has a Maximum above 0 over 5 minutes (sections 1.7 and 1.8 of spec 008, DEP-R28, DEP-R38 to DEP-R41).
+  - Done in phase 12-infra on 2026-10-09.

@@ -1,0 +1,10 @@
+metadata:
+  id: 'SCF_DEP_AC20_PROXY_POOL'
+  name: "DEP-AC20: RDS Proxy uses at most 90% of the instance's connections"
+  category: 'GENERAL_SECURITY'
+definition:
+  cond_type: 'attribute'
+  resource_types: ['aws_db_proxy_default_target_group']
+  attribute: 'connection_pool_config.max_connections_percent'
+  operator: 'less_than_or_equal'
+  value: 90

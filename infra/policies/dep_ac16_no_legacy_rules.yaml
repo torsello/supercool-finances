@@ -1,0 +1,10 @@
+# Any such resource fails: type is a required argument.
+metadata:
+  id: 'SCF_DEP_AC16_NO_LEGACY_RULES'
+  name: 'DEP-AC16: no aws_security_group_rule, so every rule is one the other policies check'
+  category: 'NETWORKING'
+definition:
+  cond_type: 'attribute'
+  resource_types: ['aws_security_group_rule']
+  attribute: 'type'
+  operator: 'not_exists'

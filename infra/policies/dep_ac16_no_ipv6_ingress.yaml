@@ -1,0 +1,14 @@
+metadata:
+  id: 'SCF_DEP_AC16_NO_IPV6_INGRESS'
+  name: 'DEP-AC16: no ingress rule admits an IPv6 range or a prefix list'
+  category: 'NETWORKING'
+definition:
+  and:
+    - cond_type: 'attribute'
+      resource_types: ['aws_vpc_security_group_ingress_rule']
+      attribute: 'cidr_ipv6'
+      operator: 'not_exists'
+    - cond_type: 'attribute'
+      resource_types: ['aws_vpc_security_group_ingress_rule']
+      attribute: 'prefix_list_id'
+      operator: 'not_exists'

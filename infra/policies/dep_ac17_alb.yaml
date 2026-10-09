@@ -1,0 +1,19 @@
+metadata:
+  id: 'SCF_DEP_AC17_ALB'
+  name: 'DEP-AC17: the ALB is a public application load balancer that drops invalid header fields'
+  category: 'NETWORKING'
+definition:
+  and:
+    - cond_type: 'attribute'
+      resource_types: ['aws_lb']
+      attribute: 'load_balancer_type'
+      operator: 'equals'
+      value: 'application'
+    - cond_type: 'attribute'
+      resource_types: ['aws_lb']
+      attribute: 'internal'
+      operator: 'is_false'
+    - cond_type: 'attribute'
+      resource_types: ['aws_lb']
+      attribute: 'drop_invalid_header_fields'
+      operator: 'is_true'

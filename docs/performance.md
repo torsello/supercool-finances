@@ -1,6 +1,6 @@
 # Performance
 
-The latest result of the load test of SYS-R20 (`scripts/load-test.ts`), written by the test itself. It runs as `npm run load` or `make load` against the stack of `docker compose up --build --wait`, and the e2e test of SYS-AC17 runs it too, so every e2e run rewrites this file. The p99 target is reported, not guaranteed: a run that misses it does not fail. A run fails on a 5xx, a connection error, a lost request, a ledger that does not reconcile, or a generator that fell behind its schedule.
+The latest result of the load test of SYS-R20 (`scripts/load-test.ts`), written by the test itself. It runs as `npm run load` or `make load` against the stack of `docker compose up --build --wait`, and the e2e test of SYS-AC17 runs it too, so every e2e run rewrites this file. The rate is `LOAD_RATE_PER_SECOND`, 200 requests per second by default; the CI job `e2e` runs at 100, because its runner has 2 CPUs for the whole stack and the generator, and the result committed here is a local run at 200. The p99 target is reported, not guaranteed: a run that misses it does not fail. A run fails on a 5xx, a connection error, a lost request, a ledger that does not reconcile, or a generator that fell behind its schedule.
 
 ## Machine
 

@@ -7,7 +7,8 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY . .
-# Compiles src/ to dist/ and copies migrations/*.sql to dist/migrations/ (plan 007 section 1).
+# Compiles src/ to dist/ and copies migrations/*.sql to dist/migrations/ (plan 007 section 1) and
+# the RDS CA bundle to dist/certs/ (DEP-R41).
 RUN npm run build
 
 # Tools stage: the build stage's /app plus gitleaks, the tools image of compose.yaml, which runs
@@ -36,7 +37,13 @@ COPY --from=build /app ./
 FROM node:24.21.0-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS runtime
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund && npm cache clean --force
+# Then npm, npx, corepack and yarn, which the base image ships and nothing in the container runs,
+# are deleted: every entry point is node (DEP-R20), and the CI job security scans the image with
+# trivy. seed, token and reconcile run in the tools stage.
+RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund && npm cache clean --force \
+  && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /opt/yarn-v* \
+    /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /usr/local/bin/yarn \
+    /usr/local/bin/yarnpkg /root/.npm
 COPY --from=build /app/dist ./dist
 # Every file stays owned by root, so the user node (uid 1000) owns none and the container also runs
 # with a read-only root file system (DEP-R19).

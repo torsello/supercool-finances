@@ -1,0 +1,9 @@
+metadata:
+  id: 'SCF_DEP_AC16_NO_INLINE_ROUTES'
+  name: 'DEP-AC16: no route table holds inline routes, so every route is one SCF_DEP_AC16_ROUTES checks'
+  category: 'NETWORKING'
+definition:
+  cond_type: 'attribute'
+  resource_types: ['aws_route_table']
+  attribute: 'route'
+  operator: 'not_exists'

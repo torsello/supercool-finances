@@ -1,0 +1,27 @@
+# Anchored on the observability module's KMS key, the one whose description names the log groups;
+# every other key passes.
+metadata:
+  id: 'SCF_DEP_AC23_LOG_GROUP_IDEMPOTENCY_CLEANUP'
+  name: 'DEP-AC23: the log group /scf/idempotency-cleanup exists, encrypted with the observability key'
+  category: 'GENERAL_SECURITY'
+definition:
+  or:
+    - cond_type: 'attribute'
+      resource_types: ['aws_kms_key']
+      attribute: 'description'
+      operator: 'not_contains'
+      value: 'CloudWatch log groups'
+    - and:
+        - cond_type: 'filter'
+          attribute: 'resource_type'
+          operator: 'within'
+          value: ['aws_kms_key']
+        - cond_type: 'connection'
+          resource_types: ['aws_kms_key']
+          connected_resource_types: ['aws_cloudwatch_log_group']
+          operator: 'one_exists'
+        - cond_type: 'attribute'
+          resource_types: ['aws_cloudwatch_log_group']
+          attribute: 'name'
+          operator: 'equals'
+          value: '/scf/idempotency-cleanup'

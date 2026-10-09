@@ -1,0 +1,39 @@
+metadata:
+  id: 'SCF_DEP_AC23_ALARM_WAF_BLOCKED'
+  name: 'DEP-AC23: the alarm WAF blocked requests above 1000 in 5 minutes exists'
+  category: 'GENERAL_SECURITY'
+definition:
+  and:
+    - cond_type: 'filter'
+      attribute: 'resource_type'
+      operator: 'within'
+      value: ['aws_sns_topic']
+    - cond_type: 'connection'
+      resource_types: ['aws_sns_topic']
+      connected_resource_types: ['aws_cloudwatch_metric_alarm']
+      operator: 'one_exists'
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_metric_alarm']
+      attribute: 'metric_name'
+      operator: 'equals'
+      value: 'BlockedRequests'
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_metric_alarm']
+      attribute: 'statistic'
+      operator: 'equals'
+      value: 'Sum'
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_metric_alarm']
+      attribute: 'period'
+      operator: 'equals'
+      value: 300
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_metric_alarm']
+      attribute: 'comparison_operator'
+      operator: 'equals'
+      value: 'GreaterThanThreshold'
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_metric_alarm']
+      attribute: 'threshold'
+      operator: 'equals'
+      value: 1000

@@ -1,0 +1,26 @@
+# The network module creates one private subnet per zone of var.availability_zones, which its
+# validation keeps at exactly two; a subnet in the second zone proves the first exists too.
+metadata:
+  id: 'SCF_DEP_AC18_TWO_ZONES'
+  name: 'DEP-AC18: the private subnets span two availability zones'
+  category: 'GENERAL_SECURITY'
+definition:
+  and:
+    - cond_type: 'filter'
+      attribute: 'resource_type'
+      operator: 'within'
+      value: ['aws_vpc']
+    - cond_type: 'connection'
+      resource_types: ['aws_vpc']
+      connected_resource_types: ['aws_subnet']
+      operator: 'one_exists'
+    - cond_type: 'attribute'
+      resource_types: ['aws_subnet']
+      attribute: 'tags.Tier'
+      operator: 'equals'
+      value: 'private'
+    - cond_type: 'attribute'
+      resource_types: ['aws_subnet']
+      attribute: '$.availability_zone'
+      operator: 'jsonpath_equals'
+      value: 'local.azs["1"]'

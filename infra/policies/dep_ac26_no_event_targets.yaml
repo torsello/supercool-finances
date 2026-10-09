@@ -1,0 +1,17 @@
+# Any EventBridge rule target that would run a task fails; the only target allowed is the alarm
+# topic, which the RDS storage events of section 1.8 use.
+metadata:
+  id: 'SCF_DEP_AC26_NO_EVENT_TARGETS'
+  name: 'DEP-AC26: no EventBridge rule runs a task, so the schedule is the only scheduled task; rule targets only reach the alarm topic'
+  category: 'GENERAL_SECURITY'
+definition:
+  and:
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_event_target']
+      attribute: 'ecs_target'
+      operator: 'not_exists'
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_event_target']
+      attribute: '$.arn'
+      operator: 'jsonpath_equals'
+      value: 'aws_sns_topic.alarms.arn'

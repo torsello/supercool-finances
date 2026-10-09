@@ -6,7 +6,12 @@ import {
   type RunScope,
 } from '../http/request-timeout.js';
 import { AccountLockTimeout, IdempotencyWaitTimeout, RetriesExhausted } from './errors.js';
-import { classifyDatabaseError, isRetryable, sqlstateOf } from './sqlstate.js';
+import {
+  classifyDatabaseError,
+  isProxyBorrowTimeout,
+  isRetryable,
+  sqlstateOf,
+} from './sqlstate.js';
 
 /** Attempts in total for a money movement, the first included (SYS-R18). */
 export const MAX_ATTEMPTS = 3;
@@ -225,7 +230,11 @@ export class TransactionRunner<Client extends RunnerClient> {
         connection.broken ??= unaccounted(client);
         return result;
       } catch (error) {
-        connection.broken ??= await rollBack(client);
+        // After RDS Proxy's borrow timeout nothing more is sent, not even ROLLBACK, which would
+        // wait for a connection again: the client is destroyed on release (SEC-R49).
+        connection.broken ??= isProxyBorrowTimeout(error)
+          ? new Error('the database proxy found no connection in time', { cause: error })
+          : await rollBack(client);
         if (retry === 'movement' && isRetryable(error)) {
           // A broken connection cannot serve another attempt, so this one was the last (SYS-R19).
           if (connection.broken !== undefined || attempt >= MAX_ATTEMPTS) {

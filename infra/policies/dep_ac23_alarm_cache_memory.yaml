@@ -1,0 +1,39 @@
+metadata:
+  id: 'SCF_DEP_AC23_ALARM_CACHE_MEMORY'
+  name: 'DEP-AC23: the alarm ElastiCache memory above 80% exists'
+  category: 'GENERAL_SECURITY'
+definition:
+  and:
+    - cond_type: 'filter'
+      attribute: 'resource_type'
+      operator: 'within'
+      value: ['aws_sns_topic']
+    - cond_type: 'connection'
+      resource_types: ['aws_sns_topic']
+      connected_resource_types: ['aws_cloudwatch_metric_alarm']
+      operator: 'one_exists'
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_metric_alarm']
+      attribute: 'threshold'
+      operator: 'equals'
+      value: 80
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_metric_alarm']
+      attribute: 'comparison_operator'
+      operator: 'equals'
+      value: 'GreaterThanThreshold'
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_metric_alarm']
+      attribute: "metric_query[?(@.id == 'highest')].expression"
+      operator: 'jsonpath_equals'
+      value: 'MAX(METRICS())'
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_metric_alarm']
+      attribute: 'dynamic.metric_query.content.metric.metric_name'
+      operator: 'equals'
+      value: 'DatabaseMemoryUsagePercentage'
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_metric_alarm']
+      attribute: 'dynamic.metric_query.content.metric.namespace'
+      operator: 'equals'
+      value: 'AWS/ElastiCache'

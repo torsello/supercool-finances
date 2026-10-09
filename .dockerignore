@@ -13,5 +13,6 @@ reports
 .claude
 docs/ai
 **/.terraform
+**/.tflint.d
 *.tfstate
 *.tfstate.*

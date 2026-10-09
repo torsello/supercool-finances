@@ -1,0 +1,15 @@
+metadata:
+  id: 'SCF_DEP_AC23_LOG_GROUPS'
+  name: 'DEP-AC23: every log group keeps its logs 30 days, encrypted with a KMS key'
+  category: 'GENERAL_SECURITY'
+definition:
+  and:
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_log_group']
+      attribute: 'retention_in_days'
+      operator: 'equals'
+      value: 30
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_log_group']
+      attribute: 'kms_key_id'
+      operator: 'exists'
