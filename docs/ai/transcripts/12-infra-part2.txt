@@ -6634,3 +6634,957 @@
   - Skipped: nothing.
 
 ✻ Cogitated for 2m 31s · done 7:41 AM
+
+❯ /export docs/ai/transcripts/12-infra-part2.txt                                
+  ⎿  Conversation exported to: /Users/matiastorsello/supercool-finances/docs/ai/
+     transcripts/12-infra-part2.txt
+
+❯ /ship add the final transcript of phase 12                                    
+
+⏺ Bash(git branch --show-current)
+  ⎿  phase/12-infra
+
+⏺ Bash(npm run check)
+  ⎿  > supercool-finances@0.1.0 check
+     > npm run typecheck && npm run lint && npm run format:check && npm run
+      test
+     … +97 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ Bash(npm run infra:up)
+  ⎿  > supercool-finances@0.1.0 infra:up
+     > docker compose up -d --wait postgres redis
+     … +6 lines (ctrl+o to expand)
+
+⏺ Bash(npm run test:integration 2>&1 | tail -6)
+  ⎿   Test Files  136 passed (136)
+           Tests  335 passed (335)
+        Start at  07:41:35
+     … +4 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ Bash(npm run trace -- --require unit,integration 2>&1 | tail -2)
+  ⎿  226 ACs in 9 specs: 226 covered, 0 pending, 0 missing, 0 unverified. T
+     est reports read: unit, integration, e2e.
+
+⏺ Bash(checkov -d infra/terraform --quiet --compact)
+  ⎿  terraform scan results:
+
+     Passed checks: 334, Failed checks: 0, Skipped checks: 24
+     … +4 lines (ctrl+o to expand)
+  ⎿  (timeout 5m)
+
+⏺ Gates pass. The part-2 row already exists in docs/ai/README.md. Staging.
+
+⏺ Bash(git add -A)
+  ⎿  (No output)
+
+⏺ Bash(git status --short)
+  ⎿  M  docs/ai/transcripts/12-infra-part2.txt
+
+⏺ Bash(git commit -m "docs(ai): add the final transcript of phase 12" -m
+      "Refreshes the second transcript of phase 12 with the end of the session:
+      the ship of the CI p…)
+  ⎿  [phase/12-infra 3fff61c] docs(ai): add the final transcript of phase 1
+     2
+      1 file changed, 133 insertions(+), 1 deletion(-)
+
+⏺ Bash(gitleaks git --no-banner --redact --log-opts="origin/main..HEAD")
+  ⎿  7:43AM INF 4 commits scanned.
+     7:43AM INF scanned ~1954281 bytes (1.95 MB) in 1.89s
+     7:43AM INF no leaks found
+
+⏺ Bash(git push -u origin HEAD)
+  ⎿  To https://github.com/torsello/supercool-finances.git
+        dfb96c2..3fff61c  HEAD -> phase/12-infra
+     branch 'phase/12-infra' set up to track 'origin/phase/12-infra'.
+
+⏺ - Commit: 3fff61c "docs(ai): add the final transcript of phase 12", pushed to
+    phase/12-infra. It only refreshes docs/ai/transcripts/12-infra-part2.txt.
+  - Gates:
+    - npm run check passes (366 unit tests).
+    - npm run test:integration passes (335).
+    - npm run trace -- --require unit,integration covers 226 of 226 ACs.
+    - checkov finds 0 failed checks.
+    - gitleaks finds no leaks.
+  - ACs covered: none changed.
+  - Pull request: https://github.com/torsello/supercool-finances/pull/14 already
+    existed and now includes this commit; I did not open a new one.
+  - Skipped: nothing. The part-2 row in docs/ai/README.md was already there.
+
+✻ Brewed for 2m 16s · done 7:43 AM
+
+※ recap: Goal: close phase 12-infra, the full CI pipeline plus AWS Terraform. Everything is pushed and PR #14 is open with all gates passing; next, wait for CI to go green on the PR, then merge it.
+
+❯ The e2e job failed on the load test (SYS-AC17): 36 of 12000 responses were    
+  503 with cause PoolAcquireTimeout, all on api-2. From the job's logs: from    
+  about 25 s into the run, nginx's per-second maximum latency stayed at 1.1 to  
+  2.2 s on both replicas, with throughput dips every 11 s or so (the two        
+  replicas' 10 s healthchecks, in phase since both restarted together, each     
+  spawning a node process), and api-2's tail crossed the 2 s                    
+  DB_POOL_ACQUIRE_TIMEOUT_MS. The first CI run of the same code passed. The     
+  cause is capacity: the runner of a private repository has 2 CPUs for the      
+  whole stack plus the generator, so 200 per second is at its limit there.      
+  Approved spec change, record it in plan 000 §11: the load test reads its rate 
+  from LOAD_RATE_PER_SECOND, 200 by default; the CI job e2e sets 100; SYS-R20,  
+  SYS-AC17, the README and docs/performance.md say so, and docs/performance.md  
+  keeps the local result at 200 per second.                                     
+  Also make the 5xx assertion print the status codes and their causes, and      
+  upload reports/load-test.json and the e2e stack's logs as artifacts of the    
+  e2e job when it fails. Run npm run check and npm run trace; don't rerun the   
+  load test locally, CI will.                                                   
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Bash(sed -n 1,140p scripts/load-test.ts)  ⎿  // npm run load: the load test of SYS-R20 and SYS-AC17 against a runni
+     ng stack, through its load
+     // balancer (E2E_BASE_URL, http://localhost:8080 by default, local onl
+     … +137 lines (ctrl+o to expand)
+
+⏺ Bash(sed -n 140,607p scripts/load-test.ts)
+  ⎿        issuer: value('JWT_ISSUER'),
+           audience: value('JWT_AUDIENCE'),
+         },
+     … +465 lines (ctrl+o to expand)
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Bash(sed -n 370,425p test/e2e/support/stack.ts; grep -n "SYS-R20" -A0
+      specs/000-overview/spec.md | cut -c1-900; grep -n -A8 "### SYS-AC17"
+      specs/000-overview/spec.md…)
+  ⎿      return container.State.Status === 'exited' ? container : undefined
+     ;
+       });
+     … +102 lines (ctrl+o to expand)
+
+⏺ Bash(grep -rn "LOAD_PARAMETERS\|200 movements\|200 requests per second\|200
+      per second" --exclude-dir=node_modules --exclude-dir=.git
+      --exclude-dir=transcripts --exc…)
+  ⎿  README.md:58:The end-to-end suite and the load test run against the Do
+     cker Compose stack through nginx, at `E2E_BASE_URL`: `http://localhost
+     :8080` by default, and local only (`localhost`, `127.0.0.1`
+     … +69 lines (ctrl+o to expand)
+
+⏺ Making the load test's rate configurable and recording the 5xx problem types,
+  starting in scripts/load-test.ts.
+
+⏺ Bash(cat > /private/tmp/claude-501/-Users-matiastorsello-supercool-finances/22
+      809153-58d3-42bb-bc81-f1c6a6245d2d/scratchpad/edit13.mjs <<'EOF'
+      import { readFileSync,…)
+  ⎿  Updated scripts/load-test.ts (+79 -19)
+       2  // balancer (E2E_BASE_URL, http://localhost:8080 by default, lo
+          cal only, since the reconciliation
+       3  // reads the stack's database on 127.0.0.1). It funds 1000 cust
+          omer account pairs
+       4  // in EUR through the API, then sends single deposits, withdraw
+          als and transfers in equal thirds as
+       5 -// an open model: each request leaves at its own scheduled mome
+         -nt, 5 ms apart for 200 requests per                            
+       6 -// second over 60 seconds, whether or not earlier ones have bee
+         -n answered, and its latency runs from                          
+       5 +// an open model: each request leaves at its own scheduled mome
+         +nt, at LOAD_RATE_PER_SECOND requests                           
+       6 +// per second (200 by default, 5 ms apart) over 60 seconds, whe
+         +ther or not earlier ones have been                             
+       7 +// answered, and its latency runs from                         
+       8  // that moment, so a slow stack shows in the latencies instead 
+          of slowing the load down. It drains
+       9  // every request still in flight, runs the reconciliation, and 
+          writes the report to
+      10  // docs/performance.md and reports/load-test.json. The test of 
+          SYS-AC17 runs it; so can `make load`
+     ...
+      26  export const REPORT_PATH = join(ROOT, 'docs', 'performance.md')
+          ;
+      27  export const RESULT_PATH = join(ROOT, 'reports', 'load-test.jso
+          n');
+      28  
+      29 +/** The rate of SYS-R20 when `LOAD_RATE_PER_SECOND` is unset; t
+         +he CI job e2e sets 100. */                                     
+      30 +export const DEFAULT_RATE_PER_SECOND = 200;                    
+      31 +/** Below the load balancer's per-IP limit of 500 requests per 
+         +second (SEC-R01). */                                           
+      32 +const MAX_RATE_PER_SECOND = 500;                               
+      33 +                                                               
+      34  /**
+      35   * The parameters SYS-R20 and SYS-AC17 fix, and the identities 
+          SEC-AC05 spreads them over: the
+      30 - * deposits over 10 operators, about 7 requests per second each
+         -, and the withdrawals and transfers                            
+      31 - * over the 1000 customers of the pairs, well under the per-use
+         -r limit of 300 per 10 s (SEC-R09).                             
+      36 + * deposits over 10 operators, about 7 requests per second each
+         + at 200 per second, and the                                    
+      37 + * withdrawals and transfers over the 1000 customers of the pai
+         +rs, well under the per-user limit of                           
+      38 + * 300 per 10 s (SEC-R09). The rate comes from `LOAD_RATE_PER_S
+         +ECOND`, 200 by default.                                        
+      39   */
+      33 -export const LOAD_PARAMETERS = {                               
+      34 -  ratePerSecond: 200,                                          
+      40 +const FIXED_PARAMETERS = {                                     
+      41    durationSeconds: 60,
+      42    pairs: 1000,
+      43    operators: 10,
+     ...
+      49    p99TargetMs: 300,
+      50  } as const;
+      51  
+      52 +export type LoadParameters = typeof FIXED_PARAMETERS & { ratePe
+         +rSecond: number };                                             
+      53 +                                                               
+      54 +/**                                                            
+      55 + * The parameters of a run: `LOAD_RATE_PER_SECOND` from `enviro
+         +nment`, a whole number from 1 to                               
+     … 182 more lines (ctrl+o to expand)
+
+⏺ Bash(cat > /private/tmp/claude-501/-Users-matiastorsello-supercool-finances/22
+      809153-58d3-42bb-bc81-f1c6a6245d2d/scratchpad/edit14.mjs <<'EOF'
+      import { readFileSync,…)
+  ⎿  Error: Exit code 2
+     [error] scripts/load-test.ts: SyntaxError: ';' expected. (601:299)
+     [error]   599 |   return `# Performance
+     [error]   600 |
+     [error] > 601 | The latest result of the load test of SYS-R20 
+     (\`scripts/load-test.ts\`), written by the test itself. It runs as \`npm 
+     run load\` or \`make load\` against the stack of \`docker compose up 
+     --build --wait\`, and the e2e test of SYS-AC17 runs it too, so every e2e 
+     run rewrites this file. The rate is `LOAD_RATE_PER_SECOND`, 200 requests 
+     per second by default; the CI job `e2e` runs at 100, because its runner has
+     2 CPUs for the whole stack and the generator, and the result committed 
+     here is a local run at 200. The p99 target is reported, not guaranteed: a 
+     run that misses it does not fail. A run fails on a 5xx, a connection error,
+     a lost request, a ledger that does not reconcile, or a generator that fell
+     behind its schedule.
+     [error]       |                                                            
+                                                                               
+                                                                               
+                                                                               
+                  ^
+     [error]   602 |
+     [error]   603 | ## Machine
+     [error]   604 |
+
+⏺ Backticks inside the template literal need escaping; fixing.
+
+⏺ Bash(node -e '
+      const fs=require("fs");const p="scripts/load-test.ts";let
+      s=fs.readFileSync(p,"utf8");…)
+  ⎿  test/e2e/load.test.ts(4,3): error TS2724: '"../../scripts/load-test.js
+     "' has no exported member named 'LOAD_PARAMETERS'. Did you mean 'LoadP
+     arameters'?
+  ⎿  Updated scripts/load-test.ts (+1 -1)
+      598      : `kept its schedule: every request left at most ${String(
+           measured.generator.maxLagMs)} ms after its moment (p99 ${Strin
+           g(measured.generator.p99LagMs)} ms; the limit is ${String(MAX_
+           GENERATOR_LAG_MS)} ms)`;
+      599    return `# Performance
+      600  
+      601 -The latest result of the load test of SYS-R20 (\`scripts/load-
+          -test.ts\`), written by the test itself. It runs as \`npm run l
+          -oad\` or \`make load\` against the stack of \`docker compose u
+          -p --build --wait\`, and the e2e test of SYS-AC17 runs it too, 
+          -so every e2e run rewrites this file. The rate is `LOAD_RATE_PE
+          -R_SECOND`, 200 requests per second by default; the CI job `e2e
+          -` runs at 100, because its runner has 2 CPUs for the whole sta
+          -ck and the generator, and the result committed here is a local
+          - run at 200. The p99 target is reported, not guaranteed: a run
+          - that misses it does not fail. A run fails on a 5xx, a connect
+          -ion error, a lost request, a ledger that does not reconcile, o
+          -r a generator that fell behind its schedule.                  
+      601 +The latest result of the load test of SYS-R20 (\`scripts/load-
+          +test.ts\`), written by the test itself. It runs as \`npm run l
+          +oad\` or \`make load\` against the stack of \`docker compose u
+          +p --build --wait\`, and the e2e test of SYS-AC17 runs it too, 
+          +so every e2e run rewrites this file. The rate is \`LOAD_RATE_P
+          +ER_SECOND\`, 200 requests per second by default; the CI job \`
+          +e2e\` runs at 100, because its runner has 2 CPUs for the whole
+          + stack and the generator, and the result committed here is a l
+          +ocal run at 200. The p99 target is reported, not guaranteed: a
+          + run that misses it does not fail. A run fails on a 5xx, a con
+          +nection error, a lost request, a ledger that does not reconcil
+          +e, or a generator that fell behind its schedule.              
+      602  
+      603  ## Machine
+      604  
+
+⏺ Now the e2e test: the rate comes from the environment, and a 5xx failure
+  prints the status codes, problem types and the replicas' logged causes.
+
+⏺ Bash(cat > /private/tmp/claude-501/-Users-matiastorsello-supercool-finances/22
+      809153-58d3-42bb-bc81-f1c6a6245d2d/scratchpad/edit15.mjs <<'EOF'
+      import { readFileSync,…)
+  ⎿  > supercool-finances@0.1.0 lint
+     > eslint .
+  ⎿  Updated test/e2e/load.test.ts (+47 -7)
+      1  import { readFileSync } from 'node:fs';
+      2  import { afterAll, beforeAll, describe, expect, it } from 'vites
+         t';
+      3  import {
+      4 -  LOAD_PARAMETERS,                                              
+      4 +  DEFAULT_RATE_PER_SECOND,                                      
+      5 +  loadParameters,                                               
+      6    REPORT_PATH,
+      7    RESULT_PATH,
+      8    type LoadResult,
+     ...
+      11  import { describeResult, run } from './support/command.js';
+      12  import { closeStackDb, ledgerState } from './support/db.js';
+      13  import { recordResponses } from './support/recorder.js';
+      13 -import { ensureStack, waitForBothReplicasThroughNginx } from '.
+         -/support/stack.js';                                            
+      14 +import {                                                       
+      15 +  containerLogs,                                               
+      16 +  daemonTime,                                                  
+      17 +  ensureStack,                                                 
+      18 +  jsonLines,                                                   
+      19 +  waitForBothReplicasThroughNginx,                             
+      20 +} from './support/stack.js';                                   
+      21 +                                                               
+      22 +/**                                                            
+      23 + * Why the replicas answered 5xx since `since`: the `cause` of 
+         +each `service unavailable` line                                
+      24 + * and the message of each `error` line, counted by replica, fo
+         +r the message of a failed run.                                 
+      25 + */                                                            
+      26 +async function serverErrorCauses(since: string): Promise<Record
+         +<string, Record<string, number>>> {                            
+      27 +  const causes: Record<string, Record<string, number>> = {};   
+      28 +  for (const replica of ['api-1', 'api-2']) {                  
+      29 +    const counts: Record<string, number> = {};                 
+      30 +    for (const line of jsonLines(await containerLogs(replica, s
+         +ince))) {                                                      
+      31 +      const cause =                                            
+      32 +        line['msg'] === 'service unavailable'                  
+      33 +          ? `service unavailable: ${String(line['cause'])}`    
+      34 +          : line['level'] === 50                               
+      35 +            ? `error: ${String(line['msg'])}`                  
+      36 +            : undefined;                                       
+      37 +      if (cause !== undefined) counts[cause] = (counts[cause] ?
+         +? 0) + 1;                                                      
+      38 +    }                                                          
+      39 +    causes[replica] = counts;                                  
+      40 +  }                                                            
+     … 50 more lines (ctrl+o to expand)
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Now the e2e job: the rate, a log file, and the failure artifacts.
+
+⏺ Bash(cat > /private/tmp/claude-501/-Users-matiastorsello-supercool-finances/22
+      809153-58d3-42bb-bc81-f1c6a6245d2d/scratchpad/edit16.mjs <<'EOF'
+      import { readFileSync,…)
+  ⎿  Checking formatting...
+     All matched files use Prettier code style!
+     ACTIONLINT=0
+  ⎿  Updated .github/workflows/ci.yml (+16 -1)
+      121          env:
+      122            # Keeps the stack when the suite ends, so a failure'
+           s logs can still be printed.
+      123            E2E_KEEP_STACK: '1'
+      124 +          # SYS-R20: the runner has 2 CPUs for the whole stack
+          + and the load generator, so the load                          
+      125 +          # test runs at 100 requests per second here, against
+          + 200 on a laptop.                                             
+      126 +          LOAD_RATE_PER_SECOND: '100'                         
+      127  
+      128        - name: Print the scf-e2e stack's state and logs
+      129          if: failure()
+      130          run: |
+      131            docker compose -p scf-e2e --profile tools ps --all
+      129 -          docker compose -p scf-e2e --profile tools logs --no-
+          -color --timestamps                                            
+      132 +          docker compose -p scf-e2e --profile tools logs --no-
+          +color --timestamps > reports/e2e-stack.log                    
+      133 +          cat reports/e2e-stack.log                           
+      134 +                                                              
+      135 +      - name: Upload the load test result and the stack's logs
+      136 +        if: failure()                                         
+      137 +        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22
+          +962f4752f3646cd9 # v7.0.2                                     
+      138 +        with:                                                 
+      139 +          name: e2e-failure                                   
+      140 +          path: |                                             
+      141 +            reports/load-test.json                            
+      142 +            reports/e2e-stack.log                             
+      143 +          if-no-files-found: warn                             
+      144 +          retention-days: 14                                  
+      145  
+      146        - name: Upload the e2e report
+      147          if: ${{ !cancelled() }}
+
+⏺ Now the spec text, README, AGENTS.md, performance.md and the plan 000 §11
+  record.
+
+⏺ Bash(awk 'NR==102' specs/000-overview/spec.md | cut -c1-700; sed -n 58p
+      README.md; grep -o "The load test of SYS-R20 against a running local
+      stack: an open model at…)
+  ⎿  | SYS-R20 | THE SYSTEM SHALL have a repeatable load test that measures
+      and reports the p50, p95 and p99 latency, throughput and error count
+     of single money movements at 200 requests per second, against a target
+     … +37 lines (ctrl+o to expand)
+
+⏺ Bash(cat > /private/tmp/claude-501/-Users-matiastorsello-supercool-finances/22
+      809153-58d3-42bb-bc81-f1c6a6245d2d/scratchpad/edit17.mjs <<'EOF'
+      import { readFileSync,…)
+  ⎿  ok
+  ⎿  Updated AGENTS.md (+1 -1)
+      78  | `npm run test:integration`                                   
+                                    | Integration tests against real Post
+          gres and Redis.                                                
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                              | 01-bootstrap   |
+      79  | `npm run test:e2e`                                           
+                                    | The e2e suite against the Docker Co
+          mpose stack, through nginx at `E2E_BASE_URL` (`http://localhost
+          :8080` by default; local only: `localhost`, `127.0.0.1` or `[::
+          1]`) and the replicas' own ports: it builds, starts and removes
+           its own stack under the project `scf-e2e`, on `10.211.0.0/24` 
+          unless `E2E_SUBNET_PREFIX` moves it, so the developer's stack m
+          ust be stopped first (`E2E_KEEP_STACK=1` keeps it running); wri
+          tes `reports/vitest-e2e.json`.                                 
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                              | 11-e2e         |
+      80  | `npm run test:all`                                           
+                                    | The unit and integration projects i
+          n one run, never the e2e suite.                                
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                              | 11-e2e         |
+      81 -| `npm run load`                                               
+         -                          | The load test of SYS-R20 against a 
+         -running local stack: an open model at 200 movements per second 
+         -for 60 s over 1000 funded account pairs, then the reconciliatio
+         -n; writes `docs/performance.md` and `reports/load-test.json`, a
+         -nd exits 1 on a 5xx, a connection error, a lost request, a gene
+         -rator behind its schedule or a ledger that does not reconcile, 
+         -never on a missed p99.                                         
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                                               
+         -                                    | 11-e2e         |         
+      81 +| `npm run load`                                               
+         +                          | The load test of SYS-R20 against a 
+         +running local stack: an open model at `LOAD_RATE_PER_SECOND` mo
+         +vements per second (200 by default; CI's `e2e` job sets 100) fo
+         +r 60 s over 1000 funded account pairs, then the reconciliation;
+         + writes `docs/performance.md` and `reports/load-test.json`, and
+         + exits 1 on a 5xx, a connection error, a lost request, a genera
+         +tor behind its schedule or a ledger that does not reconcile, ne
+         +ver on a missed p99.                                           
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                                               
+         +                                    | 11-e2e         |         
+      82  | `npm run env:sync`                                           
+                                    | Adds variables missing from `.env`,
+           taken from `.env.example`, without printing values.           
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                              | 01-bootstrap   |
+      83  | `npm run trace`                                              
+                                    | Lists every AC in `specs/` with its
+           proof, read from the Vitest JSON reports in `reports/` written
+           by `npm test`, `npm run test:integration` and `npm run test:e2
+          e`. Fails when an AC of an `Implemented` spec, or one named by 
+          a ticked task in `tasks.md`, has no passing test in the report 
+          of its level (level `ci`: a `Verified by` line that names no `n
+          pm run <script>`, or names one that is not a script in `package
+          .json` or not the whole command, `npm run <script>` with plain 
+          arguments at most, of a step of `.github/workflows/ci.yml` that
+           can fail the build) or is named by any test that did not pass;
+           when a test or task names an undefined AC; when a project name
+          d in `--require` has no report; and when a spec or task file is
+           malformed. CI's `ci` job and `/ship` pass `--require unit,inte
+          gration`, and CI's `traceability` job, after the `ci` and `e2e`
+           jobs, passes `--require unit,integration,e2e`, so e2e ACs are 
+          enforced in CI from phase 12-infra. | 02-specs       |
+      84  | `npm run migrate:up` / `migrate:down`                        
+                                    | Apply / roll back database migratio
+          ns.                                                            
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                              | 05-schema      |
+  ⎿  Updated README.md (+2 -2)
+      55  npm run trace             # every acceptance criterion in specs
+          / with the test that proves it
+      56  ```
+      57  
+      58 -The end-to-end suite and the load test run against the Docker C
+         -ompose stack through nginx, at `E2E_BASE_URL`: `http://localhos
+         -t:8080` by default, and local only (`localhost`, `127.0.0.1` or
+         - `[::1]`, any port), since both read the stack's database on `1
+         -27.0.0.1` too. `npm run test:e2e` (or `make e2e`) builds and st
+         -arts its own stack under the Compose project `scf-e2e`, from em
+         -pty volumes, on the network `10.211.0.0/24` (`E2E_SUBNET_PREFIX
+         -` moves it, as `SCF_SUBNET_PREFIX` does for your stack), and re
+         -moves it at the end (`E2E_KEEP_STACK=1` keeps it running). It u
+         -ses the same host ports, so stop your own stack first with `doc
+         -ker compose down` or `npm run infra:down`. `npm run load` (or `
+         -make load`) runs the load test of SYS-R20 against a running sta
+         -ck: 200 movements per second for 60 s over 1000 funded account 
+         -pairs. It writes the result to [`docs/performance.md`](docs/per
+         -formance.md).                                                  
+      58 +The end-to-end suite and the load test run against the Docker C
+         +ompose stack through nginx, at `E2E_BASE_URL`: `http://localhos
+         +t:8080` by default, and local only (`localhost`, `127.0.0.1` or
+         + `[::1]`, any port), since both read the stack's database on `1
+         +27.0.0.1` too. `npm run test:e2e` (or `make e2e`) builds and st
+         +arts its own stack under the Compose project `scf-e2e`, from em
+         +pty volumes, on the network `10.211.0.0/24` (`E2E_SUBNET_PREFIX
+         +` moves it, as `SCF_SUBNET_PREFIX` does for your stack), and re
+         +moves it at the end (`E2E_KEEP_STACK=1` keeps it running). It u
+         +ses the same host ports, so stop your own stack first with `doc
+         +ker compose down` or `npm run infra:down`. `npm run load` (or `
+         +make load`) runs the load test of SYS-R20 against a running sta
+         +ck: `LOAD_RATE_PER_SECOND` movements per second, 200 by default
+         +, for 60 s over 1000 funded account pairs. It writes the result
+         + to [`docs/performance.md`](docs/performance.md), which keeps a
+         + local run at 200; the CI job `e2e` runs it at 100, since its r
+         +unner has 2 CPUs for the whole stack and the generator.        
+      59  
+      60  Every behaviour is specified before it is built: the specs, wit
+          h their requirements and acceptance criteria, are in [`specs/`]
+          (specs/README.md), and `npm run trace` fails when an acceptance
+           criterion that must be proven has no passing test.
+      61  
+     ...
+      184  [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on
+            every push, on pull requests to `main` and on demand:
+      185  
+      186  - `ci`: `npm run check`, `npm run openapi:lint`, `npm run infr
+           a:validate`, the integration tests against Postgres and Redis,
+            `npm run reconcile` on the test database they leave (LED-AC17
+           ), `npm run trace -- --require unit,integration` and `npm run 
+           build`. It uploads the unit and integration reports.
+      187 -- `e2e`: `npm run test:e2e` on its own Compose project, `scf-e
+          -2e`; it uploads the e2e report and prints the stack's logs on 
+          -failure.                                                      
+      187 +- `e2e`: `npm run test:e2e` on its own Compose project, `scf-e
+          +2e`, with the load test at `LOAD_RATE_PER_SECOND` 100; it uplo
+          +ads the e2e report, and on failure prints the stack's logs and
+          + uploads them with `reports/load-test.json`.                  
+      188  - `traceability`: after `ci` and `e2e`, `npm run trace -- --re
+           quire unit,integration,e2e` on the three reports, so every acc
+           eptance criterion that must be proven has a passing test at it
+           s level.
+      189  - `secret-scan`: gitleaks over the full git history.
+      190  - `security`: `npm audit --audit-level=high`, and trivy on the
+            files, on the configuration and on the runtime image, from th
+           e `aquasec/trivy` image pinned by digest, failing on any HIGH 
+           or CRITICAL finding.
+  ⎿  Updated docs/performance.md (+1 -1)
+      1  # Performance
+      2  
+      3 -The latest result of the load test of SYS-R20 (`scripts/load-tes
+        -t.ts`), written by the test itself. It runs as `npm run load` or
+        - `make load` against the stack of `docker compose up --build --w
+        -ait`, and the e2e test of SYS-AC17 runs it too, so every e2e run
+        - rewrites this file. The p99 target is reported, not guaranteed:
+        - a run that misses it does not fail. A run fails on a 5xx, a con
+        -nection error, a lost request, a ledger that does not reconcile,
+        - or a generator that fell behind its schedule.                  
+      3 +The latest result of the load test of SYS-R20 (`scripts/load-tes
+        +t.ts`), written by the test itself. It runs as `npm run load` or
+        + `make load` against the stack of `docker compose up --build --w
+        +ait`, and the e2e test of SYS-AC17 runs it too, so every e2e run
+        + rewrites this file. The rate is `LOAD_RATE_PER_SECOND`, 200 req
+        +uests per second by default; the CI job `e2e` runs at 100, becau
+        +se its runner has 2 CPUs for the whole stack and the generator, 
+        +and the result committed here is a local run at 200. The p99 tar
+        +get is reported, not guaranteed: a run that misses it does not f
+        +ail. A run fails on a 5xx, a connection error, a lost request, a
+        + ledger that does not reconcile, or a generator that fell behind
+        + its schedule.                                                  
+      4  
+      5  ## Machine
+      6  
+  ⎿  Updated specs/000-overview/plan.md (+1 -1)
+      265  
+      266  ## 11. ACs that cannot be tested as written
+      267  
+      268 -None open. The owner approved on 2026-10-08 the fixes found wh
+          -ile planning: the direct-deposit rule in the preamble of spec 
+          -002, the Given of SYS-AC12, the definition of "written directl
+          -y to the database" in the preamble of spec 000, the Then of AC
+          -C-AC06, the truncation of milliseconds in section 1.5 of spec 
+          -001, and the Thens of REV-AC08 and IDM-AC17. The owner also ap
+          -proved on 2026-10-08 the edit of section 1.9 of spec 007 that 
+          -names `app.set_statement_timeout(ms integer)`, its range of 1 
+          -to 3600000 ms, and the 600000 ms the reconcile and cleanup scr
+          -ipts use. The owner also approved on 2026-10-08 the change to 
+          -the Given of LED-AC15, which starts the service with `DB_POOL_
+          -ACQUIRE_TIMEOUT_MS` "10000", `REQUEST_TIMEOUT_MS` "30000" and 
+          -`SHUTDOWN_TIMEOUT_MS` "30000", as MOV-AC14 does, so its burst 
+          -of 200 transfers can queue for a connection; LED-AC15 moved to
+          - 09-hardening. The owner also approved on 2026-10-08 the new r
+          -equirement SEC-R48 and acceptance criterion SEC-AC37 of spec 0
+          -07 for `app.set_statement_timeout`: its range of 1 to 3600000 
+          -ms, its transaction scope, execution by the runtime role only,
+          - and calls with 600000 ms by the reconcile and cleanup scripts
+          - only. The owner also approved on 2026-10-08 the request-timeo
+          -ut design of SEC-R33 in spec 007, with SEC-AC25, SEC-AC38 and 
+          -the matching text of specs 000, 005 and 007: answer 503 at onc
+          -e, start no further statement, roll back once the statement in
+          - flight ends, let a `COMMIT` already sent finish with an outco
+          -me unknown to the client, and never cancel a statement from an
+          -other connection; [ADR-0022](../../docs/adr/0022-request-timeo
+          -ut-answer-first-then-roll-back.md) records it and the design i
+          -t replaced. The owner also approved on 2026-10-08 the rewordin
+          -g of SYS-R35 in spec 000 and of the timeout invariant of spec 
+          -007: the request timeout bounds when the answer is sent, and `
+          -statement_timeout` bounds the clean-up after it. The owner als
+          -o approved on 2026-10-08 the change to the `DATABASE_URL` rule
+          - in section 1.2  … [+11596 chars]                             
+      268 +None open. The owner approved on 2026-10-08 the fixes found wh
+          +ile planning: the direct-deposit rule in the preamble of spec 
+          +002, the Given of SYS-AC12, the definition of "written directl
+          +y to the database" in the preamble of spec 000, the Then of AC
+          +C-AC06, the truncation of milliseconds in section 1.5 of spec 
+          +001, and the Thens of REV-AC08 and IDM-AC17. The owner also ap
+          +proved on 2026-10-08 the edit of section 1.9 of spec 007 that 
+          +names `app.set_statement_timeout(ms integer)`, its range of 1 
+          +to 3600000 ms, and the 600000 ms the reconcile and cleanup scr
+          +ipts use. The owner also approved on 2026-10-08 the change to 
+          +the Given of LED-AC15, which starts the service with `DB_POOL_
+          +ACQUIRE_TIMEOUT_MS` "10000", `REQUEST_TIMEOUT_MS` "30000" and 
+          +`SHUTDOWN_TIMEOUT_MS` "30000", as MOV-AC14 does, so its burst 
+          +of 200 transfers can queue for a connection; LED-AC15 moved to
+          + 09-hardening. The owner also approved on 2026-10-08 the new r
+          +equirement SEC-R48 and acceptance criterion SEC-AC37 of spec 0
+          +07 for `app.set_statement_timeout`: its range of 1 to 3600000 
+          +ms, its transaction scope, execution by the runtime role only,
+          + and calls with 600000 ms by the reconcile and cleanup scripts
+          + only. The owner also approved on 2026-10-08 the request-timeo
+          +ut design of SEC-R33 in spec 007, with SEC-AC25, SEC-AC38 and 
+          +the matching text of specs 000, 005 and 007: answer 503 at onc
+          +e, start no further statement, roll back once the statement in
+          + flight ends, let a `COMMIT` already sent finish with an outco
+          +me unknown to the client, and never cancel a statement from an
+          +other connection; [ADR-0022](../../docs/adr/0022-request-timeo
+          +ut-answer-first-then-roll-back.md) records it and the design i
+          +t replaced. The owner also approved on 2026-10-08 the rewordin
+          +g of SYS-R35 in spec 000 and of the timeout invariant of spec 
+          +007: the request timeout bounds when the answer is sent, and `
+          +statement_timeout` bounds the clean-up after it. The owner als
+          +o approved on 2026-10-08 the change to the `DATABASE_URL` rule
+          + in section 1.2  … [+12228 chars]                             
+  ⎿  Updated specs/000-overview/spec.md (+2 -2)
+       99  | SYS-R17 | WHEN money movements run concurrently THE SYSTEM S
+           HALL produce the same balances and ledger as some one-at-a-tim
+           e execution of the movements it accepted, giving this preceden
+           ce over throughput.                                           
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+               |
+      100  | SYS-R18 | WHEN the database transaction of a money movement 
+           fails with a deadlock (SQLSTATE 40P01) or a serialization fail
+           ure (40001), THE SYSTEM SHALL retry the whole transaction, up 
+           to 3 attempts in total, waiting before retry n a random delay 
+           between 0 and min(200 ms, 10 ms × 2^(n−1)).                   
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+               |
+      101  | SYS-R19 | IF a money movement still fails with 40P01 or 4000
+           1 after the last attempt THEN THE SYSTEM SHALL answer 503 with
+            problem type `/problems/service-unavailable` and the header `
+           Retry-After: 1`, and apply none of its effects.               
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+               |
+      102 -| SYS-R20 | THE SYSTEM SHALL have a repeatable load test that 
+          -measures and reports the p50, p95 and p99 latency, throughput 
+          -and error count of single money movements at 200 requests per 
+          -second, against a target of p99 under 300 ms on a laptop: two 
+          -replicas behind nginx with PostgreSQL in Docker Compose on the
+          - developer laptop, for 60 s at a constant 200 requests per sec
+          -ond over 1000 pre-funded account pairs, reported in `docs/perf
+          -ormance.md`. The target is reported, not guaranteed.          
+          -                                                              
+          -                                                              
+          -                                                              
+          -                                                              
+          -                                                              
+          -                                                              
+          -                                                              
+          -                                                              
+          -                                                              
+          -    |                                                         
+      102 +| SYS-R20 | THE SYSTEM SHALL have a repeatable load test that 
+          +measures and reports the p50, p95 and p99 latency, throughput 
+          +and error count of single money movements at the rate `LOAD_RA
+          +TE_PER_SECOND`, 200 requests per second by default, against a 
+          +target of p99 under 300 ms on a laptop: two replicas behind ng
+          +inx with PostgreSQL in Docker Compose on the developer laptop,
+          + for 60 s at a constant 200 requests per second over 1000 pre-
+          +funded account pairs, reported in `docs/performance.md`, which
+          + keeps that local result. The CI job `e2e` sets `LOAD_RATE_PER
+          +_SECOND` to 100, because its runner has 2 CPUs for the whole s
+          +tack and the load generator. The target is reported, not guara
+          +nteed.                                                        
+          +                                                              
+          +                                                              
+          +                                                              
+          +                                                              
+          +                                                              
+          +    |                                                         
+      103  | SYS-R21 | WHEN a request is received THE SYSTEM SHALL use th
+           e client's `X-Request-Id` header as its correlation id if the 
+           value is 1 to 128 characters from `A-Z a-z 0-9 . _ : -`, gener
+           ate a UUIDv7 otherwise, and return it in the `X-Request-Id` re
+           sponse header.                                                
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+               |
+      104  | SYS-R22 | THE SYSTEM SHALL include the correlation id in eve
+           ry log line written while handling a request, as the member `r
+           eqId` (SEC-R21), and in every problem details body, as the mem
+           ber `requestId`, except in the body of an idempotent replay, w
+           hich keeps the original `requestId` (SYS-R33). The lines the d
+           atabase pool writes about a connection, such as "database conn
+           ection lost", carry no `reqId`, because the pool belongs to no
+            request.                                                     
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+               |
+      105  | SYS-R23 | WHEN a money movement commits THE SYSTEM SHALL wri
+           te, in the same database transaction, exactly one audit record
+            with the acting user, their role, the action (the kind of mov
+           ement), the transaction id, the correlation id and the time.  
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+                                                                         
+               |
+     ...
+      229  - **Level:** e2e
+      230  - **Covers:** SYS-R20
+      231  - **Given** two replicas behind the load balancer and 1000 pre
+           -funded customer account pairs in EUR
+      232 -- **When** the load test sends single deposits, withdrawals an
+          -d transfers at a constant 200 requests per second for 60 secon
+          -ds                                                            
+      232 +- **When** the load test sends single deposits, withdrawals an
+          +d transfers at a constant `LOAD_RATE_PER_SECOND` requests per 
+          +second, 200 when it is unset and 100 in the CI job `e2e`, for 
+          +60 seconds                                                    
+      233  - **Then** it writes a report with the machine used, p50, p95 
+           and p99 latency, achieved throughput and the count of non-2xx 
+           responses; there are no 5xx responses; SYS-AC11 and SYS-AC12 h
+           old after the run; and a p99 at or above 300 ms is reported as
+            a missed target without failing the test
+      234  
+      235  ### SYS-AC18 · Every request has a correlation id
+
+⏺ Adding a small unit test for the rate parsing, named after SYS-R20 as the
+  other requirement-level unit tests are.
+
+  Listed 1 directory (ctrl+o to expand)
+
+⏺ Bash(cat > test/unit/deployment/load-parameters.test.ts <<'EOF'
+      import { describe, expect, it } from 'vitest';…)
+  ⎿   ✓ |unit| test/unit/http/error-handler.test.ts (39 tests) 10ms
+      Test Files  62 passed (62)
+           Tests  368 passed (368)
+  ⎿  Created test/unit/deployment/load-parameters.test.ts (+24 -0)
+       1 +import { describe, expect, it } from 'vitest';                 
+       2 +import { DEFAULT_RATE_PER_SECOND, loadParameters } from '../../
+         +../scripts/load-test.js';                                      
+       3 +                                                               
+       4 +describe('the load test parameters', () => {                   
+       5 +  it('SYS-R20 runs at LOAD_RATE_PER_SECOND, 200 when unset or e
+         +mpty, for 60 s over 1000 pairs', () => {                       
+       6 +    expect(DEFAULT_RATE_PER_SECOND).toBe(200);                 
+       7 +    expect(loadParameters({})).toMatchObject({                 
+       8 +      ratePerSecond: 200,                                      
+       9 +      durationSeconds: 60,                                     
+      10 +      pairs: 1000,                                             
+      11 +    });                                                        
+      12 +    expect(loadParameters({ LOAD_RATE_PER_SECOND: '' }).ratePer
+         +Second).toBe(200);                                             
+      13 +    expect(loadParameters({ LOAD_RATE_PER_SECOND: '100' }).rate
+         +PerSecond).toBe(100);                                          
+      14 +    expect(loadParameters({ LOAD_RATE_PER_SECOND: '500' }).rate
+         +PerSecond).toBe(500);                                          
+      15 +  });                                                          
+      16 +                                                               
+      17 +  it('SYS-R20 refuses a rate that is not a whole number from 1 
+         +to 500, naming the variable', () => {                          
+      18 +    for (const value of ['0', '501', '-1', '1.5', '100 ', '0100
+         +', 'abc']) {                                                   
+      19 +      expect(() => loadParameters({ LOAD_RATE_PER_SECOND: value
+         + }), value).toThrow(                                           
+      20 +        'LOAD_RATE_PER_SECOND',                                
+      21 +      );                                                       
+      22 +    }                                                          
+      23 +  });                                                          
+      24 +});                                                            
+  ⎿  (timeout 10m)
+
+⏺ Bash(npm run check > /dev/null 2>&1; echo CHECK=$?; npm run trace 2>&1 | tail
+      -1; npm run trace -- --require unit,integration,e2e > /dev/null 2>&1; echo
+      TRACE=$?; gi…)
+  ⎿  CHECK=0
+     226 ACs in 9 specs: 226 covered, 0 pending, 0 missing, 0 unverified. T
+     est reports read: unit, integration, e2e.
+     … +10 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ The load test now takes its rate from LOAD_RATE_PER_SECOND (200 by default),
+  and the CI job e2e sets it to 100. npm run check passes (368 unit tests) and
+  npm run trace covers all 226 ACs. As you asked, I didn't rerun the load test
+  locally; the next CI run will exercise it. Nothing is committed.
+
+  - Rate: scripts/load-test.ts reads LOAD_RATE_PER_SECOND.
+    - It accepts a whole number from 1 to 500, 500 being the load balancer's
+      per-IP limit, and stops with exit code 2 and a message naming the variable
+      on anything else.
+    - test/unit/deployment/load-parameters.test.ts covers the default and the
+      refusals; its tests are named SYS-R20, like the other requirement-level
+      unit tests.
+    - The SYS-AC17 test compares the report against the same parameters, so it
+      passes at either rate.
+  - 5xx diagnosis:
+    - The report now counts the 5xx answers by status and problem type
+      (fiveXxTypes, for example 503 /problems/service-unavailable). A body that
+      isn't problem details shows as "(no problem body)", which is how an ALB
+      HTML page would appear.
+    - When the 5xx assertion fails, its message prints the status codes, those
+      types, and, for api-1 and api-2, the cause of each service unavailable log
+      line and any error-level lines since the run started.
+  - CI e2e job:
+    - The test step sets LOAD_RATE_PER_SECOND: '100'.
+    - On failure it writes the stack's logs to reports/e2e-stack.log and prints
+      them, then uploads that file and reports/load-test.json as the artifact
+      e2e-failure. The name doesn't match the vitest-* pattern that the
+      traceability job downloads. actionlint passes.
+  - Docs:
+    - SYS-R20 and the When of SYS-AC17 in spec 000 now name the variable, the
+      default of 200 and CI's 100.
+    - The README's load-test paragraph and its CI section say the same.
+    - I also updated the npm run load row of AGENTS.md, which still said 200 per
+      second.
+    - docs/performance.md keeps the local 200-per-second result, with a sentence
+      explaining the rate. The same sentence is in the report template, so
+      later runs keep it.
+    - Your approval is recorded in plan 000 §11.
+
+✻ Cooked for 3m 22s · done 7:59 AM

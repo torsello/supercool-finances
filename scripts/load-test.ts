@@ -2,8 +2,9 @@
 // balancer (E2E_BASE_URL, http://localhost:8080 by default, local only, since the reconciliation
 // reads the stack's database on 127.0.0.1). It funds 1000 customer account pairs
 // in EUR through the API, then sends single deposits, withdrawals and transfers in equal thirds as
-// an open model: each request leaves at its own scheduled moment, 5 ms apart for 200 requests per
-// second over 60 seconds, whether or not earlier ones have been answered, and its latency runs from
+// an open model: each request leaves at its own scheduled moment, at LOAD_RATE_PER_SECOND requests
+// per second (200 by default, 5 ms apart) over 60 seconds, whether or not earlier ones have been
+// answered, and its latency runs from
 // that moment, so a slow stack shows in the latencies instead of slowing the load down. It drains
 // every request still in flight, runs the reconciliation, and writes the report to
 // docs/performance.md and reports/load-test.json. The test of SYS-AC17 runs it; so can `make load`
@@ -25,13 +26,18 @@ const ROOT = fileURLToPath(new URL('../', import.meta.url));
 export const REPORT_PATH = join(ROOT, 'docs', 'performance.md');
 export const RESULT_PATH = join(ROOT, 'reports', 'load-test.json');
 
+/** The rate of SYS-R20 when `LOAD_RATE_PER_SECOND` is unset; the CI job e2e sets 100. */
+export const DEFAULT_RATE_PER_SECOND = 200;
+/** Below the load balancer's per-IP limit of 500 requests per second (SEC-R01). */
+const MAX_RATE_PER_SECOND = 500;
+
 /**
  * The parameters SYS-R20 and SYS-AC17 fix, and the identities SEC-AC05 spreads them over: the
- * deposits over 10 operators, about 7 requests per second each, and the withdrawals and transfers
- * over the 1000 customers of the pairs, well under the per-user limit of 300 per 10 s (SEC-R09).
+ * deposits over 10 operators, about 7 requests per second each at 200 per second, and the
+ * withdrawals and transfers over the 1000 customers of the pairs, well under the per-user limit of
+ * 300 per 10 s (SEC-R09). The rate comes from `LOAD_RATE_PER_SECOND`, 200 by default.
  */
-export const LOAD_PARAMETERS = {
-  ratePerSecond: 200,
+const FIXED_PARAMETERS = {
   durationSeconds: 60,
   pairs: 1000,
   operators: 10,
@@ -42,6 +48,26 @@ export const LOAD_PARAMETERS = {
   /** The target the report states, not a guarantee (SYS-R20). */
   p99TargetMs: 300,
 } as const;
+
+export type LoadParameters = typeof FIXED_PARAMETERS & { ratePerSecond: number };
+
+/**
+ * The parameters of a run: `LOAD_RATE_PER_SECOND` from `environment`, a whole number from 1 to
+ * 500, or 200 when unset. Any other value is refused, naming the variable.
+ */
+export function loadParameters(environment: NodeJS.ProcessEnv = process.env): LoadParameters {
+  const raw = environment['LOAD_RATE_PER_SECOND'];
+  const ratePerSecond = raw === undefined || raw === '' ? DEFAULT_RATE_PER_SECOND : Number(raw);
+  if (
+    (raw !== undefined && raw !== '' && !/^[1-9][0-9]*$/.test(raw)) ||
+    ratePerSecond > MAX_RATE_PER_SECOND
+  ) {
+    throw new Error(
+      `LOAD_RATE_PER_SECOND must be a whole number from 1 to ${String(MAX_RATE_PER_SECOND)}`,
+    );
+  }
+  return { ratePerSecond, ...FIXED_PARAMETERS };
+}
 
 /** The setup's own pace and parallelism, under the load balancer's 500 requests per second. */
 const SETUP_RATE_PER_SECOND = 250;
@@ -83,7 +109,7 @@ export interface LoadResult {
   finishedAt: string;
   baseUrl: string;
   machine: Machine;
-  parameters: typeof LOAD_PARAMETERS;
+  parameters: LoadParameters;
   setup: { requests: number; statusCodes: Record<string, number>; seconds: number };
   run: {
     /** Requests on the schedule: the rate times the duration. */
@@ -97,6 +123,8 @@ export interface LoadResult {
     statusCodes: Record<string, number>;
     non2xx: number;
     fiveXx: number;
+    /** The 5xx answers by status and problem type, as "503 /problems/service-unavailable". */
+    fiveXxTypes: Record<string, number>;
     /** Connection errors, by code. */
     errors: number;
     errorCodes: Record<string, number>;
@@ -244,19 +272,20 @@ export function describeMachine(): Machine {
 async function setUp(
   baseUrl: string,
   jwt: TokenSettings,
+  parameters: LoadParameters,
 ): Promise<{ pairs: Pair[]; operators: string[]; client: SetupClient; seconds: number }> {
   const started = performance.now();
   const now = Date.now() / 1000;
   const client = new SetupClient(baseUrl);
   const operators = await Promise.all(
     Array.from(
-      { length: LOAD_PARAMETERS.operators },
+      { length: parameters.operators },
       async () => await issueToken({ userId: randomUUID(), role: 'operator' }, jwt, now),
     ),
   );
   const customers = await Promise.all(
     Array.from(
-      { length: LOAD_PARAMETERS.pairs },
+      { length: parameters.pairs },
       async () => await issueToken({ userId: randomUUID(), role: 'customer' }, jwt, now),
     ),
   );
@@ -272,7 +301,7 @@ async function setUp(
   await paced(accounts.length, SETUP_RATE_PER_SECOND, SETUP_CONCURRENCY, async (index) => {
     const operator = operators[index % operators.length] ?? '';
     await client.post(`/v1/accounts/${accounts[index] ?? ''}/deposits`, operator, {
-      amount: LOAD_PARAMETERS.funding,
+      amount: parameters.funding,
       currency: 'EUR',
     });
   });
@@ -289,11 +318,12 @@ function movement(
   index: number,
   pairs: readonly Pair[],
   operators: readonly string[],
+  amount: string,
 ): { kind: Kind; path: string; token: string; body: Record<string, string> } {
   const kind = KINDS[index % KINDS.length] ?? 'deposit';
   const round = Math.floor(index / KINDS.length);
   const pair = pairs[round % pairs.length] ?? { token: '', a: '', b: '' };
-  const body = { amount: LOAD_PARAMETERS.amount, currency: 'EUR' };
+  const body = { amount, currency: 'EUR' };
   if (kind === 'deposit') {
     const account = round % 2 === 0 ? pair.a : pair.b;
     return {
@@ -321,9 +351,17 @@ const sum = (values: Iterable<number>): number => {
 };
 
 /** Runs the whole load test against `baseUrl` and returns its result. */
-export async function runLoadTest(baseUrl: string): Promise<LoadResult> {
+export async function runLoadTest(
+  baseUrl: string,
+  parameters: LoadParameters = loadParameters(),
+): Promise<LoadResult> {
   const settings = stackSettings();
-  const { pairs, operators, client, seconds: setupSeconds } = await setUp(baseUrl, settings.jwt);
+  const {
+    pairs,
+    operators,
+    client,
+    seconds: setupSeconds,
+  } = await setUp(baseUrl, settings.jwt, parameters);
 
   const agent = new http.Agent({
     keepAlive: true,
@@ -331,11 +369,12 @@ export async function runLoadTest(baseUrl: string): Promise<LoadResult> {
     // `localhost` names ::1 and 127.0.0.1; Docker may publish on 127.0.0.1 only.
     autoSelectFamilyAttemptTimeout: 30_000,
   });
-  const scheduled = LOAD_PARAMETERS.ratePerSecond * LOAD_PARAMETERS.durationSeconds;
-  const intervalMs = 1000 / LOAD_PARAMETERS.ratePerSecond;
+  const scheduled = parameters.ratePerSecond * parameters.durationSeconds;
+  const intervalMs = 1000 / parameters.ratePerSecond;
   const latencies: number[] = [];
   const lags: number[] = [];
   const statusCodes: Record<string, number> = {};
+  const fiveXxTypes: Record<string, number> = {};
   const errorCodes: Record<string, number> = {};
   const byKind: Record<Kind, number> = { deposit: 0, withdrawal: 0, transfer: 0 };
   let lost = 0;
@@ -343,7 +382,7 @@ export async function runLoadTest(baseUrl: string): Promise<LoadResult> {
 
   /** Sends request number `index`, due at `due`, and settles once it has an outcome. */
   const send = async (index: number, due: number): Promise<void> => {
-    const { kind, path, token, body } = movement(index, pairs, operators);
+    const { kind, path, token, body } = movement(index, pairs, operators, parameters.amount);
     const payload = Buffer.from(JSON.stringify(body), 'utf8');
     await new Promise<void>((resolve) => {
       let settled = false;
@@ -376,7 +415,11 @@ export async function runLoadTest(baseUrl: string): Promise<LoadResult> {
           },
         },
         (response) => {
-          response.resume();
+          // Only a 5xx body is kept, for its problem type; every other body is discarded.
+          const serverError = (response.statusCode ?? 0) >= 500;
+          const chunks: Buffer[] = [];
+          if (serverError) response.on('data', (chunk: Buffer) => chunks.push(chunk));
+          else response.resume();
           response.once('error', fail);
           response.once('end', () => {
             if (settled) return;
@@ -385,6 +428,11 @@ export async function runLoadTest(baseUrl: string): Promise<LoadResult> {
             lastAnswer = Math.max(lastAnswer, now);
             const status = String(response.statusCode ?? 0);
             statusCodes[status] = (statusCodes[status] ?? 0) + 1;
+            if (serverError) {
+              const type = problemType(Buffer.concat(chunks).toString('utf8'));
+              const key = `${status} ${type}`;
+              fiveXxTypes[key] = (fiveXxTypes[key] ?? 0) + 1;
+            }
             byKind[kind] += 1;
             settle();
           });
@@ -462,7 +510,7 @@ export async function runLoadTest(baseUrl: string): Promise<LoadResult> {
     finishedAt: new Date().toISOString(),
     baseUrl,
     machine: describeMachine(),
-    parameters: LOAD_PARAMETERS,
+    parameters,
     setup: {
       requests: client.requests,
       statusCodes: client.statusCodes,
@@ -476,6 +524,7 @@ export async function runLoadTest(baseUrl: string): Promise<LoadResult> {
       statusCodes,
       non2xx: responses - total('2'),
       fiveXx,
+      fiveXxTypes,
       errors,
       errorCodes,
       lost,
@@ -491,7 +540,7 @@ export async function runLoadTest(baseUrl: string): Promise<LoadResult> {
         mean: round(sum(latencies) / Math.max(1, responses)),
       },
       generator: { maxLagMs, p99LagMs: round(percentile(lags, 0.99)), behind },
-      p99TargetMet: p99 < LOAD_PARAMETERS.p99TargetMs,
+      p99TargetMet: p99 < parameters.p99TargetMs,
     },
     reconciliation: {
       exitCode,
@@ -505,6 +554,17 @@ export async function runLoadTest(baseUrl: string): Promise<LoadResult> {
       !behind &&
       exitCode === 0,
   };
+}
+
+/** The `type` of a problem details body, or what the body was when it is not one. */
+function problemType(body: string): string {
+  try {
+    const parsed = JSON.parse(body) as { type?: unknown };
+    if (typeof parsed.type === 'string') return parsed.type;
+  } catch {
+    // Not JSON, such as a load balancer's own HTML page.
+  }
+  return body.trim() === '' ? '(empty body)' : '(no problem body)';
 }
 
 /** A request that got no complete answer within `REQUEST_TIMEOUT_MS` of its moment. */
@@ -523,6 +583,9 @@ export function renderReport(result: LoadResult): string {
   const codes = Object.entries(measured.statusCodes)
     .map(([status, count]) => `${status}: ${String(count)}`)
     .join(', ');
+  const fiveXxTypes = Object.entries(measured.fiveXxTypes)
+    .map(([type, count]) => `${type}: ${String(count)}`)
+    .join(', ');
   const errorCodes = Object.entries(measured.errorCodes)
     .map(([code, count]) => `${code}: ${String(count)}`)
     .join(', ');
@@ -535,7 +598,7 @@ export function renderReport(result: LoadResult): string {
     : `kept its schedule: every request left at most ${String(measured.generator.maxLagMs)} ms after its moment (p99 ${String(measured.generator.p99LagMs)} ms; the limit is ${String(MAX_GENERATOR_LAG_MS)} ms)`;
   return `# Performance
 
-The latest result of the load test of SYS-R20 (\`scripts/load-test.ts\`), written by the test itself. It runs as \`npm run load\` or \`make load\` against the stack of \`docker compose up --build --wait\`, and the e2e test of SYS-AC17 runs it too, so every e2e run rewrites this file. The p99 target is reported, not guaranteed: a run that misses it does not fail. A run fails on a 5xx, a connection error, a lost request, a ledger that does not reconcile, or a generator that fell behind its schedule.
+The latest result of the load test of SYS-R20 (\`scripts/load-test.ts\`), written by the test itself. It runs as \`npm run load\` or \`make load\` against the stack of \`docker compose up --build --wait\`, and the e2e test of SYS-AC17 runs it too, so every e2e run rewrites this file. The rate is \`LOAD_RATE_PER_SECOND\`, 200 requests per second by default; the CI job \`e2e\` runs at 100, because its runner has 2 CPUs for the whole stack and the generator, and the result committed here is a local run at 200. The p99 target is reported, not guaranteed: a run that misses it does not fail. A run fails on a 5xx, a connection error, a lost request, a ledger that does not reconcile, or a generator that fell behind its schedule.
 
 ## Machine
 
@@ -562,7 +625,7 @@ The latest result of the load test of SYS-R20 (\`scripts/load-test.ts\`), writte
 | Achieved throughput | ${String(measured.throughputPerSecond)} responses per second |
 | Responses | ${String(measured.responses)} (${String(measured.byKind.deposit)} deposits, ${String(measured.byKind.withdrawal)} withdrawals, ${String(measured.byKind.transfer)} transfers) |
 | Non-2xx responses | ${String(measured.non2xx)} |
-| 5xx responses | ${String(measured.fiveXx)} |
+| 5xx responses | ${String(measured.fiveXx)}${fiveXxTypes === '' ? '' : ` (${fiveXxTypes})`} |
 | Connection errors | ${String(measured.errors)}${errorCodes === '' ? '' : ` (${errorCodes})`} |
 | Lost requests | ${String(measured.lost)} |
 | Drain after the last send | ${String(measured.drainSeconds)} s |
