@@ -362,3 +362,571 @@
   - Skipped: docs/traceability.md regeneration and test:e2e, since no spec, task
     or test name changed.
 ✻ Cooked for 2m 46s · done 2:08 PM
+
+❯ /export docs/ai/transcripts/16-delivery.txt                                   
+  ⎿  Conversation exported to: /Users/matiastorsello/supercool-finances/docs/ai/
+     transcripts/16-delivery.txt
+
+❯ /ship add the final transcript of phase 16                                    
+
+⏺ Bash(git branch --show-current)
+  ⎿  phase/16-delivery
+
+⏺ Bash(npm run check)
+  ⎿  > supercool-finances@0.1.0 check
+     > npm run typecheck && npm run lint && npm run format:check && npm run
+      test
+     … +104 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ Bash(npm run infra:up)
+  ⎿  > supercool-finances@0.1.0 infra:up
+     > docker compose up -d --wait postgres redis
+     … +6 lines (ctrl+o to expand)
+
+⏺ Bash(npm run test:integration)
+  ⎿  > supercool-finances@0.1.0 test:integration
+     > vitest run --project integration --reporter=default --reporter=json
+     --outputFile.json=reports/vitest-integration.json
+     … +237 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ Bash(npm run trace -- --require unit,integration)
+  ⎿  > supercool-finances@0.1.0 trace
+     > tsx scripts/trace.ts --require unit,integration
+     … +426 lines (ctrl+o to expand)
+
+⏺ Bash(npm run infra:validate)
+  ⎿  > supercool-finances@0.1.0 infra:validate
+     > bash scripts/infra-validate.sh
+     … +32 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Bash(git add -A)
+  ⎿  (No output)
+
+⏺ Gates are green and the transcript is staged. I'm checking the staged list,
+  then committing.
+
+⏺ Bash(git status --short)
+  ⎿  M  docs/ai/transcripts/16-delivery.txt
+
+⏺ Bash(git commit -m "docs(ai): add the final transcript of phase 16" -m
+      "Replaces the transcript exported before the ship of the phase with the
+      final export, which in…)
+  ⎿  [phase/16-delivery ee30470] docs(ai): add the final transcript of phas
+     e 16
+      1 file changed, 237 insertions(+), 1 deletion(-)
+
+⏺ Bash(gitleaks git --no-banner --redact --log-opts="origin/main..HEAD")
+  ⎿  2:10PM INF 2 commits scanned.
+     2:10PM INF scanned ~17669 bytes (17.67 KB) in 61.1ms
+     2:10PM INF no leaks found
+
+⏺ Bash(git push -u origin HEAD)
+  ⎿  To https://github.com/torsello/supercool-finances.git
+        c65f23c..ee30470  HEAD -> phase/16-delivery
+     branch 'phase/16-delivery' set up to track 'origin/phase/16-delivery'.
+
+⏺ The final transcript is pushed as ee30470 (docs(ai): add the final transcript 
+  of phase 16) on phase/16-delivery.
+
+  - Gates:
+    - npm run check: passed (394 unit tests).
+    - npm run test:integration: passed (341 tests).
+    - npm run trace -- --require unit,integration: 244 of 244 ACs covered.
+    - npm run infra:validate: no findings.
+    - gitleaks: no leaks across the branch's 2 commits.
+  - ACs covered: none, since only the transcript changed.
+  - PR: the description doesn't start with "close phase", so I didn't open
+    another one. Phase 16's PR #19 already exists:
+    https://github.com/torsello/supercool-finances/pull/19. The push added this
+    commit to it, and you merge it once CI is green.
+  - Skipped: docs/traceability.md regeneration and test:e2e, because no spec,
+    task or test name changed.
+
+✻ Crunched for 2m 38s · done 2:11 PM
+
+※ recap: Phase 16 added two README troubleshooting rows (colima and the expected .env message) plus the transcript and its log row; everything is pushed to PR #19. Next: wait for CI to pass, then merge PR #19 with a merge commit.
+
+❯ Four last changes before I merge this pull request:                           
+  1. README.md: move the Reviewer's guide up, right after the summary and       
+  before "Why a modular monolith", so a reviewer meets it first; update         
+  Contents.                                                                     
+  2. README.md: in running prose, drop requirement and AC IDs such as SYS-R18   
+  and keep the links; leave the IDs in the tables that name the proving tests.  
+  3. docs/limitations.md: the demo panel row must say the demo UI was dropped   
+  to spend the time on the backend, not that it is planned as phase 15-demo.    
+  4. README.md: at the start of "How it works", before the diagrams, a short    
+  subsection "How money moves": one table with a row per movement (deposit,     
+  withdrawal, transfer, reversal) giving who may do it, the ledger entries it   
+  writes, with a worked example in minor units and the signs the ledger really  
+  records, and what refuses it. Then three lines on retries: the same key and   
+  body replays the stored response, the same key with another body answers 422, 
+  and a key still in progress answers 409. Take every rule from the specs and   
+  invent nothing.                                                               
+     Run npm run check and npm run docs:check. Don't commit; I'll run /ship.    
+
+⏺ Bash(grep -n "^#" README.md && sed -n '1,60p' README.md)
+  ⎿  1:# SuperCool Finances
+     9:## Why a modular monolith
+     13:## Thinking process and trade-offs
+     … +113 lines (ctrl+o to expand)
+
+  Searched for 3 patterns (ctrl+o to expand)
+
+⏺ Bash(sed -n '1,40p' docs/limitations.md | cut -c1-300; grep -n -i "demo"
+      docs/ai/00-planning.md | cut -c1-300)
+  ⎿  # Limitations
+
+     What this service does not do, and why, taken from the specs, the ADRs
+     … +90 lines (ctrl+o to expand)
+
+⏺ I've found the one ID in prose and the demo row. Next I'm reading the
+  movement, reversal and ledger specs so I can build the "How money moves"
+  table.
+
+  Listed 1 directory (ctrl+o to expand)
+
+⏺ Bash(sed -n '8,60p' specs/003-money-movements/spec.md && sed -n '260,280p'
+      specs/003-money-movements/spec.md && sed -n '8,34p'
+      specs/002-ledger/spec.md)  ⎿  ## 1. Context and goal
+
+     Money moves through three operations. A **deposit** simulates money ar
+     … +207 lines (ctrl+o to expand)
+
+⏺ Bash(sed -n '8,66p' specs/004-reversals/spec.md && sed -n '298,316p'
+      specs/004-reversals/spec.md)
+  ⎿  ## 1. Context and goal
+
+     The ledger is append-only (SYS-R15), so a deposit, withdrawal or trans
+     … +131 lines (ctrl+o to expand)
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Bash(grep -n "EUR" specs/000-overview/spec.md | head -5 | cut -c1-250; sed -n
+      '225,240p' README.md)
+  ⎿  53:| **Amount**             | An integer number of minor units togethe
+     r with a currency. `bigint` in the domain; in the API a string of deci
+     mal digits plus a currency code, for example `{"amount": "1050", "curr
+     … +27 lines (ctrl+o to expand)
+
+⏺ I have the rules I need from specs 002–005. Now I'm applying the four edits.
+
+⏺ Bash(python3 - <<'EOF'
+      p='README.md'…)
+  ⎿  9:## Reviewer's guide
+     28:## Why a modular monolith
+     32:## Thinking process and trade-offs
+     … +5 lines (ctrl+o to expand)
+  ⎿  Updated README.md (+21 -21)
+       6  
+       7  A balance service for SuperCool Finances. It provides customer 
+          accounts in five currencies, a double-entry ledger, deposits, w
+          ithdrawals, transfers and reversals, behind a versioned HTTP AP
+          I. It is a modular monolith in TypeScript on Fastify. PostgreSQ
+          L is its only source of truth and Redis is used for rate limiti
+          ng. It runs as several replicas behind a load balancer and stay
+          s correct under concurrent and repeated requests. Every behavio
+          ur is specified before it is built, and every acceptance criter
+          ion is proven by a test that names it. It was built for the tak
+          e-home challenge in [docs/challenge.md](docs/challenge.md).
+       8  
+       9 +## Reviewer's guide                                            
+      10 +                                                               
+      11 +A 15-minute path through the repository.                       
+      12 +                                                               
+      13 +1. **Run it** (2 min, Docker only): `docker compose up --build 
+         +--wait`, then follow the [Quickstart](#quickstart).            
+      14 +2. **Check the five money guarantees** (5 min): each has one te
+         +st that proves it.                                             
+      15 +                                                               
+      16 +   | Guarantee                    | Proven by                  
+         +                                                               
+         +                                                               
+         +                                                       |       
+      17 +   | ---------------------------- | ---------------------------
+         +---------------------------------------------------------------
+         +---------------------------------------------------------------
+         +------------------------------------------------------ |       
+      18 +   | No lost or duplicated money  | `DEP-AC11` in [test/e2e/rep
+         +lica-loss.test.ts](test/e2e/replica-loss.test.ts): a replica is
+         + killed during traffic and the ledger still reconciles         
+         +                                                       |       
+      19 +   | No negative customer balance | `MOV-AC13` in [test/integra
+         +tion/movements/concurrency.test.ts](test/integration/movements/
+         +concurrency.test.ts): 100 concurrent withdrawals               
+         +                                                       |       
+      20 +   | Safe retries                 | `IDM-AC10` in [test/integra
+         +tion/idempotency/concurrent-keys.test.ts](test/integration/idem
+         +potency/concurrent-keys.test.ts): one key, two replicas        
+         +                                                       |       
+      21 +   | Safe concurrency             | `MOV-AC14` in [test/integra
+         +tion/movements/concurrency.test.ts](test/integration/movements/
+         +concurrency.test.ts): crossed and circular transfers           
+         +                                                       |       
+      22 +   | Full audit trail             | `MOV-AC16` in [test/integra
+         +tion/movements/audit.test.ts](test/integration/movements/audit.
+         +test.ts) and `LED-AC11` in [test/integration/ledger/append-only
+         +.test.ts](test/integration/ledger/append-only.test.ts) |       
+      23 +                                                               
+      24 +3. **Read the reasoning** (5 min): [Thinking process and trade-
+         +offs](#thinking-process-and-trade-offs), then three ADRs: [ADR-
+         +0002 Modular monolith](docs/adr/0002-modular-monolith.md), [ADR
+         +-0008 Concurrency control](docs/adr/0008-read-committed-with-or
+         +dered-pessimistic-row-locks.md) and [ADR-0009 Idempotency](docs
+         +/adr/0009-idempotency-inside-the-movements-transaction.md).    
+      25 +4. **Skim the proof** (2 min): [docs/traceability.md](docs/trac
+         +eability.md) lists every acceptance criterion with the test tha
+         +t proves it. CI regenerates it from the test reports and fails 
+         +when the committed copy is stale.                              
+      26 +5. **See how AI was used** (1 min): [docs/ai/](docs/ai/README.m
+         +d) has every session transcript. [docs/ai/00-planning.md](docs/
+         +ai/00-planning.md) holds my planning and key decisions, and the
+         + "Open questions" tables of the [specs](specs/README.md) record
+         + each decision I made, with its date.                          
+      27 +                                                               
+      28  ## Why a modular monolith
+      29  
+      30  The challenge advises a microservice; this service is one deplo
+          yable with strict modules instead. Money has one consistency bo
+          undary: a transfer debits one account, credits another and writ
+          es the ledger entries, the idempotency key and the audit record
+          , and in one deployable all of that is a single ACID transactio
+          n in PostgreSQL, with no saga, outbox or compensation for a hal
+          f-done movement. It still scales horizontally, as identical sta
+          teless replicas whose only shared state is in PostgreSQL. Modul
+          es reach each other only through their ports and `index.ts`, en
+          forced by ESLint, so a module can be split out later. A split w
+          ould be justified when a module needs its own deploys or scalin
+          g, or the one database becomes the write bottleneck, and the fo
+          llow-up of ADR-0002 requires a new ADR first, saying how the sp
+          lit module's writes stay atomic with the ledger. The options ar
+          e in [ADR-0002](docs/adr/0002-modular-monolith.md) and the modu
+          les in [docs/architecture.md](docs/architecture.md).
+     ...
+      37  
+      38  The full documentation is indexed in [docs/README.md](docs/READ
+          ME.md).
+      39  
+      40 +- [Reviewer's guide](#reviewers-guide)                         
+      41  - [Why a modular monolith](#why-a-modular-monolith)
+      42  - [Thinking process and trade-offs](#thinking-process-and-trade
+          -offs)
+      23 -- [Reviewer's guide](#reviewers-guide)                         
+      43  - [Highlights](#highlights)
+      44  - [Quickstart](#quickstart)
+      45  - [How it works](#how-it-works)
+     ...
+      57  - [How this was built](#how-this-was-built)
+      58  - [Troubleshooting](#troubleshooting)
+      59  
+      41 -## Reviewer's guide                                            
+      42 -                                                               
+     … 28 more lines (ctrl+o to expand)
+
+⏺ Bash(python3 - <<'EOF'
+      p='docs/limitations.md'…)
+  ⎿  Updated docs/limitations.md (+1 -1)
+      33  | Four-eyes approval and time limits on reversals  | Policy tha
+          t can be added as new requirements later.                      
+                                                                         
+                                                                         
+                     | [Spec 004 section 6](../specs/004-reversals/spec.m
+          d#6-out-of-scope)                                              
+                                       |
+      34  | Audit records through the API                    | Audit reco
+          rds are written but cannot be read or searched through the API.
+           An operator finds a reversal through the account history.     
+                                                                         
+                     | [Spec 004 section 6](../specs/004-reversals/spec.m
+          d#6-out-of-scope)                                              
+                                       |
+      35  | Account lifecycle extras                         | No reopeni
+          ng or deleting accounts (a closed account stays readable for go
+          od), no account names, no operator listing or search of all acc
+          ounts, and no reading or changing system accounts.             
+                     | [Spec 001 section 6](../specs/001-accounts/spec.md
+          #6-out-of-scope)                                               
+                                       |
+      36 -| Demo panel                                       | Planned la
+         -st and optional: the core, the tests and the documentation come
+         - first, and a UI only helps if it shows the guarantees. It is t
+         -he phase `15-demo`.                                            
+         -           | [Planning](ai/00-planning.md#decisions), [AGENTS.m
+         -d section 7](../AGENTS.md#7-phases)                            
+         -                             |                                 
+      36 +| Demo panel                                       | Dropped, t
+         +o spend the time on the backend: the core, the tests and the do
+         +cumentation. The phase `15-demo` was not run.                  
+         +                                     | [Planning](ai/00-plannin
+         +g.md#decisions), [AGENTS.md section 7](../AGENTS.md#7-phases)  
+         +                                                       |       
+      37  
+      38  ## Events and integration
+      39  
+
+⏺ Now the "How money moves" subsection.
+
+⏺ Bash(python3 - <<'EOF'
+      p='README.md'…)
+  ⎿   README.md           | 59 ++++++++++++++++++++++++++++++++++----------
+     ---------
+      docs/limitations.md |  2 +-
+      2 files changed, 39 insertions(+), 22 deletions(-)
+  ⎿  Updated README.md (+17 -0)
+      232  
+      233  The diagrams below give an overview; [docs/architecture.md](do
+           cs/architecture.md) goes deeper.
+      234  
+      235 +### How money moves                                           
+      236 +                                                              
+      237 +Every movement is one database transaction of signed ledger en
+          +tries that sum to zero, and needs an `Idempotency-Key`. A posi
+          +tive amount credits an account and a negative one debits it. D
+          +eposits and withdrawals settle against the settlement account 
+          +of the currency, S(EUR) below, which goes below zero as money 
+          +is deposited. The examples are in EUR minor units (cents), wit
+          +h A and B customer accounts. The rules are in [spec 002](specs
+          +/002-ledger/spec.md), [spec 003](specs/003-money-movements/spe
+          +c.md) and [spec 004](specs/004-reversals/spec.md).            
+      238 +                                                              
+      239 +| Movement   | Who may do it                                  
+          +                             | Ledger entries                 
+          +                                       | Example              
+          +                       | Refused when                         
+          +                                                              
+          +                                                              
+          +                                                              
+          +                                                              
+          +                                               |              
+      240 +| ---------- | -----------------------------------------------
+          +---------------------------- | -------------------------------
+          +-------------------------------------- | ---------------------
+          +---------------------- | -------------------------------------
+          +--------------------------------------------------------------
+          +--------------------------------------------------------------
+          +--------------------------------------------------------------
+          +--------------------------------------------------------------
+          +---------------------------------------------- |              
+      241 +| Deposit    | An operator                                    
+          +                             | +amount on the customer account
+          +, −amount on the settlement account    | 10.50 EUR into A: A `
+          ++1050`, S(EUR) `−1050` | the caller is a customer (403); the a
+          +ccount is unknown or a system account (404); the currency diff
+          +ers from the account's, the account is `frozen` or `closed`, o
+          +r the balance would exceed its limit (422)                    
+          +                                                              
+          +                                               |              
+      242 +| Withdrawal | The owner of the account                       
+          +                             | −amount on the customer account
+          +, +amount on the settlement account    | 3.00 EUR from A: A `−
+          +300`, S(EUR) `+300`    | the caller is an operator (403); the 
+          +account is unknown or another customer's (404); the currency d
+          +iffers, the account is `frozen` or `closed`, or the amount is 
+          +greater than the balance (422)                                
+          +                                                              
+          +                                               |              
+      243 +| Transfer   | The owner of the source account, to any active 
+          +account in the same currency | −amount on the source, +amount 
+          +on the destination; no system entry    | 5.00 EUR from A to B:
+          + A `−500`, B `+500`    | the caller is an operator (403); the 
+          +source is unknown or another customer's (404); the destination
+          + is the source, the currency differs, the source is `frozen` o
+          +r `closed`, or the amount is greater than its balance (422); t
+          +he destination is unknown, a system account, not active, in an
+          +other currency or over the balance limit (422) |              
+      244 +| Reversal   | An operator, with a reason                     
+          +                             | The original's entries with the
+          +ir signs flipped, on the same accounts | Reversing that transf
+          +er: A `+500`, B `−500` | the caller is a customer (403); the t
+          +ransaction is unknown (404); it is itself a reversal (422); it
+          + is already reversed (409); an account in it is `closed` (422;
+          + `frozen` does not block); a customer account it debits has to
+          +o little money, or a credit would exceed the balance limit (42
+          +2)                                             |              
+      245 +                                                              
+      246 +Retries, per user and key ([spec 005](specs/005-idempotency/sp
+          +ec.md)):                                                      
+      247 +                                                              
+      248 +- The same key with the same request replays the stored respon
+          +se, refusals included, with `Idempotent-Replayed: true`, and m
+          +oves no money again.                                          
+      249 +- The same key with another body answers 422 `/problems/idempo
+          +tency-key-reused`.                                            
+      250 +- A key still held by a request in progress answers 409 `/prob
+          +lems/request-in-progress` with `Retry-After: 1`.              
+      251 +                                                              
+      252  ### System context
+      253  
+      254  What the system owns and what stays outside it.
+  ⎿  Updated docs/limitations.md (+1 -1)
+      33  | Four-eyes approval and time limits on reversals  | Policy tha
+          t can be added as new requirements later.                      
+                                                                         
+                                                                         
+                     | [Spec 004 section 6](../specs/004-reversals/spec.m
+          d#6-out-of-scope)                                              
+                                       |
+      34  | Audit records through the API                    | Audit reco
+          rds are written but cannot be read or searched through the API.
+           An operator finds a reversal through the account history.     
+                                                                         
+                     | [Spec 004 section 6](../specs/004-reversals/spec.m
+          d#6-out-of-scope)                                              
+                                       |
+      35  | Account lifecycle extras                         | No reopeni
+          ng or deleting accounts (a closed account stays readable for go
+          od), no account names, no operator listing or search of all acc
+          ounts, and no reading or changing system accounts.             
+                     | [Spec 001 section 6](../specs/001-accounts/spec.md
+          #6-out-of-scope)                                               
+                                       |
+      36 -| Demo panel                                       | Dropped, t
+         -o spend the time on the backend: the core, the tests and the do
+         -cumentation. The phase `15-demo` was not run.                  
+         -                                     | [Planning](ai/00-plannin
+         -g.md#decisions), [AGENTS.md section 7](../AGENTS.md#7-phases)  
+         -                                                       |       
+      36 +| Demo panel                                       | Dropped, t
+         +o spend the time on the backend: the core, the tests and the do
+         +cumentation. The phase `15-demo` was not run.                  
+         +                                                               
+         +           | [Planning](ai/00-planning.md#decisions), [AGENTS.m
+         +d section 7](../AGENTS.md#7-phases)                            
+         +                             |                                 
+      37  
+      38  ## Events and integration
+      39  
+
+⏺ Bash(python3 - <<'EOF'
+      p='README.md'…)
+  ⎿  diff --git a/README.md b/README.md
+     index acc6912..c35a84d 100644
+     --- a/README.md
+     … +166 lines (ctrl+o to expand)
+  ⎿  Updated README.md (+2 -2)
+      245  
+      246  Retries, per user and key ([spec 005](specs/005-idempotency/sp
+           ec.md)):
+      247  
+      248 -- The same key with the same request replays the stored respon
+          -se, refusals included, with `Idempotent-Replayed: true`, and m
+          -oves no money again.                                          
+      248 +- The same key with the same request replays the stored respon
+          +se with `Idempotent-Replayed: true`, and moves no money again.
+      249  - The same key with another body answers 422 `/problems/idempo
+           tency-key-reused`.
+      250 -- A key still held by a request in progress answers 409 `/prob
+          -lems/request-in-progress` with `Retry-After: 1`.              
+      250 +- A key still held by a request in progress after the wait tim
+          +eout answers 409 `/problems/request-in-progress` with `Retry-A
+          +fter: 1`.                                                     
+      251  
+      252  ### System context
+      253  
+
+⏺ Bash(grep -rn "15-demo" README.md docs --include=*.md | grep -v transcripts |
+      cut -c1-200; npm run check 2>&1 | grep -E "error|warn|Test Files|Tests|All
+      matched|Code…)
+  ⎿  (eval):1: no matches found: --include=*.md
+     All matched files use Prettier code style!
+      ✓ |unit| test/unit/platform/error-reporter.test.ts (4 tests) 379ms
+     … +6 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ All four changes are in README.md and docs/limitations.md. npm run check (394
+  unit tests) and npm run docs:check (0 failures) both pass.
+
+  1. Reviewer's guide now comes right after the summary, before "Why a modular
+     monolith", and it's first in Contents. The Contents block itself stays
+     where it was, after "Thinking process and trade-offs".
+  2. IDs in prose: only one was in running text: "SYS-R31" under Request
+     lifecycle, which now reads "(see spec 000)". The IDs in the Reviewer's
+     guide and Highlights tables, which name the proving tests, are unchanged.
+  3. docs/limitations.md: the Demo panel row now says it was dropped to spend
+     the time on the backend (the core, the tests and the documentation), and
+     that phase 15-demo was not run.
+  4. "How money moves" opens "How it works", before the diagrams:
+     - An intro on signed entries that sum to zero, the required
+       Idempotency-Key, and the settlement account going below zero as money is
+       deposited.
+     - One row per movement: who may do it, the entries, a EUR example in cents,
+       and the refusals with their HTTP status.
+     - The examples are a 1050 deposit into A, a 300 withdrawal from A, a 500
+       transfer from A to B, and the reversal of that transfer.
+     - Three retry lines: replay with Idempotent-Replayed: true, 422
+       /problems/idempotency-key-reused, and 409 /problems/request-in-progress
+       with Retry-After: 1.
+
+     Every rule comes from specs 002–005 and their error catalogues, and the
+     subsection names no requirement or AC IDs.
+
+  The refusals list is condensed. It leaves out the 400 for a missing
+  Idempotency-Key, which the intro covers, and the 503 for a lock timeout.
+
+  Decision for you: docs/development.md:143 still says the phases run "from
+  00-setup to 15-demo". I didn't touch it because you asked for limitations
+  only, but it's now stale; should I change it to end at 16-delivery?
+
+  Nothing is committed, so it's ready for /ship.
+
+✻ Baked for 2m 12s · done 2:19 PM
+
+❯ Yes: change docs/development.md to list the phases up to 16-delivery, with    
+  15-demo dropped, as AGENTS.md does. Don't commit; I'll run /ship.             
+
+⏺ Bash(sed -n '143p' docs/development.md)
+  ⎿  **Phases and branches.** Work is split into the phases of [AGENTS.md s
+     ection 7](../AGENTS.md#7-phases), from `00-setup` to `15-demo`, one se
+     ssion each. Each phase is developed on `phase/NN-name`, created from a
+     n up-to-date `main` ([section 8](../AGENTS.md#8-git)).
+
+⏺ Update(docs/development.md)
+  ⎿  Added 1 line, removed 1 line
+      140  - `--require unit,integration` fails when a report is missing.
+            CI's `traceability` job adds `e2e` and `--write`, and fails w
+           hen the regenerated `docs/traceability.md` differs from the co
+           mmitted one. When a spec, a task or a test name changes, regen
+           erate it from three fresh reports and commit it.
+      141  - A test marked `fails`, and a test that makes no assertion, f
+           ail at runtime (`vitest.shared.ts`).
+      142  
+      143 -**Phases and branches.** Work is split into the phases of [AGE
+          -NTS.md section 7](../AGENTS.md#7-phases), from `00-setup` to `
+          -15-demo`, one session each. Each phase is developed on `phase/
+          -NN-name`, created from an up-to-date `main` ([section 8](../AG
+          -ENTS.md#8-git)).                                              
+      143 +**Phases and branches.** Work is split into the phases of [AGE
+          +NTS.md section 7](../AGENTS.md#7-phases), from `00-setup` to `
+          +16-delivery`, one session each; `15-demo` was dropped. Each ph
+          +ase is developed on `phase/NN-name`, created from an up-to-dat
+          +e `main` ([section 8](../AGENTS.md#8-git)).                   
+      144  
+      145  ## Project skills and guardrails
+      146  
+
+⏺ Bash(npm run check 2>&1 | grep -E "Test Files|Tests |All matched|error" ; npm
+      run docs:check 2>&1 | tail -1; git status --short)
+  ⎿  All matched files use Prettier code style!
+      ✓ |unit| test/unit/platform/error-reporter.test.ts (4 tests) 240ms
+      ✓ |unit| test/unit/http/error-handler.test.ts (39 tests) 7ms
+     … +7 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ I updated docs/development.md:143. It now says the phases run "from 00-setup
+  to 16-delivery, one session each; 15-demo was dropped." npm run check (394
+  unit tests) and npm run docs:check (0 failures) both pass.
+
+  That sentence links to AGENTS.md section 7, whose phase list still ends at
+  15b-review. So 16-delivery now appears in docs/development.md but not in
+  AGENTS.md. Should I add 16-delivery to section 7 so the two match?
+
+  Changed files: README.md, docs/development.md and docs/limitations.md. Nothing
+  is committed, so it's ready for /ship.
+
+✻ Baked for 41s · done 2:20 PM

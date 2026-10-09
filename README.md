@@ -6,38 +6,6 @@
 
 A balance service for SuperCool Finances. It provides customer accounts in five currencies, a double-entry ledger, deposits, withdrawals, transfers and reversals, behind a versioned HTTP API. It is a modular monolith in TypeScript on Fastify. PostgreSQL is its only source of truth and Redis is used for rate limiting. It runs as several replicas behind a load balancer and stays correct under concurrent and repeated requests. Every behaviour is specified before it is built, and every acceptance criterion is proven by a test that names it. It was built for the take-home challenge in [docs/challenge.md](docs/challenge.md).
 
-## Why a modular monolith
-
-The challenge advises a microservice; this service is one deployable with strict modules instead. Money has one consistency boundary: a transfer debits one account, credits another and writes the ledger entries, the idempotency key and the audit record, and in one deployable all of that is a single ACID transaction in PostgreSQL, with no saga, outbox or compensation for a half-done movement. It still scales horizontally, as identical stateless replicas whose only shared state is in PostgreSQL. Modules reach each other only through their ports and `index.ts`, enforced by ESLint, so a module can be split out later. A split would be justified when a module needs its own deploys or scaling, or the one database becomes the write bottleneck, and the follow-up of ADR-0002 requires a new ADR first, saying how the split module's writes stay atomic with the ledger. The options are in [ADR-0002](docs/adr/0002-modular-monolith.md) and the modules in [docs/architecture.md](docs/architecture.md).
-
-## Thinking process and trade-offs
-
-I started from what can go wrong with customer money, and each risk set a decision: concurrent requests (ordered row locks in PostgreSQL, never in a process), retries (an idempotency key that commits with the movement), precision (integer minor units, never floats), auditability (an append-only double-entry ledger) and access (a role check on every route, and 404 for another customer's resources). Each decision names the alternative it rejected in [Design decisions](#design-decisions). I chose TypeScript because it is the language I know best, so I catch subtle mistakes in the code the AI writes faster, and its strict typing keeps money as `bigint`. My thinking process is in [docs/ai/00-planning.md](docs/ai/00-planning.md): what makes the problem hard, the decisions, what I rejected and where I steered.
-
-## Contents
-
-The full documentation is indexed in [docs/README.md](docs/README.md).
-
-- [Why a modular monolith](#why-a-modular-monolith)
-- [Thinking process and trade-offs](#thinking-process-and-trade-offs)
-- [Reviewer's guide](#reviewers-guide)
-- [Highlights](#highlights)
-- [Quickstart](#quickstart)
-- [How it works](#how-it-works)
-- [API overview](#api-overview)
-- [Configuration](#configuration)
-- [Testing](#testing)
-- [CI and quality gates](#ci-and-quality-gates)
-- [Observability and operations](#observability-and-operations)
-- [Security](#security)
-- [Deployment to AWS](#deployment-to-aws)
-- [Design decisions](#design-decisions)
-- [Project structure](#project-structure)
-- [Development workflow](#development-workflow)
-- [Limitations and roadmap](#limitations-and-roadmap)
-- [How this was built](#how-this-was-built)
-- [Troubleshooting](#troubleshooting)
-
 ## Reviewer's guide
 
 A 15-minute path through the repository.
@@ -56,6 +24,38 @@ A 15-minute path through the repository.
 3. **Read the reasoning** (5 min): [Thinking process and trade-offs](#thinking-process-and-trade-offs), then three ADRs: [ADR-0002 Modular monolith](docs/adr/0002-modular-monolith.md), [ADR-0008 Concurrency control](docs/adr/0008-read-committed-with-ordered-pessimistic-row-locks.md) and [ADR-0009 Idempotency](docs/adr/0009-idempotency-inside-the-movements-transaction.md).
 4. **Skim the proof** (2 min): [docs/traceability.md](docs/traceability.md) lists every acceptance criterion with the test that proves it. CI regenerates it from the test reports and fails when the committed copy is stale.
 5. **See how AI was used** (1 min): [docs/ai/](docs/ai/README.md) has every session transcript. [docs/ai/00-planning.md](docs/ai/00-planning.md) holds my planning and key decisions, and the "Open questions" tables of the [specs](specs/README.md) record each decision I made, with its date.
+
+## Why a modular monolith
+
+The challenge advises a microservice; this service is one deployable with strict modules instead. Money has one consistency boundary: a transfer debits one account, credits another and writes the ledger entries, the idempotency key and the audit record, and in one deployable all of that is a single ACID transaction in PostgreSQL, with no saga, outbox or compensation for a half-done movement. It still scales horizontally, as identical stateless replicas whose only shared state is in PostgreSQL. Modules reach each other only through their ports and `index.ts`, enforced by ESLint, so a module can be split out later. A split would be justified when a module needs its own deploys or scaling, or the one database becomes the write bottleneck, and the follow-up of ADR-0002 requires a new ADR first, saying how the split module's writes stay atomic with the ledger. The options are in [ADR-0002](docs/adr/0002-modular-monolith.md) and the modules in [docs/architecture.md](docs/architecture.md).
+
+## Thinking process and trade-offs
+
+I started from what can go wrong with customer money, and each risk set a decision: concurrent requests (ordered row locks in PostgreSQL, never in a process), retries (an idempotency key that commits with the movement), precision (integer minor units, never floats), auditability (an append-only double-entry ledger) and access (a role check on every route, and 404 for another customer's resources). Each decision names the alternative it rejected in [Design decisions](#design-decisions). I chose TypeScript because it is the language I know best, so I catch subtle mistakes in the code the AI writes faster, and its strict typing keeps money as `bigint`. My thinking process is in [docs/ai/00-planning.md](docs/ai/00-planning.md): what makes the problem hard, the decisions, what I rejected and where I steered.
+
+## Contents
+
+The full documentation is indexed in [docs/README.md](docs/README.md).
+
+- [Reviewer's guide](#reviewers-guide)
+- [Why a modular monolith](#why-a-modular-monolith)
+- [Thinking process and trade-offs](#thinking-process-and-trade-offs)
+- [Highlights](#highlights)
+- [Quickstart](#quickstart)
+- [How it works](#how-it-works)
+- [API overview](#api-overview)
+- [Configuration](#configuration)
+- [Testing](#testing)
+- [CI and quality gates](#ci-and-quality-gates)
+- [Observability and operations](#observability-and-operations)
+- [Security](#security)
+- [Deployment to AWS](#deployment-to-aws)
+- [Design decisions](#design-decisions)
+- [Project structure](#project-structure)
+- [Development workflow](#development-workflow)
+- [Limitations and roadmap](#limitations-and-roadmap)
+- [How this was built](#how-this-was-built)
+- [Troubleshooting](#troubleshooting)
 
 ## Highlights
 
@@ -232,6 +232,23 @@ To try every endpoint by hand instead, import the [Postman collection](docs/api/
 
 The diagrams below give an overview; [docs/architecture.md](docs/architecture.md) goes deeper.
 
+### How money moves
+
+Every movement is one database transaction of signed ledger entries that sum to zero, and needs an `Idempotency-Key`. A positive amount credits an account and a negative one debits it. Deposits and withdrawals settle against the settlement account of the currency, S(EUR) below, which goes below zero as money is deposited. The examples are in EUR minor units (cents), with A and B customer accounts. The rules are in [spec 002](specs/002-ledger/spec.md), [spec 003](specs/003-money-movements/spec.md) and [spec 004](specs/004-reversals/spec.md).
+
+| Movement   | Who may do it                                                               | Ledger entries                                                        | Example                                     | Refused when                                                                                                                                                                                                                                                                                                                                |
+| ---------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Deposit    | An operator                                                                 | +amount on the customer account, −amount on the settlement account    | 10.50 EUR into A: A `+1050`, S(EUR) `−1050` | the caller is a customer (403); the account is unknown or a system account (404); the currency differs from the account's, the account is `frozen` or `closed`, or the balance would exceed its limit (422)                                                                                                                                 |
+| Withdrawal | The owner of the account                                                    | −amount on the customer account, +amount on the settlement account    | 3.00 EUR from A: A `−300`, S(EUR) `+300`    | the caller is an operator (403); the account is unknown or another customer's (404); the currency differs, the account is `frozen` or `closed`, or the amount is greater than the balance (422)                                                                                                                                             |
+| Transfer   | The owner of the source account, to any active account in the same currency | −amount on the source, +amount on the destination; no system entry    | 5.00 EUR from A to B: A `−500`, B `+500`    | the caller is an operator (403); the source is unknown or another customer's (404); the destination is the source, the currency differs, the source is `frozen` or `closed`, or the amount is greater than its balance (422); the destination is unknown, a system account, not active, in another currency or over the balance limit (422) |
+| Reversal   | An operator, with a reason                                                  | The original's entries with their signs flipped, on the same accounts | Reversing that transfer: A `+500`, B `−500` | the caller is a customer (403); the transaction is unknown (404); it is itself a reversal (422); it is already reversed (409); an account in it is `closed` (422; `frozen` does not block); a customer account it debits has too little money, or a credit would exceed the balance limit (422)                                             |
+
+Retries, per user and key ([spec 005](specs/005-idempotency/spec.md)):
+
+- The same key with the same request replays the stored response with `Idempotent-Replayed: true`, and moves no money again.
+- The same key with another body answers 422 `/problems/idempotency-key-reused`.
+- A key still held by a request in progress after the wait timeout answers 409 `/problems/request-in-progress` with `Retry-After: 1`.
+
 ### System context
 
 What the system owns and what stays outside it.
@@ -298,7 +315,7 @@ flowchart TB
 
 ### Request lifecycle
 
-The order in which every request is checked; the first failure answers (SYS-R31 in [spec 000](specs/000-overview/spec.md)).
+The order in which every request is checked; the first failure answers (see [spec 000](specs/000-overview/spec.md)).
 
 The authentication, rate-limit and role checks answer before the body is read. A replay of a completed `Idempotency-Key` is answered before validation and every later check, so it returns what the first request got even after configuration changes. Every error leaves through one function, `toProblem` in [src/platform/http/error-handler.ts](src/platform/http/error-handler.ts), as `application/problem+json`.
 
