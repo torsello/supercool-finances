@@ -4369,3 +4369,144 @@ code 0)
     didn't change without asking you.
 
 ✻ Crunched for 15s · done 10:22 AM
+
+❯ /export docs/ai/transcripts/13-final-review-part2.txt                         
+  ⎿  Conversation exported to: /Users/matiastorsello/supercool-finances/docs/ai/
+     transcripts/13-final-review-part2.txt
+
+❯ /ship close phase 13: final review and specs implemented                      
+
+⏺ Starting the gates with step 2.1.
+
+⏺ Bash(npm run check)
+  ⎿  > supercool-finances@0.1.0 check
+     > npm run typecheck && npm run lint && npm run format:check && npm run
+      test
+     … +101 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ Bash(npm run infra:up)
+  ⎿  > supercool-finances@0.1.0 infra:up
+     > docker compose up -d --wait postgres redis
+     … +6 lines (ctrl+o to expand)
+
+⏺ Bash(npm run test:integration)
+  ⎿  > supercool-finances@0.1.0 test:integration
+     > vitest run --project integration --reporter=default --reporter=json
+     --outputFile.json=reports/vitest-integration.json
+     … +235 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ Bash(npm run trace -- --require unit,integration)
+  ⎿  > supercool-finances@0.1.0 trace
+     > tsx scripts/trace.ts --require unit,integration
+     … +426 lines (ctrl+o to expand)
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Bash(checkov -d infra/terraform --quiet --compact)
+  ⎿  terraform scan results:
+
+     Passed checks: 334, Failed checks: 0, Skipped checks: 24
+     … +4 lines (ctrl+o to expand)
+  ⎿  (timeout 5m)
+
+⏺ The gates pass. Step 3: checking that docs/ai/README.md lists the new
+  transcript.
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Bash(python3 - <<'EOF'
+      p='docs/ai/README.md'…)
+  ⎿  Checking formatting...
+     All matched files use Prettier code style!
+      M docs/ai/README.md
+     … +3 lines (ctrl+o to expand)
+  ⎿  Updated docs/ai/README.md (+1 -0)
+      42  | 12 part 2 | 2026-10-09 | [12-infra-part2.txt](transcripts/12-
+          infra-part2.txt) | Infra, part 2: the CI pipeline (jobs `ci`, `
+          e2e`, `traceability`, `secret-scan` and `security` with trivy, 
+          actions pinned by SHA, `ubuntu-24.04`), the runtime image witho
+          ut npm, the WAF rate rule answering 429, the Terraform connecti
+          on and shutdown budgets with the deployment surge, RDS Proxy's 
+          borrow timeout answered 503 (SEC-R49, SEC-AC39), the runbooks, 
+          README, OpenAPI error docs and ADR follow-ups, and the second a
+          udit's fixes. |
+      43  | 12b | 2026-10-09 | [12b-observability.txt](transcripts/12b-ob
+          servability.txt) | Observability: ADR-0023 and the owner-approv
+          ed changes to specs 007 and 008, optional error reporting of th
+          e 500s to a Sentry-compatible endpoint (own client on Node's `f
+          etch`, allowlisted event, scrubbed message, bounded and off by 
+          default), the `observability` Compose profile with Prometheus a
+          nd Grafana and its dashboard, the `compose.error-reporting.yaml
+          ` override, `make observability`, and the SEC-AC40 to SEC-AC46 
+          and DEP-AC31 to DEP-AC34 tests. |
+      44  | 13 part 1 | 2026-10-09 | [13-final-review-part1.txt](transcri
+          pts/13-final-review-part1.txt) | Final review, part 1: the fixe
+          s of the `/audit` of 12b-observability (the reporter frees its 
+          slot at 2000 ms, multi-line messages never sent as frames, stri
+          cter `SENTRY_DSN`, tests without fixed sleeps, plan 007), SEC-R
+          56 and SEC-AC47 (every counter of table 1.4 at 0 from startup) 
+          and the `or vector(0)` of the errors panels. |
+      45 +| 13 part 2 | 2026-10-09 | [13-final-review-part2.txt](transcri
+         +pts/13-final-review-part2.txt) | Final review, part 2: a check 
+         +of all 238 ACs against their code and tests by six parallel rev
+         +iewers, the weak assertions and unset Givens they found fixed (
+         +SYS, ACC, LED, REV, IDM, SEC and DEP ACs), the DEP-AC26 checkov
+         + policies tightened and mutation-tested, spec 007 run with its 
+         +default rate limit, the owner-approved rewordings of sections 1
+         +.6 and 1.9 of spec 007, every spec set to `Implemented`, and `d
+         +ocs/traceability.md` committed with a freshness check in the CI
+         + job `traceability`. |                                         
+
+⏺ Bash(git add -A)
+  ⎿  (No output)
+
+⏺ Bash(git status --short)
+  ⎿  M  docs/ai/README.md
+     A  docs/ai/transcripts/13-final-review-part2.txt
+     M  specs/000-overview/plan.md
+     M  specs/007-security-ops/spec.md
+
+⏺ Nothing sensitive is staged. Committing.
+
+⏺ Bash(git commit -q -F - <<'EOF'
+      docs: align spec 007 section 1.9 with the role settings and log part 2…)
+  ⎿  (No output)
+
+⏺ Bash(gitleaks git --no-banner --redact --log-opts="origin/main..HEAD")
+  ⎿  10:25AM INF 3 commits scanned.
+     10:25AM INF scanned ~378996 bytes (379 KB) in 254ms
+     10:25AM INF no leaks found
+
+⏺ Bash(git push -u origin HEAD)
+  ⎿  remote:
+     remote: Create a pull request for 'phase/13-final-review' on GitHub by
+      visiting:
+     … +7 lines (ctrl+o to expand)
+
+⏺ Bash(gh pr view)
+  ⎿  Error: Exit code 1
+     no pull requests found for branch "phase/13-final-review"
+
+⏺ Bash(gh pr create --base main --title "Phase 13-final-review: every spec
+      Implemented, 238 of 238 ACs proven" --body-file - <<'EOF'
+      ## What the phase delivered…)
+  ⎿  https://github.com/torsello/supercool-finances/pull/16
+
+⏺ - Commit: pushed phase/13-final-review with docs: align spec 007 section 1.9 
+    with the role settings and log part 2. gitleaks found no leaks in the 3
+    branch commits.
+  - Gates: npm run check passes (381 unit tests), and so does npm run 
+    test:integration (340). npm run trace -- --require unit,integration shows
+    238 of 238 ACs covered, and checkov shows 0 failed checks. I didn't rerun
+    e2e; its report is from the earlier full run, and docs/traceability.md
+    needed no regeneration.
+  - ACs covered: SEC-AC24 in this commit; the earlier two commits cover the rest
+    of the phase.
+  - Pull request: https://github.com/torsello/supercool-finances/pull/16. CI
+    hasn't run yet, and I haven't merged it.
+  - Beyond the skill's steps: I added the missing 13 part 2 row to
+    docs/ai/README.md, as step 3 requires.
+
+✻ Brewed for 3m 14s · done 10:26 AM
