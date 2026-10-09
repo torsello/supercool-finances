@@ -1,0 +1,128 @@
+ ▐▛███▛█   Claude Code v2.1.292
+▝▜██████▀  Opus 5.5 · Claude Max
+ ▝▝   ▝▝   ~/supercool-finances
+
+▎ [✻] [✻] [✻] · Share Claude Code and earn $10 in usage credits · /passes
+
+❯ /clear                                                                        
+
+!  git switch main && git pull --ff-only && git switch -c phase/16-delivery     
+  ⎿  Already on 'main'
+     Your branch is up to date with 'origin/main'.
+     Already up to date.
+     Switched to a new branch 'phase/16-delivery'
+
+⏺ You're on phase/16-delivery, branched from an up-to-date main (at 92c3f5e,
+  after PR #18), and the tree is clean.
+
+  16-delivery isn't in the phase list in AGENTS.md §7. If this phase is meant to
+  stay, I can add it there and to the AI usage log once we know its scope.
+
+  What would you like this phase to cover? For example: preparing the final
+  submission, a README pass, or packaging.
+
+✻ Brewed for 4s · done 1:59 PM
+
+❯ Add two short rows to the README's Troubleshooting table, from a clean-clone  
+  test on macOS, and change nothing else:                                       
+  - With colima, clone under your home directory: colima shares only the home   
+  directory with its VM, so a clone in /tmp fails with "error mounting          
+  .../docker/nginx/nginx.conf ... not a directory". Docker Desktop shares /tmp. 
+  - The lines ".env not found. Continuing without it." printed by make seed,    
+  make token and make demo-env are expected: the tools container takes its      
+  settings from compose.yaml.                                                   
+    Run npm run check and npm run docs:check. Don't commit; I'll run /ship.     
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Bash(python3 - <<'EOF'
+      p='README.md'…)
+  ⎿   README.md | 2 ++
+      1 file changed, 2 insertions(+)
+     diff --git a/README.md b/README.md
+     … +43 lines (ctrl+o to expand)
+  ⎿  Updated README.md (+2 -0)
+      794  | ------------------------------------------------------------
+           ---------------------------------- | -------------------------
+           --------------------------------------------------------------
+           --------------------------------------------------------------
+           --------------------------------------------------------------
+           ----------------------------------------------------- |
+      795  | `Bind for 127.0.0.1:8080 failed: port is already allocated` 
+           (or 3001, 3002, 55432, 6379, 3030) | Another process or stack 
+           holds the port. Find it with `lsof -i :8080`, stop it, or stop
+            this project's other stack with `docker compose down`. `npm r
+           un test:e2e` uses the same ports, so stop your stack before it
+           .                                                     |
+      796  | `docker: 'compose' is not a docker command` on macOS        
+                                              | The Compose v2 plugin is 
+           missing. Install or update Docker Desktop, or, with Homebrew's
+            `docker`, run `brew install docker-compose` and add `"cliPlug
+           insExtraDirs": ["/opt/homebrew/lib/docker/cli-plugins"]` to `~
+           /.docker/config.json`.                                |
+      797 +| `error mounting ".../docker/nginx/nginx.conf" ... not a dire
+          +ctory` with colima                 | colima shares only your h
+          +ome directory with its VM, so a clone in `/tmp` cannot be moun
+          +ted. Clone under your home directory. Docker Desktop shares `/
+          +tmp`.                                                         
+          +                                                      |       
+      798 +| `.env not found. Continuing without it.` from `make seed`, `
+          +make token` or `make demo-env`     | Expected: the `tools` con
+          +tainer takes its settings from `compose.yaml`. Nothing to fix.
+          +                                                              
+          +                                                              
+          +                                                      |       
+      799  | `invalid pool request: Pool overlaps with other one on this 
+           address space`                     | Another Docker network us
+           es `10.210.0.0/24`. Run with another prefix, for example `SCF_
+           SUBNET_PREFIX=10.212.0 docker compose up --build --wait`, and 
+           pass the same variable to every later command of that stack.  
+                                                                 |
+      800  | `migrate` exits non-zero, or `/health/ready` answers 503 aft
+           er a schema change                 | The database volume preda
+           tes the change, for example an edited migration or init script
+           . Recreate it: `docker compose down -v && docker compose up --
+           build --wait`; for the host's Postgres, `npm run infra:reset`.
+                                                                 |
+      801  | `401 /problems/unauthenticated` on every request            
+                                              | The token expired (15 min
+           utes) or was minted for another stack's secret. Mint new ones 
+           with `eval "$(make demo-env)"`, or `make token`.              
+                                                                         
+                                                                 |
+
+⏺ Only the two rows changed. Now the checks.
+
+⏺ Bash(npm run check 2>&1 | tail -15; echo "check exit: ${PIPESTATUS[0]}"; npm
+      run docs:check 2>&1 | tail -8; echo "docs exit: ${PIPESTATUS[0]}")
+  ⎿   ✓ |unit| test/unit/auth/tokens-helper.test.ts (3 tests) 7ms
+      ✓ |unit| test/unit/ledger/money.test.ts (5 tests) 7ms
+      ✓ |unit| test/unit/platform/log-scrubber.test.ts (3 tests) 2ms
+     … +20 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ Bash(git status --short)
+  ⎿   M README.md
+
+⏺ I added the two rows to the README's Troubleshooting table, right after the
+  docker: 'compose' is not a docker command row:
+
+  - colima: error mounting ".../docker/nginx/nginx.conf" ... not a directory →
+    clone under your home directory, because colima shares only that with its
+    VM; Docker Desktop shares /tmp.
+  - .env not found. Continuing without it. from make seed, make token or make 
+    demo-env → expected, because the tools container takes its settings from
+    compose.yaml.
+
+  Both rows fit the table's current column widths, so Prettier didn't re-pad any
+  other lines. The diff is exactly 2 added lines, and README.md is the only
+  modified file.
+
+  Checks:
+  - npm run check: all 394 unit tests in 70 files passed.
+  - npm run docs:check: 106 Markdown files and 20 mermaid diagrams checked, 0
+    failures.
+
+  Nothing is committed, so it's ready for /ship.
+
+✻ Cogitated for 52s · done 2:00 PM
