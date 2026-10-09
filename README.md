@@ -181,7 +181,7 @@ Nothing in this repository applies the Terraform (DEP-R34). `npm run infra:valid
 
 ## CI
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push, on pull requests to `main` and on demand:
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs once per change: on pushes to `main`, on pull requests to `main` and on demand:
 
 - `ci`: `npm run check`, `npm run openapi:lint`, `npm run infra:validate`, the integration tests against Postgres and Redis, `npm run reconcile` on the test database they leave (LED-AC17), `npm run trace -- --require unit,integration` and `npm run build`. It uploads the unit and integration reports.
 - `e2e`: `npm run test:e2e` on its own Compose project, `scf-e2e`, with the load test at `LOAD_RATE_PER_SECOND` 100; it uploads the e2e report, and on failure prints the stack's logs and uploads them with `reports/load-test.json`.
