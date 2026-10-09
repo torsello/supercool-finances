@@ -246,7 +246,7 @@ Unless stated otherwise: "the stack" is started with `docker compose up --build 
 - **Covers:** DEP-R16
 - **Given** the stack running, with `api-1` and `api-2` then stopped with `docker compose stop api-1 api-2`
 - **When** `/health/live` is requested through `http://localhost:8080` with `X-Request-Id: gw-1`; and the replicas are started again
-- **Then** the request answers 502 with `Retry-After: 1`, `X-Request-Id: gw-1`, content type `application/problem+json` and a body with type `/problems/upstream-unavailable`, `status` 502 and `requestId` "gw-1"; and after the restart `/health/ready` answers 200
+- **Then** the request answers 502 or 504 (504 when nginx's connect timeout to each stopped replica ends the request, 502 once nginx has marked both replicas unavailable) with `Retry-After: 1`, `X-Request-Id: gw-1`, content type `application/problem+json` and a body with type `/problems/upstream-unavailable`, a `status` equal to the response's status and `requestId` "gw-1"; and after the restart `/health/ready` answers 200
 
 ### DEP-AC11 · Losing a replica during traffic never loses or duplicates money
 

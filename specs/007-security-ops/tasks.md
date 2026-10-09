@@ -62,11 +62,11 @@ These tasks run in the cross-spec order of plan 000 section 1 for 08-api: authen
 
 ## 11-e2e
 
-- [ ] Test first: SEC-AC10 in `test/e2e/edge.test.ts`.
-- [ ] Test first: SEC-AC15 in `test/e2e/correlation-id.test.ts`.
-- [ ] Test first: SEC-AC04 in `test/e2e/user-rate-limit.test.ts`, with its own user C9.
-- [ ] Add the response recorder to the e2e HTTP helpers and the Vitest sequencer of plan section 6, with `test/e2e/support.test.ts` proving the order and the recorder file; then test first: SEC-AC05 in `test/e2e/no-rate-limited.test.ts`.
-- [ ] Test first: SEC-AC01 in `test/e2e/edge-rate-limit.test.ts`, run last by the sequencer.
+- [x] Test first: SEC-AC10 in `test/e2e/edge.test.ts`.
+- [x] Test first: SEC-AC15 in `test/e2e/correlation-id.test.ts`.
+- [x] Test first: SEC-AC04 in `test/e2e/user-rate-limit.test.ts`, with its own user C9.
+- [x] Add the response recorder to the e2e HTTP helpers and the Vitest sequencer of plan section 6, with `test/e2e/support.test.ts` proving the order and the recorder file; then test first: SEC-AC05 in `test/e2e/no-rate-limited.test.ts`.
+- [x] Test first: SEC-AC01 in `test/e2e/edge-rate-limit.test.ts`, run last by the sequencer.
 
 ## 12-infra
 

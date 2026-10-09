@@ -42,6 +42,4 @@ A new dependency needs an ADR or the owner's approval recorded here (AGENTS.md Â
 | `prettier`               | Formatter.                                                                                                    | 01-bootstrap  |
 | `pino-pretty`            | Readable local logs.                                                                                          | 08-api        |
 | `@redocly/cli`           | OpenAPI linting and bundling.                                                                                 | 08-api        |
-| `autocannon`             | Load and concurrency tests against the running stack.                                                         | 11-e2e        |
-| `@types/autocannon`      | `autocannon` type definitions.                                                                                | 11-e2e        |
 | `yaml`                   | Parses `compose.yaml` in the deployment unit tests (plan 007 section 8). Approved by the owner on 2026-10-08. | 10-runtime    |

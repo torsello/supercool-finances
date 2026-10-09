@@ -37,9 +37,9 @@ docker compose down
 
 The demo users are `demo-operator` (`0192f0a0-0000-7000-8000-00000000d0f1`, role `operator`) and `demo-customer-1` to `demo-customer-3` (`0192f0a0-0000-7000-8000-00000000d0c1` to `...d0c3`, role `customer`); a token is valid for 15 minutes. nginx balances requests round robin over `api-1` and `api-2`, and every log line of a replica carries its `replicaId`, so `docker compose logs api-1 api-2` shows which replica served each `X-Request-Id`. Only `127.0.0.1` is published: nginx on 8080, the replicas on 3001 and 3002, Postgres on 55432 and Redis on 6379.
 
-The stack's network is `10.210.0.0/24`, with nginx at the fixed address `10.210.0.10`, the only one the replicas trust for `X-Forwarded-For`, and the replicas at `10.210.0.11` and `10.210.0.12`. If another network of the host already uses that range, `docker compose up` fails with `invalid pool request: Pool overlaps with other one on this address space`. Then set `SCF_SUBNET_PREFIX` to three other octets, for example `SCF_SUBNET_PREFIX=10.211.0 docker compose up --build --wait` (and the same variable for every later command of that stack, or once in a `.env` file); it moves the subnet, the fixed addresses and the trusted address together.
+The stack's network is `10.210.0.0/24`, with nginx at the fixed address `10.210.0.10`, the only one the replicas trust for `X-Forwarded-For`, and the replicas at `10.210.0.11` and `10.210.0.12`. If another network of the host already uses that range, `docker compose up` fails with `invalid pool request: Pool overlaps with other one on this address space`. Then set `SCF_SUBNET_PREFIX` to three other octets, for example `SCF_SUBNET_PREFIX=10.212.0 docker compose up --build --wait` (and the same variable for every later command of that stack, or once in a `.env` file); it moves the subnet, the fixed addresses and the trusted address together.
 
-With `make`, the same commands are `make up`, `make seed`, `make token` (or `make token SUB=<uuid> ROLE=operator`), `make reconcile`, `make logs` and `make down`; `make test` runs the whole suite in the tools image: `npm run check`, the integration tests against the stack's Postgres and Redis, and `npm run trace -- --require unit,integration`.
+With `make`, the same commands are `make up`, `make seed`, `make token` (or `make token SUB=<uuid> ROLE=operator`), `make reconcile`, `make logs` and `make down`; `make test` runs the whole suite in the tools image: `npm run check`, the integration tests against the stack's Postgres and Redis, and `npm run trace -- --require unit,integration`. `make e2e` and `make load` run the end-to-end suite and the load test (see below); unlike the other targets, they run on the host and need Node.
 
 ### Develop on the host
 
@@ -55,11 +55,27 @@ npm run test:integration  # integration tests against Postgres and Redis
 npm run trace             # every acceptance criterion in specs/ with the test that proves it
 ```
 
+The end-to-end suite and the load test run against the Docker Compose stack through nginx, at `E2E_BASE_URL`: `http://localhost:8080` by default, and local only (`localhost`, `127.0.0.1` or `[::1]`, any port), since both read the stack's database on `127.0.0.1` too. `npm run test:e2e` (or `make e2e`) builds and starts its own stack under the Compose project `scf-e2e`, from empty volumes, on the network `10.211.0.0/24` (`E2E_SUBNET_PREFIX` moves it, as `SCF_SUBNET_PREFIX` does for your stack), and removes it at the end (`E2E_KEEP_STACK=1` keeps it running). It uses the same host ports, so stop your own stack first with `docker compose down` or `npm run infra:down`. `npm run load` (or `make load`) runs the load test of SYS-R20 against a running stack: 200 movements per second for 60 s over 1000 funded account pairs. It writes the result to [`docs/performance.md`](docs/performance.md).
+
 Every behaviour is specified before it is built: the specs, with their requirements and acceptance criteria, are in [`specs/`](specs/README.md), and `npm run trace` fails when an acceptance criterion that must be proven has no passing test.
 
 ## API
 
 Every endpoint is served under `/v1` and needs `Authorization: Bearer <JWT>` with the role `customer` or `operator` (`npm run token -- --sub <uuid> --role customer` prints one for local use). Swagger UI is at `/docs` and the OpenAPI document at `/docs/json`, without credentials; the same document is committed as [`docs/api/openapi.yaml`](docs/api/openapi.yaml), regenerated with `npm run openapi:export` and linted with `npm run openapi:lint`. The committed file is generated with the default settings, while `/docs/json` shows the running values of `MAX_AMOUNT_MINOR` and `IDEMPOTENCY_KEY_TTL_SECONDS`. Every error is `application/problem+json` (RFC 9457), and every response carries an `X-Request-Id`.
+
+## Authentication
+
+Every `/v1` request carries `Authorization: Bearer <JWT>`. The token is signed with HS256 and `JWT_SECRET`, and carries `sub` (the user's id, a UUID), `role` (`customer` or `operator`), `iat`, `exp` at most 15 minutes later, and the `iss` and `aud` of `JWT_ISSUER` and `JWT_AUDIENCE`. Each replica verifies it from the token and its configuration alone, so every replica accepts the same tokens. A missing, expired or otherwise invalid token answers 401 `/problems/unauthenticated`, and the answer never says which check failed. The authentication is simulated: the service issues no tokens, and a real identity provider would replace the shared secret (ADR-0012).
+
+The role decides what a caller may do. Customers open, list and read their own accounts, read their history and transactions, withdraw and transfer. Operators deposit, read any customer account or transaction, freeze, unfreeze and close accounts, and reverse transactions. An operation the role does not have answers 403 `/problems/forbidden`. Another customer's account or transaction answers 404 `/problems/not-found`, exactly as an unknown id does. The full matrix is table 1.3 of [`specs/006-auth`](specs/006-auth/spec.md), and the e2e suite checks every cell on both replicas.
+
+To mint a token for local use and demos, valid for 15 minutes and signed with the variables of the environment or `.env`:
+
+```sh
+npm run token -- --sub 0192f0a0-0000-7000-8000-00000000d0c1 --role customer
+# against the Docker Compose stack, with its demo secret and only Docker on the host:
+docker compose run --rm tools npm run --silent token -- --sub <uuid> --role operator
+```
 
 ## Accounts
 

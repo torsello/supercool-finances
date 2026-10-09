@@ -65,10 +65,10 @@ No task for this spec.
 
 ## 11-e2e
 
-- [ ] Add the `e2e` Vitest project to `vitest.config.ts` writing `reports/vitest-e2e.json`, and `npm run test:e2e` against the Docker Compose stack, with a smoke test that both replicas answer through nginx.
-- [ ] Test first: SYS-AC14 in `test/e2e/replicas.test.ts`.
-- [ ] Test first: SYS-AC17 in `test/e2e/load.test.ts`, with `scripts/load-test.ts` and the report in `docs/performance.md`.
-- [ ] Update the docs: in AGENTS.md, add `npm run test:e2e` to the commands table, from 11-e2e.
+- [x] Add the `e2e` Vitest project to `vitest.config.ts` writing `reports/vitest-e2e.json`, and `npm run test:e2e` against the Docker Compose stack, with a smoke test that both replicas answer through nginx.
+- [x] Test first: SYS-AC14 in `test/e2e/replicas.test.ts`.
+- [x] Test first: SYS-AC17 in `test/e2e/load.test.ts`, with `scripts/load-test.ts` and the report in `docs/performance.md`.
+- [x] Update the docs: in AGENTS.md, add `npm run test:e2e` to the commands table, from 11-e2e.
 
 ## 12-infra
 

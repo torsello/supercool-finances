@@ -42,15 +42,15 @@ No task for this spec: `REPLICA_ID` and `MIGRATION_DATABASE_URL` are validated b
 
 ## 11-e2e
 
-- [ ] Add `test/e2e/support/stack.ts` with the project name, port check, build from the working tree and log reader of plan section 5 (the e2e stack sets its own `SCF_SUBNET_PREFIX`, and checks before starting that no Docker network uses its subnet, not only that its ports are free), and the first group of the e2e sequencer, with `test/e2e/stack-support.test.ts` proving it starts and stops a stack of its own project only.
-- [ ] Test first: DEP-AC01 and DEP-AC02 in `test/e2e/stack-start.test.ts`, DEP-AC01 from a clone of `HEAD` with the warning of plan section 5.
-- [ ] Test first: DEP-AC03 in `test/e2e/stack-failed-migration.test.ts`.
-- [ ] Test first: DEP-AC04 in `test/e2e/migrations.test.ts`.
-- [ ] Test first: DEP-AC06 and DEP-AC08 in `test/e2e/seed.test.ts`.
-- [ ] Test first: DEP-AC09 in `test/e2e/replicas-round-robin.test.ts`.
-- [ ] Test first: DEP-AC10 in `test/e2e/gateway-errors.test.ts`.
-- [ ] Test first: DEP-AC13 in `test/e2e/container.test.ts`.
-- [ ] Add the retrying client of section 1.5 to the e2e support, with a test in `test/e2e/stack-support.test.ts` (DEP-R17) proving its retry rules against a fake server; then test first: DEP-AC11 in `test/e2e/replica-loss.test.ts`.
+- [x] Add `test/e2e/support/stack.ts` with the project name, port check, build from the working tree and log reader of plan section 5 (the e2e stack sets its own `SCF_SUBNET_PREFIX`, and checks before starting that no Docker network uses its subnet, not only that its ports are free), and the first group of the e2e sequencer, with `test/e2e/stack-support.test.ts` proving it starts and stops a stack of its own project only.
+- [x] Test first: DEP-AC01 and DEP-AC02 in `test/e2e/stack-start.test.ts`, DEP-AC01 from a clone of `HEAD` with the warning of plan section 5.
+- [x] Test first: DEP-AC03 in `test/e2e/stack-failed-migration.test.ts`.
+- [x] Test first: DEP-AC04 in `test/e2e/migrations.test.ts`.
+- [x] Test first: DEP-AC06 and DEP-AC08 in `test/e2e/seed.test.ts`.
+- [x] Test first: DEP-AC09 in `test/e2e/replicas-round-robin.test.ts`.
+- [x] Test first: DEP-AC10 in `test/e2e/gateway-errors.test.ts`.
+- [x] Test first: DEP-AC13 in `test/e2e/container.test.ts`.
+- [x] Add the retrying client of section 1.5 to the e2e support, with a test in `test/e2e/stack-support.test.ts` (DEP-R17) proving its retry rules against a fake server; then test first: DEP-AC11 in `test/e2e/replica-loss.test.ts`.
 
 ## 12-infra
 
