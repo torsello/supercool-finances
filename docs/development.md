@@ -140,7 +140,7 @@ The order is fixed by [AGENTS.md section 2](../AGENTS.md#2-workflow-spec-first) 
 - `--require unit,integration` fails when a report is missing. CI's `traceability` job adds `e2e` and `--write`, and fails when the regenerated `docs/traceability.md` differs from the committed one. When a spec, a task or a test name changes, regenerate it from three fresh reports and commit it.
 - A test marked `fails`, and a test that makes no assertion, fail at runtime (`vitest.shared.ts`).
 
-**Phases and branches.** Work is split into the phases of [AGENTS.md section 7](../AGENTS.md#7-phases), from `00-setup` to `15-demo`, one session each. Each phase is developed on `phase/NN-name`, created from an up-to-date `main` ([section 8](../AGENTS.md#8-git)).
+**Phases and branches.** Work is split into the phases of [AGENTS.md section 7](../AGENTS.md#7-phases), from `00-setup` to `16-delivery`, one session each; `15-demo` was dropped. Each phase is developed on `phase/NN-name`, created from an up-to-date `main` ([section 8](../AGENTS.md#8-git)).
 
 ## Project skills and guardrails
 
