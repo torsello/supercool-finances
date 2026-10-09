@@ -56,11 +56,21 @@ describe('account history', () => {
     return `${url}${url.includes('?') ? '&' : '?'}cursor=${encodeURIComponent(cursor)}`;
   }
 
-  /** Deposits into an account `count` times, one entry each, in order. */
-  async function deposits(account: AccountJson, count: number): Promise<void> {
+  /** Deposits into an account `count` times, one entry each, in order; returns their ids. */
+  async function deposits(account: AccountJson, count: number): Promise<string[]> {
+    const ids: string[] = [];
     for (let index = 0; index < count; index += 1) {
-      expect((await deposit(built.app, o1, account.id, '100')).statusCode).toBe(201);
+      const response = await deposit(built.app, o1, account.id, '100');
+      expect(response.statusCode).toBe(201);
+      ids.push(response.json<{ id: string }>().id);
     }
+    return ids;
+  }
+
+  /** Asserts that entries are in descending (`createdAt`, `id`) order. */
+  function expectNewestFirst(entries: EntryJson[]): void {
+    const order = entries.map((item) => [item.createdAt, item.id].join(' '));
+    expect([...order].sort().reverse()).toEqual(order);
   }
 
   it('ACC-AC18 a customer reads the history of their account, newest first, with only its own entries', async () => {
@@ -86,8 +96,7 @@ describe('account history', () => {
       );
       expect(item.currency).toBe('EUR');
     }
-    const order = items.map((item) => [item.createdAt, item.id].join(' '));
-    expect([...order].sort().reverse()).toEqual(order);
+    expectNewestFirst(items);
 
     // No entry of B1 or of a system account: none of their ids or entry ids appear.
     const b1Entries = (await page<EntryJson>(c2, `/v1/accounts/${b1.id}/entries`)).items;
@@ -100,13 +109,16 @@ describe('account history', () => {
   it('ACC-AC19 paging through a history is stable while a new entry arrives, which only a new first page shows', async () => {
     const c1 = tokenFor(randomUUID(), 'customer');
     const a1 = await createAccount(built.app, c1);
-    await deposits(a1, 5);
+    const recorded = await deposits(a1, 5);
     const url = `/v1/accounts/${a1.id}/entries?limit=2`;
     const all = (await page<EntryJson>(c1, `/v1/accounts/${a1.id}/entries`)).items;
-    expect(all).toHaveLength(5);
+    // E1 to E5 are the entries of the five deposits, newest first.
+    expect(all.map((entry) => entry.transactionId)).toEqual([...recorded].reverse());
+    expectNewestFirst(all);
 
     const first = await page<EntryJson>(c1, url);
-    expect((await deposit(built.app, o1, a1.id, '100')).statusCode).toBe(201);
+    const e6Deposit = await deposit(built.app, o1, a1.id, '100');
+    expect(e6Deposit.statusCode).toBe(201);
     const pages = [first];
     let cursor = first.nextCursor;
     while (cursor !== undefined) {
@@ -119,6 +131,7 @@ describe('account history', () => {
     expect(pages.flatMap((current) => current.items)).toEqual(all);
     const fresh = await page<EntryJson>(c1, url);
     const e6 = fresh.items[0];
+    expect(e6?.transactionId).toBe(e6Deposit.json<{ id: string }>().id);
     expect(all.some((entry) => entry.id === e6?.id)).toBe(false);
     expect(fresh.items[1]).toEqual(all[0]);
   });

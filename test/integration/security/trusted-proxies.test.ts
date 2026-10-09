@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, describe, expect, it } from 'vitest';
-import { buildProductionApp, type BuiltApp } from '../../support/app.js';
+import { buildProductionApp, type BuiltApp, SPEC_007_DEFAULTS } from '../../support/app.js';
 import { closePools } from '../../support/db.js';
 import { bearer, createAccount } from '../../support/http.js';
 import type { LogLine } from '../../support/logs.js';
@@ -19,7 +19,7 @@ describe('trusted proxies', () => {
   });
 
   async function started(env: Record<string, string | undefined>): Promise<BuiltApp> {
-    const built = buildProductionApp({ env });
+    const built = buildProductionApp({ env: { ...SPEC_007_DEFAULTS, ...env } });
     apps.push(built);
     await built.app.ready();
     return built;

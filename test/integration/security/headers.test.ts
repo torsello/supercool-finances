@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { connect, type AddressInfo } from 'node:net';
 import type { LightMyRequestResponse } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { buildProductionApp, type BuiltApp } from '../../support/app.js';
+import { buildProductionApp, type BuiltApp, SPEC_007_DEFAULTS } from '../../support/app.js';
 import { SECURITY_HEADERS } from '../../../src/platform/http/security-headers.js';
 import { closePools } from '../../support/db.js';
 import { bearer, createAccount } from '../../support/http.js';
@@ -42,7 +42,7 @@ describe('security headers', () => {
   let built: BuiltApp;
 
   beforeAll(async () => {
-    built = buildProductionApp();
+    built = buildProductionApp({ env: SPEC_007_DEFAULTS });
     await built.app.ready();
   });
 

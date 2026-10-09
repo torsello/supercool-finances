@@ -1,9 +1,10 @@
 import pg from 'pg';
 
-/** One statement as a `pg` client sent it. */
+/** One statement as a `pg` client sent it, with its parameter values. */
 export interface CapturedStatement {
   client: pg.Client;
   text: string;
+  values: unknown[];
 }
 
 type Query = (this: pg.Client, ...args: unknown[]) => unknown;
@@ -15,6 +16,15 @@ function textOf(argument: unknown): string {
     return String(argument.text);
   }
   return String(argument);
+}
+
+/** The parameter values of a `query` call: its second argument, or a query config's `values`. */
+function valuesOf(argument: unknown, second: unknown): unknown[] {
+  if (Array.isArray(second)) return second as unknown[];
+  if (typeof argument === 'object' && argument !== null && 'values' in argument) {
+    return Array.isArray(argument.values) ? (argument.values as unknown[]) : [];
+  }
+  return [];
 }
 
 /**
@@ -34,7 +44,7 @@ export class SqlCapture {
     this.#original = original;
     const statements = this.statements;
     prototype.query = function (this: pg.Client, ...args: unknown[]): unknown {
-      statements.push({ client: this, text: textOf(args[0]) });
+      statements.push({ client: this, text: textOf(args[0]), values: valuesOf(args[0], args[1]) });
       return original.apply(this, args);
     };
   }

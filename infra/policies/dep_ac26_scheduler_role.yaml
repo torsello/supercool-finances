@@ -36,8 +36,15 @@ definition:
           attribute: 'policy'
           operator: 'regex_match'
           value: '.*''ecs:cluster'': ''aws_ecs_cluster\.this\.arn''.*'
+        # The roles it may pass are exactly the cleanup task definition's two.
+        - cond_type: 'attribute'
+          resource_types: ['aws_iam_role_policy']
+          attribute: 'policy'
+          operator: 'regex_match'
+          value: ".*'Action': 'iam:PassRole', 'Resource': \\['aws_iam_role\\.execution\\[\"cleanup\"\\]\\.arn', 'aws_iam_role\\.task\\.arn'\\], .*"
+        # No resource is "*", alone or in a list.
         - cond_type: 'attribute'
           resource_types: ['aws_iam_role_policy']
           attribute: 'policy'
           operator: 'not_regex_match'
-          value: '.*''Resource'': ''\*''.*'
+          value: ".*'Resource': (\\[[^\\]]*)?'\\*'[,\\]}].*"

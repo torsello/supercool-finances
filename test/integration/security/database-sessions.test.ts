@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { buildProductionApp, type BuiltApp } from '../../support/app.js';
+import { buildProductionApp, type BuiltApp, SPEC_007_DEFAULTS } from '../../support/app.js';
 import { closePools } from '../../support/db.js';
 import { requireEnv } from '../../support/env.js';
 import {
@@ -72,7 +72,7 @@ describe('database sessions', () => {
     );
 
     capture.clear();
-    const built = buildProductionApp();
+    const built = buildProductionApp({ env: SPEC_007_DEFAULTS });
     let app: BuiltApp['app'] | undefined;
     try {
       app = built.app;
@@ -138,7 +138,7 @@ describe('database sessions', () => {
     }
 
     const built = buildProductionApp({
-      env: { DB_POOL_MAX: '1', ACCOUNT_LOCK_TIMEOUT_MS: '300' },
+      env: { ...SPEC_007_DEFAULTS, DB_POOL_MAX: '1', ACCOUNT_LOCK_TIMEOUT_MS: '300' },
     });
     try {
       await built.app.ready();
@@ -151,7 +151,21 @@ describe('database sessions', () => {
       capture.clear();
       expect((await withdraw(built.app, c1, a1.id, '100')).statusCode).toBe(201);
       const statements = capture.texts();
-      expect(statements.filter((text) => text.includes('app.set_lock_timeout'))).toHaveLength(2);
+      // Two calls: the key wait (IDEMPOTENCY_WAIT_TIMEOUT_MS, 2000 by default) before the key
+      // insert, then the account lock (ACCOUNT_LOCK_TIMEOUT_MS) before the account is locked.
+      const calls = capture.statements.flatMap((statement, index) =>
+        statement.text.includes('app.set_lock_timeout')
+          ? [{ index, values: statement.values }]
+          : [],
+      );
+      expect(calls.map((call) => call.values)).toEqual([[2000], [300]]);
+      const keyInsert = statements.findIndex((text) => /^INSERT INTO idempotency_keys/.test(text));
+      const accountLock = statements.findIndex((text) =>
+        /from "accounts".*for update/is.test(text),
+      );
+      expect(calls[0]?.index).toBeLessThan(keyInsert);
+      expect(keyInsert).toBeLessThan(calls[1]?.index ?? -1);
+      expect(calls[1]?.index).toBeLessThan(accountLock);
       expect(statements.filter((text) => /set_config\(/i.test(text))).toEqual([]);
 
       const only = await built.app.pool.connect();

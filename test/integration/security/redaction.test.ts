@@ -1,6 +1,11 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { buildProductionApp, TEST_CURSOR_SECRET, type BuiltApp } from '../../support/app.js';
+import {
+  buildProductionApp,
+  type BuiltApp,
+  SPEC_007_DEFAULTS,
+  TEST_CURSOR_SECRET,
+} from '../../support/app.js';
 import { closePools, ownerPool } from '../../support/db.js';
 import { requireEnv } from '../../support/env.js';
 import { bearer, createAccount, deposit } from '../../support/http.js';
@@ -45,6 +50,7 @@ describe('log redaction', () => {
   function appWith(env: Record<string, string>): BuiltApp {
     return buildProductionApp({
       env: {
+        ...SPEC_007_DEFAULTS,
         LOG_LEVEL: 'trace',
         JWT_SECRET: K,
         CURSOR_SECRET: TEST_CURSOR_SECRET,

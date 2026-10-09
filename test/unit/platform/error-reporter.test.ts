@@ -11,9 +11,11 @@ import {
   type TransportRequest,
 } from '../../../src/platform/error-reporting/reporter.js';
 import type { ReportedRequest } from '../../../src/platform/error-reporting/event.js';
+import { WorkTracker } from '../../../src/platform/lifecycle/shutdown.js';
 import { FakeClock, settle } from '../../support/clock.js';
 import { TEST_CURSOR_SECRET } from '../../support/app.js';
 import { K } from '../../support/tokens.js';
+import { coordinator, watch } from './shutdown-fakes.js';
 
 const DSN = parseSentryDsn('https://pk-unit-7781@errors.example/42') as SentryDsn;
 
@@ -120,6 +122,29 @@ describe('the error reporter', () => {
     for (let index = 0; index < 3; index += 1) reporter.report(new Error('boom'), REQUEST);
     expect(transport.sends).toHaveLength(23);
     expect(reporter.pending).toBe(3);
+
+    // The shutdown coordinator of SEC-AC21, on the same injected clock as the reporter, its three
+    // sends in flight: SIGTERM with no drain delay and no request in flight.
+    const calls: string[] = [];
+    const state = watch(
+      coordinator(clock, new WorkTracker(), calls, {
+        drainDelayMs: 0,
+        timeoutMs: 40_000,
+      }).shutdown('SIGTERM'),
+    );
+    await clock.advanceTo(2000);
+    expect(calls).toEqual([
+      'readiness 503',
+      'stopped accepting',
+      'idle connections closed',
+      'pool closed',
+      'readiness connection closed',
+      'redis closed',
+    ]);
+    expect(state.code).toBe(0);
+    // It did not wait for the reports: the three sends are still in flight.
+    expect(reporter.pending).toBe(3);
+    expect(transport.sends.slice(20).some((send) => send.aborted)).toBe(false);
 
     // The shutdown of the composition root, with the reporter main.ts builds, three of its
     // reports in flight to an endpoint that never answers.

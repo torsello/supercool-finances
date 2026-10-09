@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { afterAll, describe, expect, it } from 'vitest';
-import { buildProductionApp, type BuiltApp } from '../../support/app.js';
+import { buildProductionApp, type BuiltApp, SPEC_007_DEFAULTS } from '../../support/app.js';
 import { blockedBackends } from '../../support/backends.js';
 import {
   closePools,
@@ -36,7 +36,7 @@ describe('health checks', () => {
   });
 
   async function started(env: Record<string, string>): Promise<BuiltApp> {
-    const built = buildProductionApp({ env });
+    const built = buildProductionApp({ env: { ...SPEC_007_DEFAULTS, ...env } });
     apps.push(built);
     await built.app.ready();
     return built;

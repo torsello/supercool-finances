@@ -217,9 +217,15 @@ describe('the request timeout', () => {
     });
     const state = outcome(runner.run(work(['S1']), { retry: 'movement', scope: context }), clock);
 
+    await clock.advanceTo(999);
+    expect(state.settled).toBe(false);
     await clock.advanceTo(1000);
+    expect(state.at).toBe(1000);
     expect(state.error).toBeInstanceOf(RequestTimeout);
-    expect(toProblem(state.error).status).toBe(503);
+    const problem = toProblem(state.error);
+    expect(problem.status).toBe(503);
+    expect(problem.type).toBe('/problems/service-unavailable');
+    expect(problem.headers['retry-after']).toBe('1');
     expect(client.statements[2]).toMatchObject({ text: 'COMMIT', sentAt: 900 });
     expect(client.releases).toEqual([]);
 
@@ -228,6 +234,7 @@ describe('the request timeout', () => {
     expect(client.texts()).toEqual([BEGIN, 'S1', 'COMMIT']);
     expect(client.releases).toEqual([{ error: undefined, at: 1400 }]);
     expect(pool.connects).toBe(1);
+    expect(client.texts().some((text) => /cancel|terminate|rollback/i.test(text))).toBe(false);
   });
 
   it('SEC-R27 a request is tracked until its response has closed, its reply was sent and every connection it held is released, in any order', () => {

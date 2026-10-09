@@ -5,47 +5,10 @@ import {
   RequestDeadline,
   RequestTimeout,
 } from '../../../src/platform/http/request-timeout.js';
-import { ShutdownCoordinator, WorkTracker } from '../../../src/platform/lifecycle/shutdown.js';
+import { WorkTracker } from '../../../src/platform/lifecycle/shutdown.js';
 import { FakeClock } from '../../support/clock.js';
 import { TimedClient, TimedPool } from './runner-fakes.js';
-
-const quiet = { info: () => undefined, warn: () => undefined };
-
-/** A coordinator over `tracker` whose readiness, server and closable resources record calls. */
-function coordinator(
-  clock: FakeClock,
-  tracker: WorkTracker,
-  calls: string[],
-  settings: { drainDelayMs: number; timeoutMs: number },
-): ShutdownCoordinator {
-  const closer = (name: string) => async () => {
-    calls.push(`${name} closed`);
-    await Promise.resolve();
-  };
-  return new ShutdownCoordinator({
-    timers: clock,
-    ...settings,
-    work: tracker,
-    readiness: { stop: () => calls.push('readiness 503') },
-    server: {
-      stopAccepting: () => calls.push('stopped accepting'),
-      closeIdleConnections: () => calls.push('idle connections closed'),
-    },
-    resources: [
-      ['pool', closer('pool')],
-      ['readiness connection', closer('readiness connection')],
-      ['redis', closer('redis')],
-    ],
-    logger: quiet,
-  });
-}
-
-/** The exit code once the shutdown ended, or undefined while it runs. */
-function watch(shutdown: Promise<number>): { code: number | undefined } {
-  const state: { code: number | undefined } = { code: undefined };
-  void shutdown.then((code) => (state.code = code));
-  return state;
-}
+import { coordinator, watch } from './shutdown-fakes.js';
 
 describe('the shutdown coordinator', () => {
   it('SEC-AC21 at SHUTDOWN_TIMEOUT_MS a request still in flight has its connection destroyed and its transaction rolled back, then the pool, the readiness connection and Redis close in order, and the exit code is 1', async () => {

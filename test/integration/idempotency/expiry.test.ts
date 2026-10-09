@@ -1,10 +1,18 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { afterAll, describe, expect, it } from 'vitest';
 import { buildProductionApp } from '../../support/app.js';
 import { balanceOf, closePools } from '../../support/db.js';
 import { createAccount, deposit, withdraw } from '../../support/http.js';
 import { tokenFor } from '../../support/tokens.js';
 import { expireKeyRow, keyRowOf, transactionsOn } from './support.js';
+
+/** The fingerprint of IDM-R05 of a withdrawal, computed here from its definition. */
+function withdrawalFingerprint(accountId: string, amount: string): string {
+  const body = `{"amount":"${amount}","currency":"EUR"}`;
+  return createHash('sha256')
+    .update(`POST\n/v1/accounts/${accountId}/withdrawals\n${body}`, 'utf8')
+    .digest('hex');
+}
 
 describe('key expiry', () => {
   afterAll(async () => {
@@ -22,6 +30,7 @@ describe('key expiry', () => {
       expect(await balanceOf(a1.id)).toBe('900');
 
       const first = await keyRowOf(c1, 'k1');
+      expect(first?.fingerprint).toBe(withdrawalFingerprint(a1.id, '100'));
       expect(first?.ttl_seconds).toBe('86400');
       await expireKeyRow(c1, 'k1');
 
@@ -32,7 +41,7 @@ describe('key expiry', () => {
       expect((await transactionsOn(a1.id))['withdrawal']).toBe(2);
 
       const replaced = await keyRowOf(c1, 'k1');
-      expect(replaced?.fingerprint).not.toBe(first?.fingerprint);
+      expect(replaced?.fingerprint).toBe(withdrawalFingerprint(a1.id, '200'));
       expect(replaced?.status).toBe(201);
       expect(replaced?.body?.equals(second.rawPayload)).toBe(true);
       expect(replaced?.created_at).not.toBe(first?.created_at);

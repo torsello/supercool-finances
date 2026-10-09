@@ -10,7 +10,7 @@ describe('the SQL capture', () => {
     await pool.end();
   });
 
-  it('records every statement of a pool connection, in order, with the client that sent it, and stops recording when stopped', async () => {
+  it('records every statement of a pool connection, in order, with its values and the client that sent it, and stops recording when stopped', async () => {
     const capture = new SqlCapture();
     capture.start();
     try {
@@ -19,6 +19,7 @@ describe('the SQL capture', () => {
         await client.query('BEGIN');
         await client.query('SELECT $1::int AS n', [1]);
         await client.query({ text: 'SELECT 2 AS n' });
+        await client.query({ text: 'SELECT $1::int AS n', values: [5] });
         await client.query('COMMIT');
       } finally {
         client.release();
@@ -33,11 +34,20 @@ describe('the SQL capture', () => {
       'BEGIN',
       'SELECT $1::int AS n',
       'SELECT 2 AS n',
+      'SELECT $1::int AS n',
       'COMMIT',
       'SELECT 3 AS n',
     ]);
+    expect(capture.statements.map((statement) => statement.values)).toEqual([
+      [],
+      [1],
+      [],
+      [5],
+      [],
+      [],
+    ]);
     const first = capture.statements[0]?.client;
-    expect(capture.statements.slice(0, 4).every((statement) => statement.client === first)).toBe(
+    expect(capture.statements.slice(0, 5).every((statement) => statement.client === first)).toBe(
       true,
     );
   });

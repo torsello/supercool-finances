@@ -27,6 +27,12 @@ export function testEnvironment(overrides: Environment = {}): Environment {
   };
 }
 
+/**
+ * The overrides for the ACs of spec 007, which use the defaults of its section 1.2 unless they name
+ * a value (section 1.6 of spec 007): `RATE_LIMIT_USER_MAX` unset, so its default of 300 applies.
+ */
+export const SPEC_007_DEFAULTS: Environment = { RATE_LIMIT_USER_MAX: undefined };
+
 /** The configuration of a test app, through the service's own loader. */
 export function testConfig(overrides: Environment = {}): Config {
   return loadConfig(testEnvironment(overrides));

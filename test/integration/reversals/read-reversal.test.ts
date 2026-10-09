@@ -28,6 +28,8 @@ describe('reading a reversal', () => {
     const u = users();
     const a1 = await createAccount(built.app, u.c1);
     const b1 = await createAccount(built.app, u.c2);
+    // C3 owns Z1, an account of its own that R does not touch.
+    await createAccount(built.app, u.c3);
     idOf(await deposit(built.app, u.o1, a1.id, '1000'));
     const t = idOf(await transfer(built.app, u.c1, a1.id, b1.id, '300'));
     const r = idOf(await reverse(built.app, u.o1, t));

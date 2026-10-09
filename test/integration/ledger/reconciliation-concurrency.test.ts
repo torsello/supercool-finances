@@ -1,19 +1,34 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { KyselyReconciliation } from '../../../src/modules/ledger/adapters/persistence/kysely-reconciliation.js';
-import { reconcile } from '../../../src/modules/ledger/index.js';
-import { createDatabase } from '../../../src/platform/db/database.js';
+import { runReconcile } from '../../../src/modules/ledger/adapters/cli/reconcile.js';
+import type { ReconciliationReport } from '../../../src/modules/ledger/application/reconciliation.js';
 import { buildProductionApp, type BuiltApp } from '../../support/app.js';
 import {
   balanceOf,
   closePools,
   createCustomerAccount,
-  runtimePool,
   writeDirectDeposit,
 } from '../../support/db.js';
+import { requireEnv } from '../../support/env.js';
 import { transfer } from '../../support/http.js';
 import { openLockSession } from '../../support/sessions.js';
 import { tokenFor } from '../../support/tokens.js';
+
+/**
+ * One run of the reconciliation as `npm run reconcile` runs it: both of its queries in one
+ * REPEATABLE READ, READ ONLY transaction, so on one snapshot (LED-R20).
+ */
+async function reconcileOnce(): Promise<{ report: ReconciliationReport; exitCode: number }> {
+  let out = '';
+  let err = '';
+  const exitCode = await runReconcile({
+    databaseUrl: requireEnv('TEST_DATABASE_URL'),
+    stdout: { write: (text: string) => (out += text) },
+    stderr: { write: (text: string) => (err += text) },
+  });
+  expect(err).toBe('');
+  return { report: JSON.parse(out) as ReconciliationReport, exitCode };
+}
 
 describe('reconciliation while money moves', () => {
   let built: BuiltApp;
@@ -35,8 +50,6 @@ describe('reconciliation while money moves', () => {
   });
 
   it('LED-AC15 the reconciliation stays clean during 200 concurrent transfers, and never waits for a row lock', async () => {
-    const db = createDatabase(runtimePool());
-    const query = new KyselyReconciliation(db);
     const owners = Array.from({ length: 10 }, () => randomUUID());
     const accounts = await Promise.all(
       owners.map(async (ownerId) => await createCustomerAccount({ currency: 'EUR', ownerId })),
@@ -70,7 +83,7 @@ describe('reconciliation while money moves', () => {
     const reports = [];
     let duringTransfers = 0;
     while (reports.length < 20 || settled < 200) {
-      reports.push(await reconcile(query));
+      reports.push(await reconcileOnce());
       if (settled < 200) duringTransfers += 1;
     }
     const responses = await transfers;
@@ -93,7 +106,7 @@ describe('reconciliation while money moves', () => {
     try {
       await session.lockRow('accounts', accounts[0]?.id ?? '');
       // Completes while the session still holds the lock, which is released only afterwards.
-      const last = await reconcile(query);
+      const last = await reconcileOnce();
       expect(last.report.discrepancies).toEqual([]);
       expect(last.exitCode).toBe(0);
       await session.release();

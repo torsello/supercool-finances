@@ -91,6 +91,12 @@ describe('the load test', () => {
     expect(report.run.lost).toBe(0);
     expect(report.run.errors, JSON.stringify(report.run.errorCodes)).toBe(0);
 
+    // The non-2xx count is every answer whose status is not 2xx.
+    const non2xx = Object.entries(report.run.statusCodes)
+      .filter(([status]) => !status.startsWith('2'))
+      .reduce((sum, [, count]) => sum + count, 0);
+    expect(report.run.non2xx).toBe(non2xx);
+
     // The report: the machine, p50, p95 and p99, throughput and the non-2xx count.
     const markdown = readFileSync(REPORT_PATH, 'utf8');
     for (const value of [
@@ -100,11 +106,14 @@ describe('the load test', () => {
       `${String(report.run.latencyMs.p95)} ms`,
       `${String(report.run.latencyMs.p99)} ms`,
       `${String(report.run.throughputPerSecond)} responses per second`,
-      `Non-2xx responses`,
       'Lost requests',
     ]) {
       expect(markdown).toContain(value);
     }
+    // The table is formatted as Markdown, so its cells are padded.
+    expect(markdown).toMatch(
+      new RegExp(`^\\| Non-2xx responses +\\| +${String(report.run.non2xx)} \\|$`, 'm'),
+    );
     // A p99 at or above 300 ms is a missed target, reported, never a failure.
     expect(markdown).toContain(report.run.p99TargetMet ? 'met: p99' : 'missed: p99');
 
