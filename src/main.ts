@@ -1,7 +1,7 @@
 import closeWithGrace from 'close-with-grace';
 import { buildApp, createShutdown, listen } from './app.js';
 import { loadConfig, type Config } from './platform/config/config.js';
-import { writeStartupFailure } from './platform/logging/logger.js';
+import { replicaIdOf, writeStartupFailure } from './platform/logging/logger.js';
 
 /** Time beyond the drain delay and the shutdown timeout before the process exits regardless. */
 const SHUTDOWN_MARGIN_MS = 5000;
@@ -53,7 +53,7 @@ async function main(): Promise<void> {
     config = loadConfig(process.env);
     app = buildApp(config);
   } catch (error) {
-    writeStartupFailure(error);
+    writeStartupFailure(error, undefined, replicaIdOf(process.env['REPLICA_ID']));
     process.exitCode = 1;
     return;
   }

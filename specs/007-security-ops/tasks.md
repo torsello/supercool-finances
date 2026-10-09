@@ -54,11 +54,11 @@ These tasks run in the cross-spec order of plan 000 section 1 for 08-api: authen
 
 ## 10-runtime
 
-- [ ] Write this plan's part of `docker/nginx/templates/default.conf.template`: `limit_req`, body size, timeouts, request id, `X-Forwarded-For`, access log format without query strings, `server_tokens off`, and the problem-details `error_page` locations for 429 and 413.
-- [ ] Add `test/support/deployment.ts`, reading `compose.yaml` with the `yaml` package (added now as a development dependency, plan section 8) and the nginx template, with `test/unit/deployment/reader.test.ts` proving it finds the services, published ports and timeouts.
-- [ ] Test first: SEC-AC26 and SEC-AC36 in `test/unit/deployment/timeouts.test.ts`.
-- [ ] Test first: SEC-AC29 in `test/unit/deployment/pool-budget.test.ts`.
-- [ ] Test first: SEC-AC33 in `test/unit/deployment/metrics-port.test.ts`.
+- [x] Write this plan's part of `docker/nginx/templates/default.conf.template`: `limit_req`, body size, timeouts, request id, `X-Forwarded-For`, access log format without query strings, `server_tokens off`, and the problem-details `error_page` locations for 429 and 413.
+- [x] Add `test/support/deployment.ts`, reading `compose.yaml` with the `yaml` package (added now as a development dependency, plan section 8) and the nginx template, with `test/unit/deployment/reader.test.ts` proving it finds the services, published ports and timeouts.
+- [x] Test first: SEC-AC26 and SEC-AC36 in `test/unit/deployment/timeouts.test.ts`.
+- [x] Test first: SEC-AC29 in `test/unit/deployment/pool-budget.test.ts`.
+- [x] Test first: SEC-AC33 in `test/unit/deployment/metrics-port.test.ts`.
 
 ## 11-e2e
 

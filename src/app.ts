@@ -80,7 +80,7 @@ import {
   ShutdownCoordinator,
   WorkTracker,
 } from './platform/lifecycle/shutdown.js';
-import { loggerOptions, type LogDestination } from './platform/logging/logger.js';
+import { loggerOptions, replicaIdOf, type LogDestination } from './platform/logging/logger.js';
 import { Metrics, MetricsServer, registerRequestMetrics } from './platform/metrics/metrics.js';
 import {
   connectRedis,
@@ -177,6 +177,7 @@ export function buildApp(config: Config, options: AppOptions = {}) {
   const app = Fastify({
     logger: loggerOptions({
       level: config.logLevel,
+      replicaId: replicaIdOf(config.replicaId),
       secrets: {
         jwtSecret: config.jwt.secret,
         cursorSecret: config.cursorSecret,

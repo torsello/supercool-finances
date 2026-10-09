@@ -1,5 +1,6 @@
+import { hostname } from 'node:os';
 import type { FastifyRequest, FastifyServerOptions } from 'fastify';
-import type { LogLevel } from '../config/config.js';
+import { isReplicaId, type LogLevel } from '../config/config.js';
 
 /** Where log lines go: standard output by default, a capture in tests (plan 000 section 9). */
 export interface LogDestination {
@@ -88,16 +89,26 @@ const STDOUT: LogDestination = {
   },
 };
 
+/**
+ * The replica's name in its log lines (DEP-R14): `REPLICA_ID` when it is set and valid, and the
+ * host name otherwise, which in ECS is the task's.
+ */
+export function replicaIdOf(replicaId: string | undefined): string {
+  return replicaId !== undefined && isReplicaId(replicaId) ? replicaId : hostname();
+}
+
 export interface LoggerSettings {
   level: LogLevel;
   secrets: LogSecrets;
+  /** Written as `replicaId` on every line (DEP-R14); see `replicaIdOf`. */
+  replicaId: string;
   /** Standard output when not given. */
   destination?: LogDestination;
 }
 
 /**
- * Fastify's pino logger: one JSON object per line with `level`, `time` and `msg`, and `reqId` on
- * every line written while handling a request (SEC-R21, SYS-R22). The `authorization`, `cookie`
+ * Fastify's pino logger: one JSON object per line with `level`, `time`, `msg` and `replicaId`, and
+ * `reqId` on every line written while handling a request (SEC-R21, SYS-R22, DEP-R14). The `authorization`, `cookie`
  * and `idempotency-key` headers of the request line are `[Redacted]`, and every line goes through
  * the secret scrubber on its way to the destination (SEC-R22).
  */
@@ -108,6 +119,8 @@ export function loggerOptions(
   const scrub = secretScrubber(settings.secrets);
   return {
     level: settings.level,
+    // pino's default members, and the replica, which no response ever carries (DEP-R14).
+    base: { pid: process.pid, hostname: hostname(), replicaId: settings.replicaId },
     stream: {
       write(line: string) {
         destination.write(scrub(line));
@@ -125,17 +138,23 @@ export function loggerOptions(
 const FATAL = 60;
 
 /**
- * Writes why the service could not start as one JSON log line, before any logger exists: the
- * error's name and message, which never hold a value (SEC-R40), and, for a configuration error,
- * every invalid variable with its rule. Any other error is written by name only, since its message
- * may hold a value the configuration did not validate.
+ * Writes why the service could not start as one JSON log line, before any logger exists, with the
+ * replica id of DEP-R14: the error's name and message, which never hold a value (SEC-R40), and, for
+ * a configuration error, every invalid variable with its rule. Any other error is written by name
+ * only, since its message may hold a value the configuration did not validate. `replicaId` comes
+ * from `replicaIdOf`, since `REPLICA_ID` may be among the invalid variables.
  */
-export function writeStartupFailure(error: unknown, destination: LogDestination = STDOUT): void {
+export function writeStartupFailure(
+  error: unknown,
+  destination: LogDestination = STDOUT,
+  replicaId: string = replicaIdOf(undefined),
+): void {
   const problems =
     typeof error === 'object' && error !== null && 'problems' in error ? error.problems : undefined;
   const line = {
     level: FATAL,
     time: Date.now(),
+    replicaId,
     msg: problems === undefined ? 'startup failed' : 'invalid configuration',
     ...(problems === undefined
       ? { err: { type: error instanceof Error ? error.name : typeof error } }

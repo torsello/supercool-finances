@@ -26,21 +26,23 @@ No task for this spec: `REPLICA_ID` and `MIGRATION_DATABASE_URL` are validated b
 
 ## 10-runtime
 
-- [ ] Test first in `test/integration/deployment/migrate.test.ts` (DEP-R04, DEP-R05): `src/platform/db/migrate.ts` applies every migration to a scratch database as `scf_owner`, a second run applies nothing and exits 0, and a failing migration exits non-zero; then `migrate.ts` and its executable entry point `src/cli/migrate.ts`, compiled into `dist/`, with `npm run migrate:up` and the test helpers switched to it.
-- [ ] Test first: DEP-AC05 in `test/unit/deployment/demo-secrets.test.ts`; then the demo values in `compose.yaml` and their refusal in production in `src/platform/config/config.ts`.
-- [ ] Test first in `test/unit/deployment/healthcheck.test.ts` (DEP-R21): the script exits 0 when `/health/live` answers 200 and 1 otherwise; then `src/healthcheck.ts`.
-- [ ] Test first: DEP-AC12 in `test/unit/deployment/dockerfile.test.ts`; then the `Dockerfile` and `.dockerignore`, relying on the copy of `migrations/` into `dist/migrations/` that `npm run build` makes since 09-hardening.
-- [ ] Build the full `compose.yaml` of plan section 3, with `test/unit/deployment/compose.test.ts` (DEP-R02, DEP-R06, DEP-R08) proving the dependency conditions, the published ports on `127.0.0.1` only and the absence of `env_file`.
-- [ ] Write this plan's part of the nginx template (upstream with `resolve`, `worker_processes 1` with a comment naming DEP-R15 and the round robin it keeps, retries, gateway `error_page`) and pin an nginx 1.28 stable image by version and digest, with `test/unit/deployment/nginx.test.ts` (DEP-R15, DEP-R16) proving the retry directives and the problem body of the gateway errors.
-- [ ] Test first in `test/unit/platform/logger.test.ts` (DEP-R14): every line carries `replicaId` from `REPLICA_ID` or the host name; then the logger change, and a check in the same file that no response header or body holds it.
-- [ ] Test first: DEP-AC07 in `test/unit/deployment/seed.test.ts`; then the guards of `scripts/seed.ts`.
-- [ ] Test first in `test/unit/deployment/seed.test.ts` (DEP-R10, DEP-R11): with a fake API, a first run creates the accounts and deposits of table 1.2 and a second run, after every key expired, creates and moves nothing and prints the same JSON; then the rest of `runSeed` and `npm run seed`.
-- [ ] Test first: DEP-AC25 in `test/integration/deployment/gitleaks.test.ts`; then `.gitleaks.toml` only if the scan flags a demo value.
-- [ ] Update the docs: in AGENTS.md, add `npm run seed` and the Docker Compose commands of the full stack to the commands table, from 10-runtime, and `docker/` (Postgres init script, nginx template) and the `Dockerfile` to the repository map.
+- [x] Test first in `test/integration/deployment/migrate.test.ts` (DEP-R04, DEP-R05): `src/platform/db/migrate.ts` applies every migration to a scratch database as `scf_owner`, a second run applies nothing and exits 0, and a failing migration exits non-zero; then `migrate.ts` and its executable entry point `src/cli/migrate.ts`, compiled into `dist/`, with `npm run migrate:up` and the test helpers switched to it.
+- [x] Test first: DEP-AC05 in `test/unit/deployment/demo-secrets.test.ts`; then the demo values in `compose.yaml` and their refusal in production in `src/platform/config/config.ts`.
+- [x] Test first in `test/unit/deployment/healthcheck.test.ts` (DEP-R21): the script exits 0 when `/health/live` answers 200 and 1 otherwise; then `src/healthcheck.ts`.
+- [x] Test first: DEP-AC12 in `test/unit/deployment/dockerfile.test.ts`; then the `Dockerfile` and `.dockerignore`, relying on the copy of `migrations/` into `dist/migrations/` that `npm run build` makes since 09-hardening.
+- [x] Build the full `compose.yaml` of plan section 3, with `test/unit/deployment/compose.test.ts` (DEP-R02, DEP-R06, DEP-R08) proving the dependency conditions, the published ports on `127.0.0.1` only and the absence of `env_file`.
+- [x] Write this plan's part of the nginx template (upstream over the replicas' fixed addresses, without `resolve`, `worker_processes 1` with a comment naming DEP-R15 and the round robin it keeps, retries, gateway `error_page`) and pin an nginx 1.28 stable image by version and digest, with `test/unit/deployment/nginx.test.ts` (DEP-R15, DEP-R16) proving the retry directives and the problem body of the gateway errors.
+- [x] Test first in `test/unit/platform/logger.test.ts` (DEP-R14): every line carries `replicaId` from `REPLICA_ID` or the host name; then the logger change, and a check in the same file that no response header or body holds it.
+- [x] Test first: DEP-AC07 in `test/unit/deployment/seed.test.ts`; then the guards of `scripts/seed.ts`.
+- [x] Test first in `test/unit/deployment/seed.test.ts` (DEP-R10, DEP-R11): with a fake API, a first run creates the accounts and deposits of table 1.2 and a second run, after every key expired, creates and moves nothing and prints the same JSON; then the rest of `runSeed` and `npm run seed`.
+- [x] Test first: DEP-AC25 in `test/integration/deployment/gitleaks.test.ts`; then `.gitleaks.toml` only if the scan flags a demo value.
+- [x] Add the `Makefile` (`up`, `down`, `logs`, `seed`, `token`, `test`, `reconcile`, all through Docker Compose) and the `tools` stage of the `Dockerfile` (gitleaks pinned by version and sha256, `/app` copied from the build stage, no dependency of the runtime stage), with the `tools` service pointed at it, as approved by the owner on 2026-10-08 (DEP-R09, DEP-R22).
+- [x] Add `.github/dependabot.yml` for the `docker` ecosystem (the `Dockerfile`, and `compose.yaml` through `docker-compose`), `npm` and `github-actions`, so the pins of DEP-R22 are updated as section 1.6 says.
+- [x] Update the docs: in AGENTS.md, add `npm run seed` and the Docker Compose commands of the full stack to the commands table, from 10-runtime, and `docker/` (Postgres init script, nginx template) and the `Dockerfile` to the repository map.
 
 ## 11-e2e
 
-- [ ] Add `test/e2e/support/stack.ts` with the project name, port check, build from the working tree and log reader of plan section 5, and the first group of the e2e sequencer, with `test/e2e/stack-support.test.ts` proving it starts and stops a stack of its own project only.
+- [ ] Add `test/e2e/support/stack.ts` with the project name, port check, build from the working tree and log reader of plan section 5 (the e2e stack sets its own `SCF_SUBNET_PREFIX`, and checks before starting that no Docker network uses its subnet, not only that its ports are free), and the first group of the e2e sequencer, with `test/e2e/stack-support.test.ts` proving it starts and stops a stack of its own project only.
 - [ ] Test first: DEP-AC01 and DEP-AC02 in `test/e2e/stack-start.test.ts`, DEP-AC01 from a clone of `HEAD` with the warning of plan section 5.
 - [ ] Test first: DEP-AC03 in `test/e2e/stack-failed-migration.test.ts`.
 - [ ] Test first: DEP-AC04 in `test/e2e/migrations.test.ts`.

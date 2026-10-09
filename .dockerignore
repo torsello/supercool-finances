@@ -1,0 +1,17 @@
+# The build context of the Dockerfile. The build stage, which is also the tools image, gets the
+# repository without what is generated, local or secret; the runtime stage copies only
+# package.json, package-lock.json and the compiled dist/ (DEP-R18).
+.git
+.env
+.env.*
+!.env.example
+node_modules
+dist
+coverage
+reports
+*.tsbuildinfo
+.claude
+docs/ai
+**/.terraform
+*.tfstate
+*.tfstate.*

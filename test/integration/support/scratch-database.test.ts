@@ -53,6 +53,27 @@ describe('scratch databases', () => {
     expect(await databaseExists(seen)).toBe(false);
   });
 
+  it('leaves the database empty when asked not to migrate it', async () => {
+    const seen = await withScratchDatabase(
+      async (scratch) => {
+        const client = new pg.Client({ connectionString: scratch.ownerUrl });
+        await client.connect();
+        try {
+          const tables = await client.query(
+            `SELECT 1 FROM pg_tables WHERE schemaname NOT IN ('pg_catalog', 'information_schema')`,
+          );
+          expect(tables.rowCount).toBe(0);
+        } finally {
+          await client.end();
+        }
+        return scratch.name;
+      },
+      { migrated: false },
+    );
+
+    expect(await databaseExists(seen)).toBe(false);
+  });
+
   it('drops the database also when the test body throws', async () => {
     let name = '';
     await expect(
