@@ -126,3 +126,239 @@
   Nothing is committed, so it's ready for /ship.
 
 ✻ Cogitated for 52s · done 2:00 PM
+
+❯ /export docs/ai/transcripts/16-delivery.txt                                   
+  ⎿  Conversation exported to: /Users/matiastorsello/supercool-finances/docs/ai/
+     transcripts/16-delivery.txt
+
+❯ /ship close phase 16: delivery notes                                          
+
+⏺ Bash(git branch --show-current)
+  ⎿  phase/16-delivery
+
+⏺ Bash(npm run check)
+  ⎿  > supercool-finances@0.1.0 check
+     > npm run typecheck && npm run lint && npm run format:check && npm run
+      test
+     … +102 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ Bash(npm run infra:up)
+  ⎿  > supercool-finances@0.1.0 infra:up
+     > docker compose up -d --wait postgres redis
+     … +20 lines (ctrl+o to expand)
+  ⎿  (timeout 5m)
+
+⏺ Bash(npm run test:integration)
+  ⎿  > supercool-finances@0.1.0 test:integration
+     > vitest run --project integration --reporter=default --reporter=json
+     --outputFile.json=reports/vitest-integration.json
+     … +239 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ Bash(npm run trace -- --require unit,integration)
+  ⎿  > supercool-finances@0.1.0 trace
+     > tsx scripts/trace.ts --require unit,integration
+     … +426 lines (ctrl+o to expand)
+
+⏺ The trace gate printed a long table, so I'm checking the end of its output for
+  the result.
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Trace is clean. Next gate: Terraform validation.
+
+⏺ Bash(npm run infra:validate)
+  ⎿  > supercool-finances@0.1.0 infra:validate
+     > bash scripts/infra-validate.sh
+     … +32 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ All gates pass. Step 3: check that the transcript has a row in the AI README.
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ I stopped before staging because the AI README has no row for the phase 16
+  transcript. /ship doesn't edit files, so the row has to be added in the main
+  conversation.
+
+  Gates that passed:
+  - npm run check: 394 unit tests passed.
+  - npm run test:integration: 341 tests passed.
+  - npm run trace -- --require unit,integration: 244 of 244 ACs covered, none
+    missing.
+  - npm run infra:validate: no findings.
+
+  What is missing: docs/ai/README.md ends at the 15b row (line 84). The new
+  docs/ai/transcripts/16-delivery.txt needs one too. Here is a proposed row,
+  with the same format as 15b:
+
+  | 16 | 2026-10-09 | [16-delivery.txt](transcripts/16-delivery.txt) | Delivery 
+  notes from a clean-clone test on macOS: two README Troubleshooting rows, one 
+  for colima sharing only the home directory and one for the expected .env not
+  found lines. |
+
+  Once the row is in, run /ship close phase 16: delivery notes again. The unit,
+  integration, trace and Terraform gates will rerun, then the commit, secret
+  scan, push and pull request follow.
+
+  I haven't staged, committed or pushed anything. infra:up left Postgres and
+  Redis running.
+✻ Sautéed for 2m 38s · done 2:04 PM
+
+❯ Add that row to docs/ai/README.md as you proposed. Don't commit; I'll run     
+  /ship.                                                                        
+
+⏺ Bash(sed -n '80,90p' docs/ai/README.md)
+  ⎿  | 13 part 1 | 2026-10-09 | [13-final-review-part1.txt](transcripts/13-
+     final-review-part1.txt) | Final review, part 1: the fixes of the `/aud
+     it` of 12b-observability (the reporter frees its slot at 2000 ms, mult
+     … +33 lines (ctrl+o to expand)
+
+⏺ Update(docs/ai/README.md)
+  ⎿  Added 1 line
+      82  | 14 part 1 | 2026-10-09 | [14-docs-part1.txt](transcripts/14-d
+          ocs-part1.txt) | Docs, part 1: the README rewritten as the proj
+          ect's front page with diagrams and a Quickstart run against the
+           stack, the architecture, API guide (with `requests.http` and a
+           Postman collection), observability, security, development and 
+          limitations docs and the CHANGELOG, `make demo-env`, `npm run d
+          ocs:check` and its CI job, a lost database connection answered 
+          503 instead of 500 (SEC-AC48, SEC-AC49), the owner-approved DEP
+          -AC36 to DEP-AC38, and `/ship`. |
+      83  | 14 part 2 | 2026-10-09 | [14-docs-part2.txt](transcripts/14-d
+          ocs-part2.txt) | Docs, part 2: the twelve runbooks with one str
+          ucture and the alerts without an alarm in `docs/observability.m
+          d`, a review of the README and every doc against the code by fo
+          ur parallel reviewers and their fixes, the API guide's outputs 
+          regenerated from one run, the owner-approved update notes on AD
+          R-0013, 0014, 0016 and 0018, the three findings of the `/audit`
+           (the 503 after a lost connection in the OpenAPI document, the 
+          `docs:check` anchor crash, UUID-only ids in `demo-env`), the ow
+          ner's texts in the README and this log, and `/ship` closing the
+           phase. |
+      84  | 15b | 2026-10-09 | [15b-review.txt](transcripts/15b-review.tx
+          t) | Review against the challenge: a requirement-by-requirement
+           table with the gaps, then the README sections on the modular m
+          onolith and the thinking process, the advisor chat summary, wha
+          t the exports contain and the redactions, and the phase list. |
+      85 +| 16 | 2026-10-09 | [16-delivery.txt](transcripts/16-delivery.t
+         +xt) | Delivery notes from a clean-clone test on macOS: two READ
+         +ME Troubleshooting rows, one for colima sharing only the home d
+         +irectory and one for the expected `.env not found` lines. |    
+
+⏺ Bash(npx prettier --check docs/ai/README.md README.md && npm run docs:check
+      2>&1 | tail -2 && git status --short)
+  ⎿  Checking formatting...
+     All matched files use Prettier code style!
+     … +4 lines (ctrl+o to expand)
+  ⎿  (timeout 5m)
+
+⏺ I added the phase 16 row to docs/ai/README.md, right after the 15b row, with
+  the text I proposed.
+
+  Checks:
+  - Prettier: both READMEs pass.
+  - npm run docs:check: 0 failures. It only reads files tracked by git, so it
+    doesn't see the new transcript yet. The new row's link points at
+    transcripts/16-delivery.txt, which exists.
+
+  Changed files: README.md, docs/ai/README.md, and the untracked
+  docs/ai/transcripts/16-delivery.txt. Nothing is committed, so it's ready for
+  /ship.
+
+✻ Churned for 25s · done 2:05 PM
+
+❯ /ship close phase 16: delivery notes                                          
+
+⏺ Bash(git branch --show-current)
+  ⎿  phase/16-delivery
+
+⏺ Bash(npm run check)
+  ⎿  > supercool-finances@0.1.0 check
+     > npm run typecheck && npm run lint && npm run format:check && npm run
+      test
+     … +106 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ Bash(npm run infra:up)
+  ⎿  > supercool-finances@0.1.0 infra:up
+     > docker compose up -d --wait postgres redis
+     … +6 lines (ctrl+o to expand)
+
+⏺ Bash(npm run test:integration)
+  ⎿  > supercool-finances@0.1.0 test:integration
+     > vitest run --project integration --reporter=default --reporter=json
+     --outputFile.json=reports/vitest-integration.json
+     … +236 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ Bash(npm run trace -- --require unit,integration)
+  ⎿  > supercool-finances@0.1.0 trace
+     > tsx scripts/trace.ts --require unit,integration
+     … +426 lines (ctrl+o to expand)
+
+⏺ Bash(npm run infra:validate)
+  ⎿  > supercool-finances@0.1.0 infra:validate
+     > bash scripts/infra-validate.sh
+     … +32 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Bash(git add -A)
+  ⎿  (No output)
+
+⏺ All gates passed. I'm checking what's staged before I commit.
+
+⏺ Bash(git status --short)
+  ⎿  M  README.md
+     M  docs/ai/README.md
+     A  docs/ai/transcripts/16-delivery.txt
+
+⏺ Bash(git commit -m "docs: add two README troubleshooting rows from a
+      clean-clone test" -m "Two rows from a clean-clone test on macOS: colima
+      shares only the home
+      dir…)
+  ⎿  [phase/16-delivery c65f23c] docs: add two README troubleshooting rows
+     from a clean-clone test
+      3 files changed, 131 insertions(+)
+      create mode 100644 docs/ai/transcripts/16-delivery.txt
+
+⏺ Bash(gitleaks git --no-banner --redact --log-opts="origin/main..HEAD")
+  ⎿  2:07PM INF 1 commits scanned.
+     2:07PM INF scanned ~7914 bytes (7.91 KB) in 61.5ms
+     2:07PM INF no leaks found
+
+⏺ Bash(git push -u origin HEAD)
+  ⎿  remote:
+     remote: Create a pull request for 'phase/16-delivery' on GitHub by vis
+     iting:
+     … +6 lines (ctrl+o to expand)
+
+⏺ Bash(gh pr view)
+  ⎿  Error: Exit code 1
+     no pull requests found for branch "phase/16-delivery"
+
+⏺ Bash(gh pr create --base main --title "Phase 16-delivery: README
+      troubleshooting rows from a clean-clone test" --body-file - <<'EOF'
+      ## What the phase delivered…)
+  ⎿  https://github.com/torsello/supercool-finances/pull/19
+
+⏺ Commit c65f23c is pushed to phase/16-delivery, and PR #19 is open:
+  https://github.com/torsello/supercool-finances/pull/19. I haven't merged it,
+  since that happens once CI is green.
+
+  - Commit: docs: add two README troubleshooting rows from a clean-clone test.
+    It holds README.md, the new row in docs/ai/README.md and
+    docs/ai/transcripts/16-delivery.txt.
+  - Gates:
+    - npm run check: passed (394 unit tests).
+    - npm run test:integration: passed (341 tests).
+    - npm run trace -- --require unit,integration: 244 of 244 ACs covered.
+    - npm run infra:validate: no findings.
+    - gitleaks: no leaks in the branch's one commit.
+  - ACs covered: none, because the change is documentation only.
+  - Skipped: docs/traceability.md regeneration and test:e2e, since no spec, task
+    or test name changed.
+✻ Cooked for 2m 46s · done 2:08 PM
