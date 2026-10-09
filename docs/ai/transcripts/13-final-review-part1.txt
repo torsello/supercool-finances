@@ -1863,3 +1863,137 @@
      exist yet.
 
 ✻ Worked for 2m 1s · done 9:37 AM
+
+❯ /export docs/ai/transcripts/13-final-review-part1.txt                         
+  ⎿  Conversation exported to: /Users/matiastorsello/supercool-finances/docs/ai/
+     transcripts/13-final-review-part1.txt
+
+❯ /ship fix the final review findings in the observability add-on               
+
+⏺ Branch is phase/12b-observability, not main. Running the gates.
+⏺ Bash(npm run check 2>&1 | tail -6)
+  ⎿   Test Files  67 passed (67)
+           Tests  381 passed (381)
+        Start at  09:38:37
+     … +5 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ Bash(npm run infra:up 2>&1 | tail -5)
+  ⎿   Container supercool-finances-redis-1 Started
+      Container supercool-finances-redis-1 Waiting
+      Container supercool-finances-postgres-1 Waiting
+     … +2 lines (ctrl+o to expand)
+  ⎿  (timeout 5m)
+
+⏺ Bash(npm run test:integration 2>&1 | grep -E "×|FAIL|Test Files|Tests ")
+  ⎿   Test Files  139 passed (139)
+           Tests  340 passed (340)
+  ⎿  (timeout 10m)
+
+⏺ Bash(npm run trace -- --require unit,integration 2>&1 | tail -2)
+  ⎿  238 ACs in 9 specs: 238 covered, 0 pending, 0 missing, 0 unverified. T
+     est reports read: unit, integration, e2e.
+
+⏺ Bash(ls infra/terraform >/dev/null 2>&1 && checkov -d infra/terraform --quiet
+      --compact 2>&1 | tail -5; grep -n "12b\|13-final" docs/ai/README.md)
+  ⎿  secrets scan results:
+
+     Passed checks: 0, Failed checks: 0, Skipped checks: 1
+     … +10 lines (ctrl+o to expand)
+
+⏺ Gates pass. The new transcript has no row in docs/ai/README.md, so I'm adding
+  one.
+
+⏺ Bash(sed -n 40,60p docs/ai/README.md | cut -c1-200)
+  ⎿  | 11 | 2026-10-09 | [11-e2e.txt](transcripts/11-e2e.txt) | E2E: the `e
+     2e` Vitest project and `npm run test:e2e` against its own Compose stac
+     k `scf-e2e` with a file sequencer and a response recorder, t
+     … +9 lines (ctrl+o to expand)
+
+⏺ Bash(printf '%s\n' "| 13 part 1 | 2026-10-09 |
+      [13-final-review-part1.txt](transcripts/13-final-review-part1.txt) | Final
+      review, part 1: the fixes of the \`/audit\`…)
+  ⎿  es of the `/audit` of 12b-observability (the reporter frees its slot a
+     t 2000 ms, multi-line messages never sent as frames, stricter `SENTRY_
+     DSN`, tests without fixed sleeps, plan 007), SEC-R56 and SEC-AC47 (eve
+     … +4 lines (ctrl+o to expand)
+  ⎿  Updated docs/ai/README.md (+1 -0)
+      41  | 12 part 1 | 2026-10-09 | [12-infra-part1.txt](transcripts/12-
+          infra-part1.txt) | Infra, part 1: the owner's answers to the fo
+          llow-up of ADR-0019 (migrations and a new bootstrap task straig
+          ht to the RDS instance with the RDS CA bundle, the alarm on pin
+          ned connections) and the matching changes to specs 007 and 008,
+           the bootstrap CLI, `PGPASSWORD`, the Terraform root and its se
+          ven modules, `npm run infra:validate` with tflint and checkov a
+          nd 60 custom policies tested by mutation, `docs/deployment/aws.
+          md`, and the DEP-AC14, DEP-AC24, DEP-AC27, DEP-AC29 and DEP-AC3
+          0 tests. |
+      42  | 12 part 2 | 2026-10-09 | [12-infra-part2.txt](transcripts/12-
+          infra-part2.txt) | Infra, part 2: the CI pipeline (jobs `ci`, `
+          e2e`, `traceability`, `secret-scan` and `security` with trivy, 
+          actions pinned by SHA, `ubuntu-24.04`), the runtime image witho
+          ut npm, the WAF rate rule answering 429, the Terraform connecti
+          on and shutdown budgets with the deployment surge, RDS Proxy's 
+          borrow timeout answered 503 (SEC-R49, SEC-AC39), the runbooks, 
+          README, OpenAPI error docs and ADR follow-ups, and the second a
+          udit's fixes. |
+      43  | 12b | 2026-10-09 | [12b-observability.txt](transcripts/12b-ob
+          servability.txt) | Observability: ADR-0023 and the owner-approv
+          ed changes to specs 007 and 008, optional error reporting of th
+          e 500s to a Sentry-compatible endpoint (own client on Node's `f
+          etch`, allowlisted event, scrubbed message, bounded and off by 
+          default), the `observability` Compose profile with Prometheus a
+          nd Grafana and its dashboard, the `compose.error-reporting.yaml
+          ` override, `make observability`, and the SEC-AC40 to SEC-AC46 
+          and DEP-AC31 to DEP-AC34 tests. |
+      44 +| 13 part 1 | 2026-10-09 | [13-final-review-part1.txt](transcri
+         +pts/13-final-review-part1.txt) | Final review, part 1: the fixe
+         +s of the `/audit` of 12b-observability (the reporter frees its 
+         +slot at 2000 ms, multi-line messages never sent as frames, stri
+         +cter `SENTRY_DSN`, tests without fixed sleeps, plan 007), SEC-R
+         +56 and SEC-AC47 (every counter of table 1.4 at 0 from startup) 
+         +and the `or vector(0)` of the errors panels. |                 
+
+⏺ Bash(git add -A && git status --short)
+  ⎿  M  README.md
+     M  docker/grafana/dashboards/scf-overview.json
+     M  docs/ai/README.md
+     … +21 lines (ctrl+o to expand)
+
+⏺ Nothing sensitive is staged. Committing.
+
+⏺ Bash(git commit -q -F - <<'EOF'
+      fix(observability): close the audit findings and start counters at 0…)
+  ⎿  f2b3066 fix(observability): close the audit findings and start counter
+     s at 0
+
+⏺ Bash(gitleaks git --no-banner --redact --log-opts="origin/main..HEAD" 2>&1 |
+      tail -5)
+  ⎿  9:41AM INF 3 commits scanned.
+     9:41AM INF scanned ~939889 bytes (939.89 KB) in 991ms
+     9:41AM INF no leaks found
+
+⏺ Bash(git push -u origin HEAD 2>&1 | tail -4)
+  ⎿  To https://github.com/torsello/supercool-finances.git
+        0193ef7..f2b3066  HEAD -> phase/12b-observability
+     branch 'phase/12b-observability' set up to track 'origin/phase/12b-obs
+     ervability'.
+
+⏺ - Commit: f2b3066 fix(observability): close the audit findings and start 
+    counters at 0, pushed to phase/12b-observability. The gitleaks scan of the
+    branch found no leaks.
+  - Gates: npm run check passed (381 unit tests), npm run test:integration
+    passed (340), and npm run trace -- --require unit,integration covered 238 of
+    238 ACs. checkov on infra/terraform reported no failed checks.
+  - ACs covered: SEC-AC40, SEC-AC41, SEC-AC43, SEC-AC44, SEC-AC45, SEC-AC46,
+    SEC-AC47 and DEP-AC32.
+  - PR: none opened, because the description doesn't start with "close phase
+    NN".
+  - Extras:
+    - I added the missing row for 13-final-review-part1.txt to
+      docs/ai/README.md. The transcript is named for phase 13, but its content
+      is the 12b follow-up.
+    - The commit also includes the changed docs/performance.md and the updated
+      12b transcript.
+
+✻ Sautéed for 3m 4s · done 9:41 AM
