@@ -84,4 +84,5 @@ Chosen option: **Option A**, because it answers at the deadline and never sends 
 ### Follow-ups
 
 - Phase 09-hardening: `src/platform/http/request-timeout.ts` and the shutdown coordinator's count of clean-ups, proven by SEC-AC25, SEC-AC38, SEC-AC21 and requirement-named tests of SEC-R27, SEC-R28 and SEC-R33 (plan 007).
+  - Done in phase 09-hardening on 2026-10-08.
 - Phase 12-infra: the runbook on timeouts and 503 answers explains the unknown outcome of a commit in flight and the retry with the same key.

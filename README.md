@@ -39,3 +39,28 @@ Every money movement is one transaction of two or more ledger entries that sum t
 Deposits and withdrawals move money against the settlement account of their currency, a system account with no cached balance: its balance is the sum of its entries and may go below zero. A customer balance never does. The ledger is append-only, in the code and in the database; a mistake is corrected by a reversal (`POST /v1/transactions/{id}/reversals`), never by an edit.
 
 `npm run reconcile` checks every cached balance against the ledger and every currency's global sum against zero; see the [reconciliation runbook](docs/runbooks/reconciliation.md). Spec: [`specs/002-ledger`](specs/002-ledger/spec.md).
+
+## Money movements
+
+Operators deposit into any customer account (`POST /v1/accounts/{id}/deposits`); customers withdraw from their own accounts (`/withdrawals`) and transfer out of them (`/transfers`). Each answers 201 with `Location: /v1/transactions/{id}`; a withdrawal and a transfer also return the account's new balance. A movement in another currency than the account's answers 422 `/problems/currency-mismatch`, and a frozen or closed account 422 `/problems/account-not-active`.
+
+**A transfer.** `POST /v1/accounts/{A1}/transfers` with `{"destinationAccountId": "<B1>", "amount": "1050", "currency": "EUR"}` writes one transaction of two entries, −1050 on A1 and +1050 on B1, and both balance changes, in one database transaction: all of it happens or none of it. A1 never goes below "0" (422 `/problems/insufficient-funds`). B1 must be an active customer account in the same currency. When B1 is another customer's, every reason it cannot be credited (unknown, a system account, frozen, closed, another currency, a balance that would pass the maximum) gets one answer, 422 `/problems/destination-unavailable`, so a transfer reveals nothing about other customers' accounts.
+
+**Concurrent transfers.** Each movement locks the customer accounts it changes with `SELECT ... FOR UPDATE`, one by one in ascending id order, and checks balances and statuses only once it holds them; system accounts are never locked (ADR-0008). Crossed transfers (A1 to B1 while B1 sends to A1) and cycles (A1 to B1 to Z1 to A1) take their locks in the same order, so they queue instead of deadlocking. A deadlock or serialization failure that still happens is retried, up to 3 attempts with a short random backoff; an account lock not acquired within `ACCOUNT_LOCK_TIMEOUT_MS` (2000 ms) answers 503 `/problems/service-unavailable` with `Retry-After: 1`, and the request can be retried with the same `Idempotency-Key`. Spec: [`specs/003-money-movements`](specs/003-money-movements/spec.md).
+
+## Corrections
+
+The ledger is never edited. An operator corrects a movement by reversing it: `POST /v1/transactions/{id}/reversals` with a `reason` of 3 to 500 characters, which is stored and audited but never returned. The reversal is a new transaction, linked to the original, with every entry of the original negated, and the balances change with it.
+
+A transaction is reversed at most once (409 `/problems/already-reversed`), even when two operators try at the same time, and a reversal cannot itself be reversed (422 `/problems/transaction-not-reversible`). A reversal that would take a customer balance below "0", because the money has moved on, answers 422 `/problems/insufficient-funds-for-reversal`. A reversal is allowed on a frozen account, so a mistake can be undone while the account is under review, and refused on a closed one (422 `/problems/account-not-active`). Spec: [`specs/004-reversals`](specs/004-reversals/spec.md).
+
+## Duplicate requests
+
+Every deposit, withdrawal, transfer and reversal requires an `Idempotency-Key` header, a fresh value such as a UUID for each new request; account creation takes one optionally. Keys belong to the user who sent them.
+
+1. The first request with a key runs, and its response (status, headers and body) is stored with the key in the same database transaction as the movement.
+2. A repeat with the same key, method, path and body, within `IDEMPOTENCY_KEY_TTL_SECONDS` (24 hours by default), gets the stored response byte for byte, with `Idempotent-Replayed: true`, and moves no money. This holds on any replica, because the key lives in PostgreSQL.
+3. A repeat that arrives while the first is still running waits for it, at most `IDEMPOTENCY_WAIT_TIMEOUT_MS` (2000 ms), and then gets the stored response, or 409 `/problems/request-in-progress` with `Retry-After: 1` if the first is still running.
+4. The same key with another method, path or body answers 422 `/problems/idempotency-key-reused`.
+
+A client that gets a connection error, a 502, 503 or 504, or a 409 `/problems/request-in-progress` retries the same request with the same key, waiting `Retry-After` (200 ms without one), up to 60 times; it never retries any other 4xx. Expired keys are deleted by `npm run idempotency:cleanup`; see the [idempotency cleanup runbook](docs/runbooks/idempotency-cleanup.md). Spec: [`specs/005-idempotency`](specs/005-idempotency/spec.md).

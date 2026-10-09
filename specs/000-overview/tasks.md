@@ -56,8 +56,8 @@ These tasks run in the cross-spec order of plan 000 section 1 for 08-api: authen
 
 ## 09-hardening
 
-- [ ] Test first: SYS-AC02 in `test/integration/overview/authentication.test.ts`, once the metrics server of spec 007 serves `/metrics` on `METRICS_PORT`.
-- [ ] Test first: SYS-AC29 in `test/integration/overview/versioned-paths.test.ts`.
+- [x] Test first: SYS-AC02 in `test/integration/overview/authentication.test.ts`, once the metrics server of spec 007 serves `/metrics` on `METRICS_PORT`.
+- [x] Test first: SYS-AC29 in `test/integration/overview/versioned-paths.test.ts`.
 
 ## 10-runtime
 

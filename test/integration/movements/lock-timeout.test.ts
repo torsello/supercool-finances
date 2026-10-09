@@ -2,7 +2,12 @@ import { randomUUID } from 'node:crypto';
 import type { LightMyRequestResponse } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildProductionApp, type BuiltApp } from '../../support/app.js';
-import { balanceOf, closePools } from '../../support/db.js';
+import {
+  balanceOf,
+  closePools,
+  createCustomerAccount,
+  writeDirectDeposit,
+} from '../../support/db.js';
 import {
   createAccount,
   deposit,
@@ -11,9 +16,17 @@ import {
   withdraw,
   type MovementJson,
 } from '../../support/http.js';
+import { blockedBackends, blockersOf } from '../../support/backends.js';
 import { openLockSession, type LockSession } from '../../support/sessions.js';
 import { tokenFor } from '../../support/tokens.js';
-import { auditsOn, entriesOn, keyRecord, transactionsOfKind, transactionsOn } from './support.js';
+import {
+  auditsOn,
+  auditsWithRequestId,
+  entriesOn,
+  keyRecord,
+  transactionsOfKind,
+  transactionsOn,
+} from './support.js';
 
 describe('the account lock timeout', () => {
   let built: BuiltApp;
@@ -91,5 +104,83 @@ describe('the account lock timeout', () => {
     expect(body.balance).toBe('900');
     expect(await transactionsOfKind(a1.id, 'withdrawal')).toEqual([body.id]);
     expect((await keyRecord(c1Id, k1))?.body?.['id']).toBe(body.id);
+  });
+});
+
+describe('the idempotency wait and the account lock timeout', () => {
+  let built: BuiltApp;
+  let session: LockSession;
+
+  beforeAll(async () => {
+    built = buildProductionApp({
+      env: {
+        ACCOUNT_LOCK_TIMEOUT_MS: '4000',
+        IDEMPOTENCY_WAIT_TIMEOUT_MS: '300',
+        REQUEST_TIMEOUT_MS: '30000',
+        SHUTDOWN_TIMEOUT_MS: '30000',
+      },
+    });
+    await built.app.ready();
+    session = await openLockSession();
+  });
+
+  afterAll(async () => {
+    await session.close();
+    await built.app.close();
+    await closePools();
+  });
+
+  it('MOV-AC19 a second request with the key waits for the first, not for the account lock, and answers 409 before the first answers 503', async () => {
+    const c1Id = randomUUID();
+    const c1 = tokenFor(c1Id, 'customer');
+    const a1 = await createCustomerAccount({ currency: 'EUR', ownerId: c1Id });
+    await writeDirectDeposit(a1, '1000');
+    const k1 = randomUUID();
+    const send = async (requestId: string) =>
+      await built.app.inject({
+        method: 'POST',
+        url: `/v1/accounts/${a1.id}/withdrawals`,
+        headers: {
+          authorization: `Bearer ${c1}`,
+          'idempotency-key': k1,
+          'x-request-id': requestId,
+        },
+        payload: { amount: '100', currency: 'EUR' },
+      });
+
+    await session.lockRow('accounts', a1.id);
+    try {
+      let r1Answered = false;
+      const r1 = send('mov-ac19-r1').then((response) => {
+        r1Answered = true;
+        return response;
+      });
+      const [r1Backend] = await blockedBackends({ count: 1, by: session.pid });
+      if (r1Backend === undefined) throw new Error('R1 is not waiting');
+
+      const r2 = send('mov-ac19-r2');
+      const [r2Backend] = await blockedBackends({ count: 1, by: r1Backend });
+      if (r2Backend === undefined) throw new Error('R2 is not waiting');
+      expect(await blockersOf(r2Backend)).toEqual([r1Backend]);
+
+      const second = await r2;
+      expect(r1Answered).toBe(false);
+      expect(second.statusCode).toBe(409);
+      expect(problemOf(second).type).toBe('/problems/request-in-progress');
+
+      const first = await r1;
+      expect(first.statusCode).toBe(503);
+      expect(problemOf(first).type).toBe('/problems/service-unavailable');
+      expect(first.headers['retry-after']).toBe('1');
+    } finally {
+      await session.release();
+    }
+
+    expect(await balanceOf(a1.id)).toBe('1000');
+    expect(await transactionsOfKind(a1.id, 'withdrawal')).toEqual([]);
+    expect(await entriesOn(a1.id)).toBe(1);
+    expect(await keyRecord(c1Id, k1)).toBeUndefined();
+    expect(await auditsWithRequestId('mov-ac19-r1')).toEqual([]);
+    expect(await auditsWithRequestId('mov-ac19-r2')).toEqual([]);
   });
 });

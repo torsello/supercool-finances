@@ -49,7 +49,7 @@ These tasks run in the cross-spec order of plan 000 section 1 for 08-api: authen
 
 ## 09-hardening
 
-- [ ] Test first: LED-AC15 in `test/integration/ledger/reconciliation-concurrency.test.ts`, with the service started with `DB_POOL_ACQUIRE_TIMEOUT_MS` "10000", `REQUEST_TIMEOUT_MS` "30000" and `SHUTDOWN_TIMEOUT_MS` "30000".
+- [x] Test first: LED-AC15 in `test/integration/ledger/reconciliation-concurrency.test.ts`, with the service started with `DB_POOL_ACQUIRE_TIMEOUT_MS` "10000", `REQUEST_TIMEOUT_MS` "30000" and `SHUTDOWN_TIMEOUT_MS` "30000".
 
 ## 10-runtime
 

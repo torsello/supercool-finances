@@ -1,8 +1,7 @@
 /**
  * The problem type registry (SYS-R24, ADR-0016): every type the service answers, with its status
  * and its fixed `title` and `detail`, so bodies of one type differ only in `requestId` (SYS-R05,
- * MOV-R15). Only a malformed request names what is broken in its `detail` (SYS-R26). 09-hardening
- * adds the types of spec 007 (413, 415, 429).
+ * MOV-R15). Only a malformed request names what is broken in its `detail` (SYS-R26).
  */
 
 export const PROBLEM_CONTENT_TYPE = 'application/problem+json';
@@ -33,6 +32,16 @@ export const PROBLEM_TYPES = {
     status: 400,
     title: 'Malformed Request',
     detail: 'The request is malformed.',
+  },
+  '/problems/unsupported-media-type': {
+    status: 415,
+    title: 'Unsupported Media Type',
+    detail: 'The request body must be application/json, in UTF-8.',
+  },
+  '/problems/payload-too-large': {
+    status: 413,
+    title: 'Payload Too Large',
+    detail: 'The request body is larger than 16384 bytes.',
   },
   '/problems/validation-error': {
     status: 422,
@@ -98,6 +107,11 @@ export const PROBLEM_TYPES = {
     status: 422,
     title: 'Insufficient Funds For Reversal',
     detail: 'An account balance does not cover the reversal.',
+  },
+  '/problems/rate-limited': {
+    status: 429,
+    title: 'Rate Limited',
+    detail: 'Too many requests; retry after the number of seconds in Retry-After.',
   },
   '/problems/service-unavailable': {
     status: 503,

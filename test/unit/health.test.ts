@@ -8,6 +8,7 @@ describe('GET /health/live', () => {
   const app = buildApp(
     loadConfig({
       DATABASE_URL: 'postgres://scf_app:unused@127.0.0.1:1/unused',
+      REDIS_URL: 'redis://127.0.0.1:1',
       JWT_SECRET: K,
       JWT_ISSUER: 'scf-test',
       JWT_AUDIENCE: 'scf-api',

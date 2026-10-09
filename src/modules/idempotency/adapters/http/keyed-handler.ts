@@ -7,6 +7,8 @@ import {
   toProblem,
   type BodyExtension,
 } from '../../../../platform/http/error-handler.js';
+import { PoolAcquireTimeout, PoolClosed } from '../../../../platform/db/errors.js';
+import { RequestTimeout } from '../../../../platform/http/request-timeout.js';
 import type { IdempotentRunner, KeyedAnswer } from '../../application/idempotent-runner.js';
 import type { KeyedTransactions, Presenter } from '../../application/ports.js';
 import { keyHooks, keyOf, receivedBody, type KeyHooks } from './key-header.js';
@@ -36,9 +38,40 @@ export interface AfterCommitHook {
 /** The test seams this component attaches, as plan 000 section 8 names them. */
 export type KeyedHandlerTestHook = 'extra-response-member' | 'destroy-connection-after-commit';
 
+/** What a keyed route does: a money movement, or an account creation with a key. */
+export type KeyedKind = 'deposit' | 'withdrawal' | 'transfer' | 'reversal' | 'account_creation';
+
+/**
+ * How a keyed request ended, for the metrics of section 1.4 of spec 007: a new 201 (`applied`), a
+ * new stored 4xx (`rejected`), a 5xx (`failed`), or a stored response (`replayed`). A 4xx that is
+ * not stored, such as a reused key or a request in progress, is not reported.
+ */
+export type KeyedOutcome = 'applied' | 'rejected' | 'failed' | 'replayed';
+
+export interface KeyedObserver {
+  answered(kind: KeyedKind, outcome: KeyedOutcome): void;
+}
+
 export interface KeyedHandlerOptions {
   responseBody?: ResponseBodyHook;
   afterCommit?: AfterCommitHook;
+  observer?: KeyedObserver;
+}
+
+/**
+ * Whether a request answered 5xx reached the idempotency step: not when no connection was free or
+ * the pool was closed, nor when its request timeout came before its transaction began, so only
+ * movements that reached that step are counted as failed (table 1.4 of spec 007).
+ */
+function reachedKeyStep(error: unknown): boolean {
+  if (error instanceof PoolAcquireTimeout || error instanceof PoolClosed) return false;
+  return !(error instanceof RequestTimeout) || error.transactionStarted;
+}
+
+/** A response the runner returned: a replay, a new 201, or a new stored rejection. */
+function outcomeOf(answer: KeyedAnswer): KeyedOutcome {
+  if (answer.replayed) return 'replayed';
+  return answer.response.status === 201 ? 'applied' : 'rejected';
 }
 
 /** A 201 as a keyed route presents it: its `Location` and its body, before serialization. */
@@ -49,6 +82,7 @@ export interface Created {
 
 /** What a keyed route runs: its keyed transactions, its operation (steps 5 to 8) and its 201. */
 export interface KeyedOperation<Operation, Result> {
+  kind: KeyedKind;
   transactions: KeyedTransactions<Operation>;
   operation: (tx: Operation) => Promise<Result>;
   created: (result: Result) => Created;
@@ -65,11 +99,13 @@ export class KeyedHandler {
   readonly #runner: IdempotentRunner;
   readonly #responseBody: ResponseBodyHook | undefined;
   readonly #afterCommit: AfterCommitHook | undefined;
+  readonly #observer: KeyedObserver | undefined;
 
   constructor(runner: IdempotentRunner, options: KeyedHandlerOptions = {}) {
     this.#runner = runner;
     this.#responseBody = options.responseBody;
     this.#afterCommit = options.afterCommit;
+    this.#observer = options.observer;
   }
 
   attachedTestHooks(): KeyedHandlerTestHook[] {
@@ -119,8 +155,12 @@ export class KeyedHandler {
     } catch (error) {
       const problem = toProblem(error);
       logFailure(request, error, problem);
+      if (problem.status >= 500 && reachedKeyStep(error)) {
+        this.#observer?.answered(keyed.kind, 'failed');
+      }
       return await sendProblem(reply, problemResponse(problem, request.id, this.#extend()));
     }
+    this.#observer?.answered(keyed.kind, outcomeOf(answer));
     if (!answer.replayed) this.#afterCommit?.afterCommit(request.raw.socket);
     return await sendAnswer(request, reply, answer);
   }

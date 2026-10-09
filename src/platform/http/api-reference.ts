@@ -8,12 +8,22 @@ import { PROBLEM_CONTENT_TYPE, PROBLEM_TYPES, type ProblemTypeUri } from './prob
  */
 
 /**
- * The problem types the document lists: those the service answers today. The types of spec 007
- * (413, 415, 429) and the load balancer's `/problems/upstream-unavailable` (spec 008) join with
- * the 12-infra docs task of plan 007, once 09-hardening and 10-runtime serve them, as do the
- * pool wait and the request timeout among the causes of a 503.
+ * The problem types of spec 007 that the service answers from 09-hardening but the document does
+ * not list yet: they join, with the load balancer's `/problems/upstream-unavailable` (spec 008),
+ * the pool wait and the request timeout among the causes of a 503, with the 12-infra docs task of
+ * plan 007.
  */
-export type DocumentedProblemType = ProblemTypeUri;
+export const UNDOCUMENTED_PROBLEM_TYPES = [
+  '/problems/payload-too-large',
+  '/problems/unsupported-media-type',
+  '/problems/rate-limited',
+] as const satisfies readonly ProblemTypeUri[];
+
+/** The problem types the document lists. */
+export type DocumentedProblemType = Exclude<
+  ProblemTypeUri,
+  (typeof UNDOCUMENTED_PROBLEM_TYPES)[number]
+>;
 
 interface ProblemReference {
   /** The statuses the type is answered with. */
@@ -67,9 +77,15 @@ function referenceOf(type: DocumentedProblemType): ProblemReference {
   return { statuses: [status], title, detail, when: WHEN[type] };
 }
 
-/** Every problem type, in the order of the registry. */
+function isDocumented(type: ProblemTypeUri): type is DocumentedProblemType {
+  return !(UNDOCUMENTED_PROBLEM_TYPES as readonly ProblemTypeUri[]).includes(type);
+}
+
+/** Every documented problem type, in the order of the registry. */
 export const PROBLEM_REFERENCE = Object.fromEntries(
-  (Object.keys(PROBLEM_TYPES) as DocumentedProblemType[]).map((type) => [type, referenceOf(type)]),
+  (Object.keys(PROBLEM_TYPES) as ProblemTypeUri[])
+    .filter(isDocumented)
+    .map((type) => [type, referenceOf(type)]),
 ) as Readonly<Record<DocumentedProblemType, ProblemReference>>;
 
 /** The ids and times of the examples of every operation. */

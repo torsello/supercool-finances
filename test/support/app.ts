@@ -9,12 +9,15 @@ export const TEST_CURSOR_SECRET = 'test-only-cursor-secret-for-unit-and-integrat
 
 /**
  * The environment every test app runs with (section 3 of spec 006): the test token settings, the
- * test cursor secret and the shared test database, with `overrides` on top. A variable set to
- * `undefined` in `overrides` is unset.
+ * test cursor secret, the shared test database and Redis, and a per-user rate limit that no test
+ * reaches unless it sets its own (section 1.6 of spec 007), with `overrides` on top. A variable set
+ * to `undefined` in `overrides` is unset.
  */
 export function testEnvironment(overrides: Environment = {}): Environment {
   return {
     DATABASE_URL: requireEnv('TEST_DATABASE_URL'),
+    REDIS_URL: requireEnv('REDIS_URL'),
+    RATE_LIMIT_USER_MAX: '1000000',
     JWT_SECRET: K,
     JWT_ISSUER: TEST_ISSUER,
     JWT_AUDIENCE: TEST_AUDIENCE,

@@ -42,3 +42,65 @@ export class RouteNotFound extends Error {
     super('no route');
   }
 }
+
+/**
+ * A request body above 16384 bytes, by `Content-Length` or by the bytes received (SEC-R10): 413
+ * `/problems/payload-too-large`.
+ */
+export class PayloadTooLarge extends Error {
+  override readonly name = 'PayloadTooLarge';
+
+  constructor() {
+    super('request body too large');
+  }
+}
+
+/**
+ * A request body whose `Content-Type` is missing or is not `application/json`, alone or with
+ * `charset=utf-8` (SEC-R11): 415 `/problems/unsupported-media-type`.
+ */
+export class UnsupportedMediaType extends Error {
+  override readonly name = 'UnsupportedMediaType';
+
+  constructor() {
+    super('unsupported request media type');
+  }
+}
+
+/**
+ * An authenticated user above `RATE_LIMIT_USER_MAX` requests in the current window (SEC-R03): 429
+ * `/problems/rate-limited`, with the whole seconds left in the window as `Retry-After`.
+ */
+export class RateLimited extends Error {
+  override readonly name = 'RateLimited';
+
+  constructor(readonly retryAfterSeconds: number) {
+    super('per-user rate limit exceeded');
+  }
+}
+
+/**
+ * The replica is not ready: the database did not answer in time, a shipped migration is missing,
+ * or the process is shutting down (SEC-R24, SEC-R26): 503 `/problems/service-unavailable`, with
+ * one body whatever the cause, which only the log names.
+ */
+export class NotReady extends Error {
+  override readonly name = 'NotReady';
+
+  constructor() {
+    super('not ready');
+  }
+}
+
+/**
+ * A request that arrived after the replica stopped accepting connections, on a connection kept
+ * alive from before (SEC-R25): 503 `/problems/service-unavailable` with `Retry-After: 1`, answered
+ * before it reaches the pool, so the client retries on another replica.
+ */
+export class ShuttingDown extends Error {
+  override readonly name = 'ShuttingDown';
+
+  constructor() {
+    super('the replica is shutting down');
+  }
+}

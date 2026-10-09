@@ -1,14 +1,20 @@
+import { isIPv4, isIPv6 } from 'node:net';
+
 /**
  * The service's configuration, read from environment variables once and validated before anything
- * connects or listens (plan 000 section 4, SEC-R39). Every invalid variable is collected into one
- * `ConfigError` that names it with its rule and never its value (SEC-R40, AUT-R18). 09-hardening
- * adds the rest of section 1.2 of spec 007 and the timeout budget of SEC-R35.
+ * connects or listens (plan 000 section 4, SEC-R39): every variable of section 1.2 of spec 007, of
+ * specs 002, 003, 005 and 006, `REPLICA_ID` and `MIGRATION_DATABASE_URL` (spec 008), and the
+ * timeout budget of SEC-R35. Every invalid variable is collected into one `ConfigError` that names
+ * it with its rule and never its value (SEC-R40, AUT-R18).
  */
 
 export type Environment = Readonly<Record<string, string | undefined>>;
 
 export const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace'] as const;
 export type LogLevel = (typeof LOG_LEVELS)[number];
+
+export const NODE_ENVS = ['development', 'test', 'production'] as const;
+export type NodeEnv = (typeof NODE_ENVS)[number];
 
 /** `JWT_SECRET`, `JWT_ISSUER` and `JWT_AUDIENCE` (section 1.4 of spec 006). */
 export interface JwtConfig {
@@ -19,9 +25,14 @@ export interface JwtConfig {
 }
 
 export interface Config {
+  nodeEnv: NodeEnv;
   port: number;
+  /** The port of the metrics server, never routed by the load balancer (SEC-R43). */
+  metricsPort: number;
   logLevel: LogLevel;
   databaseUrl: string;
+  /** Used for nothing but the per-user rate-limit counters (SEC-R07). */
+  redisUrl: string;
   /** The HMAC key of pagination cursors (section 1.5 of spec 001). */
   cursorSecret: string;
   /** The largest amount of one deposit, withdrawal or transfer, in minor units (LED-R23). */
@@ -29,6 +40,22 @@ export interface Config {
   accountLockTimeoutMs: number;
   idempotencyWaitTimeoutMs: number;
   idempotencyKeyTtlSeconds: number;
+  dbPoolMax: number;
+  dbPoolAcquireTimeoutMs: number;
+  redisCommandTimeoutMs: number;
+  requestTimeoutMs: number;
+  shutdownDrainDelayMs: number;
+  shutdownTimeoutMs: number;
+  rateLimitUserMax: number;
+  rateLimitUserWindowSeconds: number;
+  /** The CIDR blocks of the proxies whose `X-Forwarded-For` is trusted (SEC-R18). */
+  trustedProxyCidrs: readonly string[];
+  /** The exact origins CORS allows; empty turns CORS off (SEC-R16, SEC-R17). */
+  corsOrigins: readonly string[];
+  /** The replica's name in its log lines (DEP-R14); the host name is used when unset. */
+  replicaId: string | undefined;
+  /** The owner role's URL, read only by the migrations, validated where it is set (spec 008). */
+  migrationDatabaseUrl: string | undefined;
   jwt: JwtConfig;
 }
 
@@ -113,9 +140,45 @@ class Reader {
     return found ?? fallback;
   }
 
+  /** A value that may be unset; when set, `valid` must hold, an empty string included. */
+  optional(variable: string, rule: string, valid: (value: string) => boolean): string | undefined {
+    const value = this.#env[variable];
+    if (value === undefined) return undefined;
+    if (!valid(value)) {
+      this.#fail(variable, rule);
+      return undefined;
+    }
+    return value;
+  }
+
+  /**
+   * A comma-separated list, empty when unset or empty; each item, without the spaces around it,
+   * must satisfy `valid`.
+   */
+  list(variable: string, rule: string, valid: (item: string) => boolean): string[] {
+    const value = this.#env[variable];
+    if (value === undefined || value === '') return [];
+    const items = value.split(',').map((item) => item.trim());
+    if (!items.every(valid)) {
+      this.#fail(variable, rule);
+      return [];
+    }
+    return items;
+  }
+
   /** A variable that must not be set at all, whatever its value. */
   unset(variable: string, rule: string): void {
     if (this.#env[variable] !== undefined) this.#fail(variable, rule);
+  }
+
+  /** Records a rule across variables, such as the budget of SEC-R35, under `variable`. */
+  refuse(variable: string, rule: string): void {
+    this.#fail(variable, rule);
+  }
+
+  /** Whether any of `variables` was found invalid. */
+  anyInvalid(variables: readonly string[]): boolean {
+    return this.#problems.some((problem) => variables.includes(problem.variable));
   }
 
   finish(): void {
@@ -134,20 +197,109 @@ const DATABASE_URL_PARAMETERS: ReadonlySet<string> = new Set([
   'connect_timeout',
 ]);
 
-function isPostgresUrl(value: string): boolean {
-  let url: URL;
+function urlOf(value: string): URL | undefined {
   try {
-    url = new URL(value);
+    return new URL(value);
   } catch {
-    return false;
+    return undefined;
   }
+}
+
+function isPostgresProtocol(url: URL): boolean {
+  return url.protocol === 'postgres:' || url.protocol === 'postgresql:';
+}
+
+function isPostgresUrl(value: string): boolean {
+  const url = urlOf(value);
   // pg turns every query parameter into a connection setting, and sends some, such as `options`
   // or `statement_timeout`, as startup parameters that would override the role's timeouts
   // (SEC-R29), so only these are accepted (section 1.2 of spec 007).
   return (
-    (url.protocol === 'postgres:' || url.protocol === 'postgresql:') &&
+    url !== undefined &&
+    isPostgresProtocol(url) &&
     [...url.searchParams.keys()].every((name) => DATABASE_URL_PARAMETERS.has(name))
   );
+}
+
+function isRedisUrl(value: string): boolean {
+  const url = urlOf(value);
+  return url !== undefined && (url.protocol === 'redis:' || url.protocol === 'rediss:');
+}
+
+const CIDR = /^([^/]+)\/(0|[1-9][0-9]{0,2})$/;
+
+/** An IPv4 block with a prefix of 0 to 32, or an IPv6 block with a prefix of 0 to 128. */
+export function isCidr(value: string): boolean {
+  const match = CIDR.exec(value);
+  const address = match?.[1];
+  const prefix = match?.[2];
+  if (address === undefined || prefix === undefined) return false;
+  if (isIPv4(address)) return Number(prefix) <= 32;
+  return isIPv6(address) && Number(prefix) <= 128;
+}
+
+/**
+ * An origin as a browser sends it in `Origin`: a scheme, a lowercase host and an optional port,
+ * with no path, credentials or trailing slash, so it can be compared exactly (SEC-R17). `http:`
+ * only outside production.
+ */
+function isOrigin(value: string, nodeEnv: NodeEnv): boolean {
+  const url = urlOf(value);
+  if (url === undefined || url.origin !== value) return false;
+  return url.protocol === 'https:' || (url.protocol === 'http:' && nodeEnv !== 'production');
+}
+
+const REPLICA_ID = /^[A-Za-z0-9._-]{1,64}$/;
+
+/** The variables of the request-timeout budget of SEC-R35, the request timeout first. */
+const BUDGET_VARIABLES = [
+  'REQUEST_TIMEOUT_MS',
+  'DB_POOL_ACQUIRE_TIMEOUT_MS',
+  'REDIS_COMMAND_TIMEOUT_MS',
+  'IDEMPOTENCY_WAIT_TIMEOUT_MS',
+  'ACCOUNT_LOCK_TIMEOUT_MS',
+] as const;
+
+/** Attempts of a money movement in the budget (SYS-R18), and the sum of the two backoff bounds. */
+const BUDGET_ATTEMPTS = 3;
+const BUDGET_BACKOFF_MS = 30;
+
+/**
+ * The worst case of section 1.1 of spec 007 that the request timeout must exceed: the pool wait,
+ * one Redis command, and three attempts each waiting for the key and two account locks, plus the
+ * backoff between them (SEC-R35).
+ */
+export function timeoutBudgetMs(config: {
+  dbPoolAcquireTimeoutMs: number;
+  redisCommandTimeoutMs: number;
+  idempotencyWaitTimeoutMs: number;
+  accountLockTimeoutMs: number;
+}): number {
+  return (
+    config.dbPoolAcquireTimeoutMs +
+    config.redisCommandTimeoutMs +
+    BUDGET_ATTEMPTS * (config.idempotencyWaitTimeoutMs + 2 * config.accountLockTimeoutMs) +
+    BUDGET_BACKOFF_MS
+  );
+}
+
+/**
+ * The budgets of SEC-R35, each checked once the variables it compares are valid on their own, so
+ * one error lists every rule broken. The rules name every variable involved and no value, the sum
+ * included (SEC-R40).
+ */
+function checkBudget(reader: Reader, config: Config): void {
+  // Taken before the request budget is checked, whose refusal names REQUEST_TIMEOUT_MS too.
+  const shutdownComparable = !reader.anyInvalid(['REQUEST_TIMEOUT_MS', 'SHUTDOWN_TIMEOUT_MS']);
+  if (!reader.anyInvalid(BUDGET_VARIABLES) && config.requestTimeoutMs <= timeoutBudgetMs(config)) {
+    reader.refuse(
+      'REQUEST_TIMEOUT_MS',
+      'greater than DB_POOL_ACQUIRE_TIMEOUT_MS + REDIS_COMMAND_TIMEOUT_MS + 3 × (IDEMPOTENCY_WAIT_TIMEOUT_MS + 2 × ACCOUNT_LOCK_TIMEOUT_MS) + 30',
+    );
+  }
+  if (shutdownComparable && config.shutdownTimeoutMs < config.requestTimeoutMs) {
+    reader.refuse('SHUTDOWN_TIMEOUT_MS', 'not less than REQUEST_TIMEOUT_MS');
+  }
 }
 
 function readJwt(reader: Reader): JwtConfig {
@@ -176,14 +328,25 @@ export function loadAuthConfig(env: Environment): JwtConfig {
 export function loadConfig(env: Environment): Config {
   const reader = new Reader(env);
   const jwt = readJwt(reader);
+  const nodeEnv = reader.oneOf('NODE_ENV', NODE_ENVS, 'development');
+  const port = reader.integer('PORT', 1, 65535, 3000);
+  const metricsPort = reader.integer('METRICS_PORT', 1, 65535, 9464);
+  // Compared once both are valid, the default of METRICS_PORT included, so a clash is refused
+  // before anything listens (SEC-R40).
+  if (!reader.anyInvalid(['PORT', 'METRICS_PORT']) && metricsPort === port) {
+    reader.refuse('METRICS_PORT', `${integerRule(1n, 65535n)}, different from PORT`);
+  }
   const config: Config = {
-    port: reader.integer('PORT', 1, 65535, 3000),
+    nodeEnv,
+    port,
+    metricsPort,
     logLevel: reader.oneOf('LOG_LEVEL', LOG_LEVELS, 'info'),
     databaseUrl: reader.required(
       'DATABASE_URL',
       'a postgres:// or postgresql:// URL whose only query parameters are sslmode, sslrootcert, application_name and connect_timeout',
       isPostgresUrl,
     ),
+    redisUrl: reader.required('REDIS_URL', 'a redis:// or rediss:// URL', isRedisUrl),
     cursorSecret: reader.required(
       'CURSOR_SECRET',
       `at least ${String(MIN_SECRET_BYTES)} bytes in UTF-8 and different from JWT_SECRET`,
@@ -194,10 +357,40 @@ export function loadConfig(env: Environment): Config {
     accountLockTimeoutMs: reader.integer('ACCOUNT_LOCK_TIMEOUT_MS', 1, 4999, 2000),
     idempotencyWaitTimeoutMs: reader.integer('IDEMPOTENCY_WAIT_TIMEOUT_MS', 1, 4999, 2000),
     idempotencyKeyTtlSeconds: reader.integer('IDEMPOTENCY_KEY_TTL_SECONDS', 3600, 2592000, 86400),
+    dbPoolMax: reader.integer('DB_POOL_MAX', 1, 100, 10),
+    dbPoolAcquireTimeoutMs: reader.integer('DB_POOL_ACQUIRE_TIMEOUT_MS', 1, 60000, 2000),
+    redisCommandTimeoutMs: reader.integer('REDIS_COMMAND_TIMEOUT_MS', 1, 5000, 100),
+    requestTimeoutMs: reader.integer('REQUEST_TIMEOUT_MS', 1, 120000, 25000),
+    shutdownDrainDelayMs: reader.integer('SHUTDOWN_DRAIN_DELAY_MS', 0, 60000, 2000),
+    shutdownTimeoutMs: reader.integer('SHUTDOWN_TIMEOUT_MS', 1, 120000, 30000),
+    rateLimitUserMax: reader.integer('RATE_LIMIT_USER_MAX', 1, 1000000, 300),
+    rateLimitUserWindowSeconds: reader.integer('RATE_LIMIT_USER_WINDOW_S', 1, 3600, 10),
+    trustedProxyCidrs: reader.list(
+      'TRUSTED_PROXY_CIDRS',
+      'comma-separated IPv4 or IPv6 CIDR blocks, or empty',
+      isCidr,
+    ),
+    corsOrigins: reader.list(
+      'CORS_ORIGINS',
+      'comma-separated origins (scheme, lowercase host and optional port, no path), https:// or http:// only when NODE_ENV is not production, or empty; never *',
+      (item) => isOrigin(item, nodeEnv),
+    ),
+    replicaId: reader.optional('REPLICA_ID', '1 to 64 characters of A-Z a-z 0-9 . _ -', (value) =>
+      REPLICA_ID.test(value),
+    ),
+    migrationDatabaseUrl: reader.optional(
+      'MIGRATION_DATABASE_URL',
+      'a postgres:// or postgresql:// URL',
+      (value) => {
+        const url = urlOf(value);
+        return url !== undefined && isPostgresProtocol(url);
+      },
+    ),
     jwt,
   };
   // pg reads PGOPTIONS when the URL has no `options`, and sends it as the connection's options.
   reader.unset('PGOPTIONS', "unset, because pg would send it as the connection's options");
+  checkBudget(reader, config);
   reader.finish();
   return config;
 }

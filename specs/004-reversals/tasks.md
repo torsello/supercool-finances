@@ -43,8 +43,8 @@ These tasks run in the cross-spec order of plan 000 section 1 for 08-api: authen
 
 ## 09-hardening
 
-- [ ] Test first: REV-AC23 in `test/integration/reversals/concurrency.test.ts`, once the pool acquire, request and shutdown timeouts are configurable.
-- [ ] Update the docs: the OpenAPI description of the reversal route (body, response, every problem type of plan section 5, and that `reason` is never returned), the README section on corrections, and the Related ADRs of this spec.
+- [x] Test first: REV-AC23 in `test/integration/reversals/concurrency.test.ts`, once the pool acquire, request and shutdown timeouts are configurable.
+- [x] Update the docs: the OpenAPI description of the reversal route (body, response, every problem type of plan section 5, and that `reason` is never returned), the README section on corrections, and the Related ADRs of this spec.
 
 ## 10-runtime
 

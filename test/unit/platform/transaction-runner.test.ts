@@ -1,12 +1,17 @@
 import { EventEmitter } from 'node:events';
 import pg from 'pg';
 import { describe, expect, it } from 'vitest';
-import { RetriesExhausted } from '../../../src/platform/db/errors.js';
+import {
+  AccountLockTimeout,
+  IdempotencyWaitTimeout,
+  RetriesExhausted,
+} from '../../../src/platform/db/errors.js';
 import { toProblem } from '../../../src/platform/http/error-handler.js';
 import {
   backoffBound,
   TransactionRunner,
   type RunnerClient,
+  type TransactionObserver,
 } from '../../../src/platform/db/transaction-runner.js';
 
 function databaseError(code: string): pg.DatabaseError {
@@ -360,5 +365,32 @@ describe('transaction runner', () => {
     );
     expect(client.statements).toEqual([BEGIN, 'ROLLBACK']);
     expect(client.releases).toEqual([undefined]);
+  });
+
+  it('SEC-R41 counts a lock timeout only when its wait ended with SQLSTATE 55P03, as table 1.4 of spec 007 defines it', async () => {
+    const counted: string[] = [];
+    const observer: TransactionObserver = {
+      retried: () => undefined,
+      retriesExhausted: () => undefined,
+      lockTimeout: (lock) => {
+        counted.push(lock);
+      },
+    };
+    const client = new FakeClient();
+    const runner = new TransactionRunner({
+      pool: { connect: () => Promise.resolve(client) },
+      observer,
+    });
+    for (const error of [
+      new IdempotencyWaitTimeout({ cause: databaseError('55P03') }),
+      // The key-wait deadline ran out without a lock wait: answered 409, not counted.
+      new IdempotencyWaitTimeout(),
+      new AccountLockTimeout({ cause: databaseError('55P03') }),
+    ]) {
+      await expect(runner.run(() => Promise.reject(error), { retry: 'movement' })).rejects.toBe(
+        error,
+      );
+    }
+    expect(counted).toEqual(['idempotency', 'account']);
   });
 });

@@ -2106,10 +2106,11 @@ paths:
         repeat with the same key and body answers the stored response with
         `Idempotent-Replayed: true`; the same key with another body answers 422
         `/problems/idempotency-key-reused`; while the first request is still
-        running, 409 `/problems/request-in-progress`. Answers 201 with
-        `Location: /v1/transactions/{id}`. A lock or retry that runs out answers
-        503 `/problems/service-unavailable` with `Retry-After: 1`; retry with
-        the same key."
+        running, 409 `/problems/request-in-progress` with `Retry-After: 1`:
+        retry with the same key. Answers 201 with `Location:
+        /v1/transactions/{id}`. A lock or retry that runs out answers 503
+        `/problems/service-unavailable` with `Retry-After: 1`; retry with the
+        same key."
       requestBody:
         required: true
         content:
@@ -2451,10 +2452,10 @@ paths:
         answers the stored response with `Idempotent-Replayed: true`; the same
         key with another body answers 422 `/problems/idempotency-key-reused`;
         while the first request is still running, 409
-        `/problems/request-in-progress`. Answers 201 with `Location:
-        /v1/transactions/{id}`. A lock or retry that runs out answers 503
-        `/problems/service-unavailable` with `Retry-After: 1`; retry with the
-        same key."
+        `/problems/request-in-progress` with `Retry-After: 1`: retry with the
+        same key. Answers 201 with `Location: /v1/transactions/{id}`. A lock or
+        retry that runs out answers 503 `/problems/service-unavailable` with
+        `Retry-After: 1`; retry with the same key."
       requestBody:
         required: true
         content:
@@ -2816,10 +2817,11 @@ paths:
         and body answers the stored response with `Idempotent-Replayed: true`;
         the same key with another body answers 422
         `/problems/idempotency-key-reused`; while the first request is still
-        running, 409 `/problems/request-in-progress`. Answers 201 with
-        `Location: /v1/transactions/{id}`. A lock or retry that runs out answers
-        503 `/problems/service-unavailable` with `Retry-After: 1`; retry with
-        the same key."
+        running, 409 `/problems/request-in-progress` with `Retry-After: 1`:
+        retry with the same key. Answers 201 with `Location:
+        /v1/transactions/{id}`. A lock or retry that runs out answers 503
+        `/problems/service-unavailable` with `Retry-After: 1`; retry with the
+        same key."
       requestBody:
         required: true
         content:
@@ -3407,10 +3409,10 @@ paths:
         answers the stored response with `Idempotent-Replayed: true`; the same
         key with another body answers 422 `/problems/idempotency-key-reused`;
         while the first request is still running, 409
-        `/problems/request-in-progress`. Answers 201 with `Location:
-        /v1/transactions/{id}`. A lock or retry that runs out answers 503
-        `/problems/service-unavailable` with `Retry-After: 1`; retry with the
-        same key.'
+        `/problems/request-in-progress` with `Retry-After: 1`: retry with the
+        same key. Answers 201 with `Location: /v1/transactions/{id}`. A lock or
+        retry that runs out answers 503 `/problems/service-unavailable` with
+        `Retry-After: 1`; retry with the same key.'
       requestBody:
         required: true
         content:

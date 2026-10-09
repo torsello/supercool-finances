@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildProductionApp, type BuiltApp } from '../../support/app.js';
 import { balanceOf, closePools } from '../../support/db.js';
 import { createAccount, deposit, problemOf, reverse, transfer } from '../../support/http.js';
-import { idOf, reconciliation, users } from './support.js';
+import { idOf, reconciliation, reversalsOf, users } from './support.js';
 
 describe('a reversal racing a transfer', () => {
   let built: BuiltApp;
@@ -52,5 +52,45 @@ describe('a reversal racing a transfer', () => {
     const reconciled = await reconciliation();
     expect(reconciled.report.discrepancies).toEqual([]);
     expect(reconciled.exitCode).toBe(0);
+  });
+
+  it('REV-AC23 reversals and crossed transfers at the same time never deadlock: all 120 answer 201', async () => {
+    const burst = buildProductionApp({
+      env: {
+        DB_POOL_ACQUIRE_TIMEOUT_MS: '10000',
+        REQUEST_TIMEOUT_MS: '30000',
+        SHUTDOWN_TIMEOUT_MS: '30000',
+      },
+    });
+    try {
+      await burst.app.ready();
+      const u = users();
+      const a1 = await createAccount(burst.app, u.c1);
+      const b1 = await createAccount(burst.app, u.c2);
+      idOf(await deposit(burst.app, u.o1, a1.id, '100000'));
+      idOf(await deposit(burst.app, u.o1, b1.id, '100000'));
+      const originals: string[] = [];
+      for (let i = 0; i < 20; i += 1) {
+        originals.push(idOf(await transfer(burst.app, u.c1, a1.id, b1.id, '100')));
+      }
+      expect([await balanceOf(a1.id), await balanceOf(b1.id)]).toEqual(['98000', '102000']);
+
+      const responses = await Promise.all([
+        ...originals.map((id) => reverse(burst.app, u.o1, id)),
+        ...Array.from({ length: 50 }, () => transfer(burst.app, u.c1, a1.id, b1.id, '1000')),
+        ...Array.from({ length: 50 }, () => transfer(burst.app, u.c2, b1.id, a1.id, '1000')),
+      ]);
+
+      expect(responses).toHaveLength(120);
+      expect(responses.filter((response) => response.statusCode >= 500)).toEqual([]);
+      expect(responses.every((response) => response.statusCode === 201)).toBe(true);
+      expect([await balanceOf(a1.id), await balanceOf(b1.id)]).toEqual(['100000', '100000']);
+      for (const id of originals) expect(await reversalsOf(id)).toHaveLength(1);
+      const reconciled = await reconciliation();
+      expect(reconciled.report.discrepancies).toEqual([]);
+      expect(reconciled.exitCode).toBe(0);
+    } finally {
+      await burst.app.close();
+    }
   });
 });

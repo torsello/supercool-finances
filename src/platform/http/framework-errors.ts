@@ -4,6 +4,7 @@ import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 import { handleError, problemResponse, sendProblem, toProblem } from './error-handler.js';
 import { MalformedRequest, RouteNotFound } from './errors.js';
 import { REQUEST_ID_HEADER, setRequestIdHeader } from './request-id.js';
+import { SECURITY_HEADERS } from './security-headers.js';
 
 /**
  * The router's longest path parameter: Node's maximum header size, which also bounds the request
@@ -23,8 +24,10 @@ export function handleFrameworkError(
   request: FastifyRequest,
   reply: FastifyReply,
 ): void {
-  // The router answers before the `onRequest` hook that sets the header, so it is set here (SYS-R21).
+  // The router answers before the `onRequest` hooks that set the correlation id and the security
+  // headers, so they are set here (SYS-R21, SEC-R14).
   setRequestIdHeader(reply, request.id);
+  void reply.headers(SECURITY_HEADERS);
   if (error.code === 'FST_ERR_BAD_URL' || error.code === 'FST_ERR_MAX_PARAM_LENGTH') {
     void sendProblem(reply, problemResponse(toProblem(new RouteNotFound()), request.id));
     return;
@@ -47,8 +50,8 @@ interface ClientError extends Error {
  * answers 400 `/problems/malformed-request` whatever Node reports (an invalid request line or
  * header, headers above the maximum size, or a request not received in time), the one status spec
  * 000 and plan 000 section 7 give that type. The body comes from `toProblem` and the registry, with
- * an id from the app's request id generator, also sent as `X-Request-Id` (SYS-R21, SYS-R24,
- * SYS-R26). Like Fastify's default, it answers nothing on a reset or destroyed socket and then
+ * an id from the app's request id generator, also sent as `X-Request-Id`, and the security headers
+ * of every response (SYS-R21, SYS-R24, SYS-R26, SEC-R14). Like Fastify's default, it answers nothing on a reset or destroyed socket and then
  * destroys it.
  */
 export function clientErrorHandler(): (
@@ -62,7 +65,11 @@ export function clientErrorHandler(): (
     const requestId = this.genReqId(new IncomingMessage(socket));
     const response = problemResponse(toProblem(new MalformedRequest('request')), requestId);
     if (socket.writable) {
-      const headers = Object.entries({ ...response.headers, [REQUEST_ID_HEADER]: requestId })
+      const headers = Object.entries({
+        ...SECURITY_HEADERS,
+        ...response.headers,
+        [REQUEST_ID_HEADER]: requestId,
+      })
         .map(([name, value]) => `${name}: ${value}\r\n`)
         .join('');
       socket.write(
