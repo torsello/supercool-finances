@@ -131,4 +131,15 @@ describe('docs links (DEP-R47)', () => {
     const repo = repository({ 'docs/with space.md': '# A\n' });
     expect(linkFailures('README.md', '[x](docs/with%20space.md#a)', repo)).toEqual([]);
   });
+
+  it('DEP-R47 reports an anchor that is not valid percent-encoding at its file and line, without throwing', () => {
+    const repo = repository({ 'docs/guide.md': '# Guide\n' });
+    expect(linkFailures('README.md', '# T\n\n[x](docs/guide.md#100%)', repo)).toEqual([
+      {
+        file: 'README.md',
+        line: 3,
+        message: 'docs/guide.md#100%: the anchor is not valid percent-encoding',
+      },
+    ]);
+  });
 });

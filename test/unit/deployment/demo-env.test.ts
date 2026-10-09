@@ -62,7 +62,7 @@ async function run(seed: DemoEnvSeed) {
 }
 
 describe('make demo-env', () => {
-  it('DEP-AC36 prints the four assignments of the Quickstart, and nothing on a failed or incomplete seed', async () => {
+  it('DEP-AC36 prints the four assignments of the Quickstart, and nothing on a failed, incomplete or malformed seed', async () => {
     const ok = await run(async (stdout) => {
       stdout.write(seedOutput());
       return await Promise.resolve(0);
@@ -100,6 +100,15 @@ describe('make demo-env', () => {
     expect(incomplete.code).not.toBe(0);
     expect(incomplete.stdout).toBe('');
     expect(incomplete.stderr).toContain('demo-customer-2');
+
+    // An account id that is not a UUID would reach the shell of `eval "$(make demo-env)"`.
+    const injected = await run(async (stdout) => {
+      stdout.write(seedOutput().replace(A, "x'; touch pwned; '"));
+      return await Promise.resolve(0);
+    });
+    expect(injected.code).not.toBe(0);
+    expect(injected.stdout).toBe('');
+    expect(injected.stderr).toContain('no valid JSON');
 
     const makefile = readRepositoryFile('Makefile').split('\n');
     const start = makefile.findIndex((line) => line.startsWith('demo-env:'));

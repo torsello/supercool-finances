@@ -8,11 +8,30 @@ The challenge asks for every prompt used with an AI along with every response. T
 ## How a session works
 
 1. A fresh session per phase, so each one starts from the repository and `AGENTS.md`, not from earlier chat history.
-2. I write the prompts; the AI implements.
+2. I write or approve every prompt, many of them drafted with a separate Claude chat (see What the AI did and what I decided); the AI implements.
 3. I review the output and ask for changes.
 4. `/audit` runs an independent, read-only review in a separate agent that has not seen the conversation.
 5. `/export` saves the transcript to `transcripts/`.
 6. `/ship` runs the quality gates, commits and pushes the phase branch. When a phase closes, it also opens the pull request to `main`, which I merge once CI is green.
+
+## What the AI did and what I decided
+
+**How I worked.** I treated the AI as the implementation team and kept the decisions. Each phase started from a written spec with acceptance criteria, and from an ADR for each significant choice. Claude Code implemented it test-first under the rules of AGENTS.md. An independent agent that had not seen the session audited the result, and /ship committed it only after the quality gates passed. Any change to an approved spec needed my approval, recorded with its date in section 11 of plan 000.
+
+**What the AI did.**
+- Claude Code wrote the code, the tests, the Terraform, the CI pipeline and the documentation, following the specs.
+- The /audit agent reviewed each phase against the specs and ADRs; I decided which findings were fixed before shipping.
+- A separate Claude chat helped me plan the phases, draft the prompts I gave Claude Code (all of them are in the transcripts), and review each result and each audit before I approved it.
+
+**What I decided.** The main decisions:
+- PostgreSQL as the only source of truth, although the challenge allowed in-memory storage: money needs transactions, row locks and constraints shared by several replicas ([ADR-0005](../adr/0005-postgresql-as-the-only-source-of-truth.md)).
+- A modular monolith with hexagonal modules instead of microservices: one transactional boundary for money, with seams that allow a later split ([ADR-0002](../adr/0002-modular-monolith.md), [ADR-0003](../adr/0003-hexagonal-architecture-with-tactical-ddd.md)).
+- A double-entry ledger in integer minor units, and idempotency inside the same transaction as the movement ([ADR-0006](../adr/0006-double-entry-ledger-with-signed-integer-minor-units.md), [ADR-0009](../adr/0009-idempotency-inside-the-movements-transaction.md)).
+- Two replicas behind a load balancer from the start, so that concurrency and retries are tested across processes, not assumed.
+- AWS on ECS Fargate with RDS, described in Terraform that CI validates against policies and that this repository never applies ([ADR-0014](../adr/0014-aws-deployment-on-ecs-fargate-with-rds-postgresql.md), [ADR-0015](../adr/0015-terraform-for-infrastructure-as-code.md)).
+- Dashboards and error reporting as opt-in extras, off by default, and no product-analytics tool for a money service ([ADR-0023](../adr/0023-optional-observability-off-by-default.md)). No demo UI, to spend the time on the backend.
+
+**How I checked.** Beyond the gates and the audits, I exercised the running stack by hand (Swagger UI, curl scenarios, Grafana) and reviewed every result with the advisor chat before approving it. When CI failed, I asked for the cause before the fix: for example, the load test's 503s on a two-CPU CI runner came from capacity, so CI runs it at 100 requests per second while the local benchmark stays at 200.
 
 ## Sessions
 
@@ -28,7 +47,7 @@ The challenge asks for every prompt used with an AI along with every response. T
 | 02 part 5 | 2026-10-07 | [02-specs-part5.txt](transcripts/02-specs-part5.txt) | Specs, part 5: cross-spec review of specs 000-008, the owner's answers to every open question folded into the specs as rules, eight overview ACs retired, all specs set to Approved, an audit round and its fixes, including a traceability gate that accepts a CI script only as the whole command of a step, and `/ship` closing the phase. |
 | 03 | 2026-10-08 | [03-adrs.txt](transcripts/03-adrs.txt) | ADRs: twenty decisions 0001-0020 with the owner's reasoning, alternatives and consequences, the ADR index, links to and from every spec, the AWS RDS Proxy pinning source checked, and three audit rounds and their fixes. |
 | 04 | 2026-10-08 | [04-plans.txt](transcripts/04-plans.txt) | Plans: plan.md and tasks.md for specs 000-008 with every AC placed in a phase and a test file, owner-approved spec fixes, ADR-0021 (statement-timeout function) and ADR-0022 (request timeout: answer first, then roll back), the `yaml` dev dependency, and seven audit rounds and their fixes. |
-| 05 | 2026-10-08 | [05-schema.txt](transcripts/05-schema.txt) | Schema: the owner and runtime roles, eight SQL migrations (role settings, session functions, accounts, ledger with deferred and append-only triggers, settlement accounts, audit records, idempotency keys, readiness grant), the Kysely instance with exact int8 and numeric strings, test helpers, the database-check ACs, down migrations proven, and an audit round with six fixes.
+| 05 | 2026-10-08 | [05-schema.txt](transcripts/05-schema.txt) | Schema: the owner and runtime roles, eight SQL migrations (role settings, session functions, accounts, ledger with deferred and append-only triggers, settlement accounts, audit records, idempotency keys, readiness grant), the Kysely instance with exact int8 and numeric strings, test helpers, the database-check ACs, down migrations proven, and an audit round with six fixes. |
 | 06 part 1 | 2026-10-08 | [06-domain-part1.txt](transcripts/06-domain-part1.txt) | Domain, part 1: the accounts module, the transaction runner and unit of work, module lint rules, the ledger, money movements and reconciliation domain with tests first. |
 | 06 part 2 | 2026-10-08 | [06-domain-part2.txt](transcripts/06-domain-part2.txt) | Domain, part 2: the reversals domain (`reversalOf`, reversal rules, the `Reversals` use case with its test seam, the 23505 mapping to `AlreadyReversed`), lock-wait and racing tests, an audit round with four Low fixes, and ADR follow-ups marked done. |
 | 07 | 2026-10-08 | [07-idempotency.txt](transcripts/07-idempotency.txt) | Idempotency: the key parser, RFC 8785 fingerprint, stored-outcome table and idempotent runner with the shared key-wait budget, the Kysely key store, the cleanup command and its `src/cli/` entry point, keyed wiring of account creation, movements and reversals, and an audit round with three Low fixes. |
@@ -43,3 +62,4 @@ The challenge asks for every prompt used with an AI along with every response. T
 | 12b | 2026-10-09 | [12b-observability.txt](transcripts/12b-observability.txt) | Observability: ADR-0023 and the owner-approved changes to specs 007 and 008, optional error reporting of the 500s to a Sentry-compatible endpoint (own client on Node's `fetch`, allowlisted event, scrubbed message, bounded and off by default), the `observability` Compose profile with Prometheus and Grafana and its dashboard, the `compose.error-reporting.yaml` override, `make observability`, and the SEC-AC40 to SEC-AC46 and DEP-AC31 to DEP-AC34 tests. |
 | 13 part 1 | 2026-10-09 | [13-final-review-part1.txt](transcripts/13-final-review-part1.txt) | Final review, part 1: the fixes of the `/audit` of 12b-observability (the reporter frees its slot at 2000 ms, multi-line messages never sent as frames, stricter `SENTRY_DSN`, tests without fixed sleeps, plan 007), SEC-R56 and SEC-AC47 (every counter of table 1.4 at 0 from startup) and the `or vector(0)` of the errors panels. |
 | 13 part 2 | 2026-10-09 | [13-final-review-part2.txt](transcripts/13-final-review-part2.txt) | Final review, part 2: a check of all 238 ACs against their code and tests by six parallel reviewers, the weak assertions and unset Givens they found fixed (SYS, ACC, LED, REV, IDM, SEC and DEP ACs), the DEP-AC26 checkov policies tightened and mutation-tested, spec 007 run with its default rate limit, the owner-approved rewordings of sections 1.6 and 1.9 of spec 007, every spec set to `Implemented`, and `docs/traceability.md` committed with a freshness check in the CI job `traceability`. |
+| 14 part 1 | 2026-10-09 | [14-docs-part1.txt](transcripts/14-docs-part1.txt) | Docs, part 1: the README rewritten as the project's front page with diagrams and a Quickstart run against the stack, the architecture, API guide (with `requests.http` and a Postman collection), observability, security, development and limitations docs and the CHANGELOG, `make demo-env`, `npm run docs:check` and its CI job, a lost database connection answered 503 instead of 500 (SEC-AC48, SEC-AC49), the owner-approved DEP-AC36 to DEP-AC38, and `/ship`. |

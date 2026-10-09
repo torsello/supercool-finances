@@ -54,7 +54,7 @@ The stack needs no `.env`: its values are literals in `compose.yaml`.
 
 ## npm scripts
 
-Every script of [package.json](../package.json). Scripts that read `.env` load it with `--env-file-if-exists`, so a variable already set in the environment wins.
+Every script of [package.json](../package.json). The scripts that read `.env` load it with `--env-file-if-exists`, and the Vitest scripts through `process.loadEnvFile` in `vitest.config.ts`; either way a variable already set in the environment wins.
 
 | Script                | What it does                                                                                                                                                                                      | Prerequisites                                                           |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |

@@ -184,17 +184,17 @@ Neither scales on its own:
 
 ## Deployment and migration steps
 
-Placeholders: `<region>`, `<cluster>` (output `cluster_name`), `<subnets>` (output `private_subnet_ids`, comma-separated), `<one-off-sg>` (output `one_off_db_security_group_id`), `<tag>` (the image tag).
+Placeholders: `<region>`, `<cluster>` (output `cluster_name`), `<subnets>` (output `private_subnet_ids`, comma-separated), `<one-off-sg>` (output `one_off_db_security_group_id`), `<tasks-sg>` (output `tasks_security_group_id`), `<ecr>` (output `ecr_repository_url`), `<tag>` (the image tag).
 
 ### First deployment
 
-1. Configure the state backend outside the repository. `backend.tf` is an empty `s3` block; give it a bucket with versioning and S3's native locking, for example `terraform init -backend-config="bucket=<state-bucket>" -backend-config="key=supercool-finances/terraform.tfstate" -backend-config="region=<region>" -backend-config="encrypt=true" -backend-config="use_lockfile=true"`. Copy `example.tfvars` to a variables file of the environment.
+1. Configure the state backend outside the repository. `backend.tf` is an empty `s3` block; give it a bucket with versioning and S3's native locking, for example `terraform init -backend-config="bucket=<state-bucket>" -backend-config="key=supercool-finances/terraform.tfstate" -backend-config="region=<region>" -backend-config="encrypt=true" -backend-config="use_lockfile=true"`. Copy `example.tfvars` to `terraform.tfvars`, which Terraform loads on its own (or pass `-var-file=<file>` to every command below), and fill in its values.
 2. Create the secrets first, because the cache module reads the Redis token while it is applied: `terraform apply -target=module.secrets`.
 3. Put every value of the table of the Secrets section with `aws secretsmanager put-secret-value --secret-id <name> --secret-string <value>`, generating passwords and tokens with `aws secretsmanager get-random-password --exclude-punctuation --password-length 40`. The Redis secret's `url` cannot be known yet: put `{"auth_token": "<token>", "url": "pending"}`.
 4. Create the certificate alone, `terraform apply -target=module.edge.aws_acm_certificate.this`, and publish the DNS records of the output `certificate_validation_records` in the domain's zone. AWS refuses an HTTPS listener whose certificate is not issued, so this comes before the edge is applied.
 5. Apply everything but the service, so that no task starts before the schema exists: `terraform apply -target=module.network -target=module.edge -target=module.database -target=module.cache -target=module.observability`. The edge waits on `aws_acm_certificate_validation` until ACM has issued the certificate, then creates the HTTPS listener with it.
 6. Write the Redis `url` from the output `redis_primary_endpoint`, with the same token, and point the domain at `alb_dns_name`.
-7. Create the ECR repository, `terraform apply -target=module.service.aws_ecr_repository.this`, then build the image's runtime stage for the `cpu_architecture` of the variables and push it to the output `ecr_repository_url`: `docker build --target runtime -t <ecr>:<tag> .` and `docker push <ecr>:<tag>`.
+7. Create the ECR repository, `terraform apply -target=module.service.aws_ecr_repository.this`, then log in to it, build the image's runtime stage for the `cpu_architecture` of the variables and push it: `aws ecr get-login-password --region <region> | docker login --username AWS --password-stdin <ecr>`, `docker build --platform linux/amd64 --target runtime -t <ecr>:<tag> .` (`linux/arm64` when `cpu_architecture` is `ARM64`) and `docker push <ecr>:<tag>`.
 8. Register the one-off task definitions with that tag: `terraform apply -var image_tag=<tag> -target=module.service.aws_ecs_task_definition.bootstrap -target=module.service.aws_ecs_task_definition.migrate`.
 9. Run the bootstrap task once (below). It creates `scf_owner` (`LOGIN CREATEROLE`) and `scf_app` (`LOGIN`) with the passwords of their secrets, grants `scf_app` to `scf_owner` `WITH ADMIN TRUE, INHERIT FALSE, SET FALSE` and gives the database to `scf_owner`, as `docker/postgres/init/01-databases.sql` does locally (section 1.7 of spec 008, ADR-0018). The RDS master credentials are used for nothing else.
 10. Run the migration task (below) and wait for exit code 0.
@@ -214,13 +214,13 @@ aws ecs describe-tasks --cluster <cluster> --tasks "$task_arn" \
   --query 'tasks[0].containers[0].exitCode' --output text   # must print 0
 ```
 
-The same with `--task-definition scf-bootstrap` runs the bootstrap. A failure prints one line in the task's log group (`/scf/migrate` or `/scf/bootstrap`) with the SQLSTATE or the variable at fault, never a password.
+The same with `--task-definition scf-bootstrap` runs the bootstrap. To run the idempotency cleanup by hand, use `--task-definition scf-idempotency-cleanup` with `securityGroups=[<tasks-sg>]`: it connects through RDS Proxy, which the `one-off-db` group cannot reach. A failure prints one line in the task's log group (`/scf/migrate` or `/scf/bootstrap`) with the SQLSTATE or the variable at fault, never a password.
 
 ### Every deployment
 
 The pipeline runs, in order, and stops at the first failure:
 
-1. Build and push the image with a new, immutable tag.
+1. Build and push the image with a new, immutable tag, for the platform of `cpu_architecture`, as in step 7 of the first deployment.
 2. Register the migration task definition of that tag: `terraform apply -var image_tag=<tag> -target=module.service.aws_ecs_task_definition.migrate`.
 3. Run the migration task and require exit code 0, as `depends_on` does locally. Migrations are expand-then-contract ([ADR-0020](../adr/0020-expand-then-contract-migrations.md)), so the running version keeps working on the new schema, and readiness accepts migrations newer than the code (SEC-R24). A failed migration stops the deployment with the old version still serving.
 4. Apply with the new tag: `terraform apply -var image_tag=<tag>`. ECS starts the new tasks, waits for the ALB to see them healthy, then deregisters and drains the old ones: each gets SIGTERM, keeps serving for `SHUTDOWN_DRAIN_DELAY_MS`, finishes its requests within `SHUTDOWN_TIMEOUT_MS` and is killed only after the 40 s `stopTimeout`.
@@ -271,11 +271,7 @@ Either way the rollout is the same rolling deployment, with the same draining. W
 
 ### Rotating a secret
 
-- `JWT_SECRET`, `CURSOR_SECRET`: put the new value, then `aws ecs update-service --cluster <cluster> --service scf-api --force-new-deployment`. Tokens and cursors signed with the old value stop being accepted.
-- The owner role's password (`scf/db-owner`): put the new value and run the bootstrap task, which sets both roles' passwords to their secrets' current values. Only the migration and bootstrap tasks use it, so nothing is interrupted.
-- The runtime role's password (`scf/db-runtime`): this interrupts new database connections until the redeploy finishes, so it is done in a maintenance window. RDS Proxy checks a client's password against the secret's current value, and opens database connections with it, while the running tasks keep the old `PGPASSWORD` until they are replaced. In this order, which keeps the window shortest: register the bootstrap task definition beforehand; put the new value; run the bootstrap task at once, so the database accepts the new password and the proxy can open connections again; force a new deployment at once with `aws ecs update-service --cluster <cluster> --service scf-api --force-new-deployment` and wait for `aws ecs wait services-stable`. Until each old task is replaced, its new pool connections are refused, so requests may answer 503; connections it already holds keep working. A cleanup run that falls in the window fails and the next hour's run catches up. The follow-up that removes the window is an alternating two-user rotation: two login users for the runtime role, with the secret switching between them, so the old password stays valid until every task has the new one.
-- The Redis token: put the new `auth_token` and `url`, raise `redis_auth_token_version` and apply, then force a new deployment.
-- The RDS master password: RDS rotates it in its own secret; only the bootstrap task reads it.
+Each secret's procedure, what it interrupts and how to verify it are in the [secret rotation runbook](../runbooks/secret-rotation.md). In short: `JWT_SECRET` and `CURSOR_SECRET` need a forced redeploy, and the token issuer switches together with the tasks; the owner role's password needs only the bootstrap task; the runtime role's password interrupts new database connections until the redeploy ends, so it is done in a maintenance window; the Redis token needs `redis_auth_token_version` raised, an apply and a redeploy; RDS rotates the master password itself.
 
 ### Refreshing the RDS CA bundle
 
@@ -283,7 +279,7 @@ Either way the rollout is the same rolling deployment, with the same draining. W
 
 ## Failure modes
 
-What each loss does to requests and to money, and how the deployment recovers.
+What each loss does to requests and to money, and how the deployment recovers. The operational procedures are in the runbooks: [database](../runbooks/database.md) (failover and the RDS alarms), [capacity](../runbooks/capacity.md), [timeouts and 503](../runbooks/timeouts-and-503.md), [rate limits](../runbooks/rate-limits.md), [deploy and migrate](../runbooks/deploy-and-migrate.md) and [secret rotation](../runbooks/secret-rotation.md).
 
 | Failure              | Detected by                                                                                | Recovery                                                          | The client sees                                                           |
 | -------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------- |

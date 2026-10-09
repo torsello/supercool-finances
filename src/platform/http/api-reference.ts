@@ -58,7 +58,7 @@ const REPLAY: Readonly<Partial<Record<DocumentedProblemType, string>>> = {
   '/problems/transaction-not-reversible': STORED,
   '/problems/insufficient-funds-for-reversal': STORED,
   '/problems/service-unavailable':
-    'no, except at the request timeout after the `COMMIT` was sent: if it committed, a retry with the same key gets the stored response',
+    'no, except at the request timeout after the `COMMIT` was sent, or a connection lost during `COMMIT`: if it committed, a retry with the same key gets the stored response',
   '/problems/upstream-unavailable':
     'not by the load balancer; if the movement committed, a retry with the same key gets its stored response',
 };
@@ -104,7 +104,7 @@ const WHEN: Readonly<Record<DocumentedProblemType, string>> = {
   '/problems/rate-limited':
     "Too many requests. One user sent more than `RATE_LIMIT_USER_MAX` (300 by default) authenticated requests within a window of `RATE_LIMIT_USER_WINDOW_S` (10 by default) seconds that starts at the user's first request, refused ones and replays included; `Retry-After` is the whole seconds left in the window. Or one client IP passed the per-IP limit in front of the service: nginx answers with `Retry-After: 1`, and AWS WAF with `Retry-After: 60` and a body of content type `application/json` without `requestId`. Nothing is changed or stored: wait `Retry-After` seconds before sending more requests.",
   '/problems/service-unavailable':
-    'A transient condition of a replica, with `Retry-After: 1`: no database connection free within `DB_POOL_ACQUIRE_TIMEOUT_MS`, or in AWS none free at RDS Proxy within its 5 s borrow timeout, an account lock not acquired in time, a deadlock or serialization failure still present after 3 attempts, a statement timeout, the request timeout `REQUEST_TIMEOUT_MS` (25 s by default) reached, or the replica shutting down. Nothing is stored, and the transaction rolls back; only when the request timeout comes after the `COMMIT` was sent does that commit finish, with an outcome unknown to the client. Retry after `Retry-After`, with the same `Idempotency-Key` for a POST, which then gets the stored response if the movement committed.',
+    'A transient condition of a replica, with `Retry-After: 1`: no database connection free within `DB_POOL_ACQUIRE_TIMEOUT_MS`, or in AWS none free at RDS Proxy within its 5 s borrow timeout, an account lock not acquired in time, a deadlock or serialization failure still present after 3 attempts, a statement timeout, a database connection lost while a statement ran (SEC-R57), the request timeout `REQUEST_TIMEOUT_MS` (25 s by default) reached, or the replica shutting down. Nothing is stored, and the transaction rolls back; only at the request timeout after the `COMMIT` was sent, or for a connection lost during `COMMIT`, may the commit have succeeded, with an outcome unknown to the client. Retry after `Retry-After`, with the same `Idempotency-Key` for a POST, which then gets the stored response if the movement committed.',
   '/problems/upstream-unavailable':
     'Answered by the load balancer, not by a replica: no replica answered, one sent a broken response, or none answered in time. Locally nginx answers it as problem details; in AWS the ALB answers its own 502, 503 and 504 as `text/html` without a problem body, `Retry-After` or `X-Request-Id`, so a client keys on the status, as the retry policy does. The outcome of a POST is unknown: retry after `Retry-After` (1 second) with the same `Idempotency-Key`, which answers the stored response if the movement committed.',
 };

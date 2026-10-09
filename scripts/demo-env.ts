@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { issueToken } from '../src/modules/auth/index.js';
+import { CURRENCIES } from '../src/modules/ledger/index.js';
 import { ConfigError, loadAuthConfig, type Environment } from '../src/platform/config/config.js';
 import { DEMO_USERS, fetchHttp, runSeed, SEED_API_URL } from './seed.js';
 
@@ -28,7 +29,10 @@ const SeedOutputSchema = z.object({
   users: z.array(
     z.object({
       name: z.string(),
-      accounts: z.array(z.object({ id: z.string(), currency: z.string() })),
+      // The ids reach the shell of `eval "$(make demo-env)"`, so only UUIDs pass.
+      accounts: z.array(
+        z.object({ id: z.uuid(), currency: z.enum(CURRENCIES.map((currency) => currency.code)) }),
+      ),
     }),
   ),
 });
@@ -87,7 +91,7 @@ export async function runDemoEnv(options: DemoEnvOptions): Promise<0 | 1> {
       A: a,
       B: b,
     };
-    // Every value is a JWT or a UUID, so single quotes need no escaping.
+    // Every value is a JWT or a UUID checked above, so single quotes need no escaping.
     stdout.write(
       Object.entries(assignments)
         .map(([name, value]) => `${name}='${value}'\n`)

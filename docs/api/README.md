@@ -1,6 +1,6 @@
 # API guide
 
-For API clients: how to authenticate, send money movements safely, page through lists and read errors. The reference for every field is the OpenAPI document, [openapi.yaml](openapi.yaml), also served with Swagger UI at `/docs` on a running stack. The endpoint table and the request lifecycle diagram are in the [README](../../README.md#api-overview), and every request below is ready to run from [requests.http](requests.http) or the [Postman collection](#postman-collection).
+For API clients: how to authenticate, send money movements safely, page through lists and read errors. The reference for every field is the OpenAPI document, [openapi.yaml](openapi.yaml), also served with Swagger UI at `/docs` on a running stack. The endpoint table and the request lifecycle diagram are in the [README](../../README.md#api-overview), and every endpoint is ready to run from [requests.http](requests.http) or the [Postman collection](#postman-collection).
 
 The examples run against the local stack of the [Quickstart](../../README.md#quickstart), from a fresh `docker compose up --build --wait`, and show real responses. Ids, timestamps and request ids differ on every run.
 
@@ -19,7 +19,7 @@ The examples run against the local stack of the [Quickstart](../../README.md#qui
 | Topic        | Rule                                                                                                                                                                                                                              |
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Base path    | Every endpoint is under `/v1`. The health checks (`/health/live`, `/health/ready`) and the documentation (`/docs`, `/docs/json`) are outside it and need no token.                                                                |
-| Bodies       | `Content-Type: application/json` (UTF-8), at most 16384 bytes. Unknown members are refused with 422.                                                                                                                              |
+| Bodies       | `Content-Type: application/json` (UTF-8), at most 16384 bytes. Unknown members are refused with 422. In AWS, the WAF common rule set answers 403 to bodies above 8 KB before they reach the service.                              |
 | Amounts      | Strings of decimal digits in minor units, never JSON numbers ([ADR-0011](../adr/0011-amounts-as-strings-in-the-api-and-bigint-in-the-domain.md)): `"1050"` is 10.50 EUR. A ledger entry's amount is signed: `"-1050"` is a debit. |
 | Currencies   | `USD`, `MXN`, `EUR` and `COP` have 2 decimal places; `JPY` has none, so `"1050"` JPY is 1050 yen. A deposit, withdrawal or transfer is at most `MAX_AMOUNT_MINOR` (100000000000 by default).                                      |
 | Ids          | UUIDv7 strings. An id in the path that is not a UUID answers 404, as an unknown one does.                                                                                                                                         |
@@ -118,8 +118,8 @@ C=$ID
 ```text
 HTTP/1.1 201 Created
 Content-Type: application/json; charset=utf-8
-location: /v1/accounts/01a12126-dbe3-7510-872d-e1aea0094766
-{"id":"01a12126-dbe3-7510-872d-e1aea0094766","currency":"COP","status":"active","balance":"0","createdAt":"2026-10-09T14:52:37.218Z","updatedAt":"2026-10-09T14:52:37.218Z"}
+location: /v1/accounts/01a1213e-9c8e-71e4-8fb8-410e01a911f2
+{"id":"01a1213e-9c8e-71e4-8fb8-410e01a911f2","currency":"COP","status":"active","balance":"0","createdAt":"2026-10-09T15:18:33.869Z","updatedAt":"2026-10-09T15:18:33.869Z"}
 ```
 
 ### List your accounts
@@ -135,10 +135,10 @@ call "$BASE/v1/accounts?limit=2&cursor=$CURSOR" -H "Authorization: Bearer $TOKEN
 ```text
 HTTP/1.1 200 OK
 Content-Type: application/json; charset=utf-8
-{"items":[{"id":"01a12126-dbe3-7510-872d-e1aea0094766","currency":"COP","status":"active","balance":"0","createdAt":"2026-10-09T14:52:37.218Z","updatedAt":"2026-10-09T14:52:37.218Z"},{"id":"01a12126-dace-77e5-939e-a334d298417a","currency":"USD","status":"active","balance":"100000","createdAt":"2026-10-09T14:52:36.941Z","updatedAt":"2026-10-09T14:52:36.949Z"}],"nextCursor":"eyJsIjoiYWNjb3VudHMiLCJ1IjoiMDE5MmYwYTAtMDAwMC03MDAwLTgwMDAtMDAwMDAwMDBkMGMxIiwidCI6IjIwMjYtMTAtMDlUMTQ6NTI6MzYuOTQxNjgxWiIsImkiOiIwMWExMjEyNi1kYWNlLTc3ZTUtOTM5ZS1hMzM0ZDI5ODQxN2EifRh-p3rpEoP_CYnI3Dx-1uSedRuGWU_zm8Al0qSvCWTP"}
+{"items":[{"id":"01a1213e-9c8e-71e4-8fb8-410e01a911f2","currency":"COP","status":"active","balance":"0","createdAt":"2026-10-09T15:18:33.869Z","updatedAt":"2026-10-09T15:18:33.869Z"},{"id":"01a1213e-9ba7-70da-97d5-45fcd21b5f91","currency":"USD","status":"active","balance":"100000","createdAt":"2026-10-09T15:18:33.638Z","updatedAt":"2026-10-09T15:18:33.646Z"}],"nextCursor":"eyJsIjoiYWNjb3VudHMiLCJ1IjoiMDE5MmYwYTAtMDAwMC03MDAwLTgwMDAtMDAwMDAwMDBkMGMxIiwidCI6IjIwMjYtMTAtMDlUMTU6MTg6MzMuNjM4ODQ0WiIsImkiOiIwMWExMjEzZS05YmE3LTcwZGEtOTdkNS00NWZjZDIxYjVmOTEifYRFmINy9KH37C0SedLBxCVeb0MpNKqa5LdHJbpfH1wu"}
 HTTP/1.1 200 OK
 Content-Type: application/json; charset=utf-8
-{"items":[{"id":"01a12126-dab2-768b-badc-2cb8c8b645a1","currency":"EUR","status":"active","balance":"250000","createdAt":"2026-10-09T14:52:36.909Z","updatedAt":"2026-10-09T14:52:36.933Z"}]}
+{"items":[{"id":"01a1213e-9b87-71a0-bdd6-8009c7a1a8eb","currency":"EUR","status":"active","balance":"250000","createdAt":"2026-10-09T15:18:33.601Z","updatedAt":"2026-10-09T15:18:33.630Z"}]}
 ```
 
 ### Read an account
@@ -153,10 +153,10 @@ call $BASE/v1/accounts/$A -H "Authorization: Bearer $OPERATOR_TOKEN"
 ```text
 HTTP/1.1 200 OK
 Content-Type: application/json; charset=utf-8
-{"id":"01a12126-dab2-768b-badc-2cb8c8b645a1","currency":"EUR","status":"active","balance":"250000","createdAt":"2026-10-09T14:52:36.909Z","updatedAt":"2026-10-09T14:52:36.933Z"}
+{"id":"01a1213e-9b87-71a0-bdd6-8009c7a1a8eb","currency":"EUR","status":"active","balance":"250000","createdAt":"2026-10-09T15:18:33.601Z","updatedAt":"2026-10-09T15:18:33.630Z"}
 HTTP/1.1 200 OK
 Content-Type: application/json; charset=utf-8
-{"id":"01a12126-dab2-768b-badc-2cb8c8b645a1","currency":"EUR","status":"active","balance":"250000","createdAt":"2026-10-09T14:52:36.909Z","updatedAt":"2026-10-09T14:52:36.933Z","ownerId":"0192f0a0-0000-7000-8000-00000000d0c1"}
+{"id":"01a1213e-9b87-71a0-bdd6-8009c7a1a8eb","currency":"EUR","status":"active","balance":"250000","createdAt":"2026-10-09T15:18:33.601Z","updatedAt":"2026-10-09T15:18:33.630Z","ownerId":"0192f0a0-0000-7000-8000-00000000d0c1"}
 ```
 
 ### Deposit
@@ -172,8 +172,8 @@ DEPOSIT=$ID
 ```text
 HTTP/1.1 201 Created
 Content-Type: application/json; charset=utf-8
-location: /v1/transactions/01a12126-dc49-7187-8274-85e4fe334e84
-{"id":"01a12126-dc49-7187-8274-85e4fe334e84","kind":"deposit","amount":"5000","currency":"EUR","createdAt":"2026-10-09T14:52:37.322Z"}
+location: /v1/transactions/01a1213e-9cf8-7120-bea5-ec65f4649e9d
+{"id":"01a1213e-9cf8-7120-bea5-ec65f4649e9d","kind":"deposit","amount":"5000","currency":"EUR","createdAt":"2026-10-09T15:18:33.977Z"}
 ```
 
 ### Withdraw
@@ -188,8 +188,8 @@ call -X POST $BASE/v1/accounts/$A/withdrawals -H "Authorization: Bearer $TOKEN" 
 ```text
 HTTP/1.1 201 Created
 Content-Type: application/json; charset=utf-8
-location: /v1/transactions/01a12126-dbb3-7459-b0ee-99bbfe9ec7e0
-{"id":"01a12126-dbb3-7459-b0ee-99bbfe9ec7e0","kind":"withdrawal","amount":"2000","currency":"EUR","createdAt":"2026-10-09T14:52:37.171Z","accountId":"01a12126-dab2-768b-badc-2cb8c8b645a1","balance":"253000"}
+location: /v1/transactions/01a1213e-9d10-750b-aeac-1de13e1c2a97
+{"id":"01a1213e-9d10-750b-aeac-1de13e1c2a97","kind":"withdrawal","amount":"2000","currency":"EUR","createdAt":"2026-10-09T15:18:34.001Z","accountId":"01a1213e-9b87-71a0-bdd6-8009c7a1a8eb","balance":"253000"}
 ```
 
 ### Transfer
@@ -206,8 +206,8 @@ TRANSFER=$ID
 ```text
 HTTP/1.1 201 Created
 Content-Type: application/json; charset=utf-8
-location: /v1/transactions/01a12126-dc4a-76ee-9f8b-fe6516197f00
-{"id":"01a12126-dc4a-76ee-9f8b-fe6516197f00","kind":"transfer","amount":"1050","currency":"EUR","createdAt":"2026-10-09T14:52:37.199Z","accountId":"01a12126-dab2-768b-badc-2cb8c8b645a1","balance":"251950"}
+location: /v1/transactions/01a1213e-9d2b-7074-9e14-749ef7896020
+{"id":"01a1213e-9d2b-7074-9e14-749ef7896020","kind":"transfer","amount":"1050","currency":"EUR","createdAt":"2026-10-09T15:18:34.027Z","accountId":"01a1213e-9b87-71a0-bdd6-8009c7a1a8eb","balance":"251950"}
 ```
 
 The same request again, as a client would send it after a timeout, is replayed:
@@ -221,9 +221,9 @@ call -X POST $BASE/v1/accounts/$A/transfers -H "Authorization: Bearer $TOKEN" -H
 ```text
 HTTP/1.1 201 Created
 Content-Type: application/json; charset=utf-8
-location: /v1/transactions/01a12126-dc4a-76ee-9f8b-fe6516197f00
+location: /v1/transactions/01a1213e-9d2b-7074-9e14-749ef7896020
 idempotent-replayed: true
-{"id":"01a12126-dc4a-76ee-9f8b-fe6516197f00","kind":"transfer","amount":"1050","currency":"EUR","createdAt":"2026-10-09T14:52:37.199Z","accountId":"01a12126-dab2-768b-badc-2cb8c8b645a1","balance":"251950"}
+{"id":"01a1213e-9d2b-7074-9e14-749ef7896020","kind":"transfer","amount":"1050","currency":"EUR","createdAt":"2026-10-09T15:18:34.027Z","accountId":"01a1213e-9b87-71a0-bdd6-8009c7a1a8eb","balance":"251950"}
 ```
 
 ### Read an account's history
@@ -237,7 +237,7 @@ call "$BASE/v1/accounts/$A/entries?limit=2" -H "Authorization: Bearer $TOKEN"
 ```text
 HTTP/1.1 200 OK
 Content-Type: application/json; charset=utf-8
-{"items":[{"id":"01a12126-dc4a-76ee-9f8b-f0ea4748ed06","transactionId":"01a12126-dc49-7187-8274-85e4fe334e84","kind":"deposit","amount":"5000","currency":"EUR","createdAt":"2026-10-09T14:52:37.322Z"},{"id":"01a12126-dc4a-76ee-9f8c-016076f1e025","transactionId":"01a12126-dc4a-76ee-9f8b-fe6516197f00","kind":"transfer","amount":"-1050","currency":"EUR","createdAt":"2026-10-09T14:52:37.200Z"}],"nextCursor":"eyJsIjoiZW50cmllcyIsInUiOiIwMTkyZjBhMC0wMDAwLTcwMDAtODAwMC0wMDAwMDAwMGQwYzEiLCJhIjoiMDFhMTIxMjYtZGFiMi03NjhiLWJhZGMtMmNiOGM4YjY0NWExIiwidCI6IjIwMjYtMTAtMDlUMTQ6NTI6MzcuMjAwMTAxWiIsImkiOiIwMWExMjEyNi1kYzRhLTc2ZWUtOWY4Yy0wMTYwNzZmMWUwMjUifefOrEItdnOaGtOQBwwGr7rwrOmIzbjmLCecBoUWNObx"}
+{"items":[{"id":"01a1213e-9d2b-7074-9e14-78b5706919d7","transactionId":"01a1213e-9d2b-7074-9e14-749ef7896020","kind":"transfer","amount":"-1050","currency":"EUR","createdAt":"2026-10-09T15:18:34.027Z"},{"id":"01a1213e-9d11-7306-976f-968f89c66a33","transactionId":"01a1213e-9d10-750b-aeac-1de13e1c2a97","kind":"withdrawal","amount":"-2000","currency":"EUR","createdAt":"2026-10-09T15:18:34.001Z"}],"nextCursor":"eyJsIjoiZW50cmllcyIsInUiOiIwMTkyZjBhMC0wMDAwLTcwMDAtODAwMC0wMDAwMDAwMGQwYzEiLCJhIjoiMDFhMTIxM2UtOWI4Ny03MWEwLWJkZDYtODAwOWM3YTFhOGViIiwidCI6IjIwMjYtMTAtMDlUMTU6MTg6MzQuMDAxNjY5WiIsImkiOiIwMWExMjEzZS05ZDExLTczMDYtOTc2Zi05NjhmODljNjZhMzMifQFNLtxQvuR9LvPTw1673_U1yd2ejc-Y5ygZn92Jvks7"}
 ```
 
 ### Read a transaction
@@ -252,10 +252,10 @@ call $BASE/v1/transactions/$DEPOSIT -H "Authorization: Bearer $OPERATOR_TOKEN"
 ```text
 HTTP/1.1 200 OK
 Content-Type: application/json; charset=utf-8
-{"id":"01a12126-dc4a-76ee-9f8b-fe6516197f00","kind":"transfer","amount":"1050","currency":"EUR","createdAt":"2026-10-09T14:52:37.199Z","entries":[{"accountId":"01a12126-dab2-768b-badc-2cb8c8b645a1","amount":"-1050"}]}
+{"id":"01a1213e-9d2b-7074-9e14-749ef7896020","kind":"transfer","amount":"1050","currency":"EUR","createdAt":"2026-10-09T15:18:34.027Z","entries":[{"accountId":"01a1213e-9b87-71a0-bdd6-8009c7a1a8eb","amount":"-1050"}]}
 HTTP/1.1 200 OK
 Content-Type: application/json; charset=utf-8
-{"id":"01a12126-dc49-7187-8274-85e4fe334e84","kind":"deposit","amount":"5000","currency":"EUR","createdAt":"2026-10-09T14:52:37.322Z","entries":[{"accountId":"01a12126-dab2-768b-badc-2cb8c8b645a1","amount":"5000"},{"accountId":"01a11bd5-1bfc-73c6-a32f-b7dbf9a42bae","amount":"-5000"}]}
+{"id":"01a1213e-9cf8-7120-bea5-ec65f4649e9d","kind":"deposit","amount":"5000","currency":"EUR","createdAt":"2026-10-09T15:18:33.977Z","entries":[{"accountId":"01a1213e-9b87-71a0-bdd6-8009c7a1a8eb","amount":"5000"},{"accountId":"01a11bd5-1bfc-73c6-a32f-b7dbf9a42bae","amount":"-5000"}]}
 ```
 
 ### Reverse a transaction
@@ -271,8 +271,8 @@ REVERSAL=$ID
 ```text
 HTTP/1.1 201 Created
 Content-Type: application/json; charset=utf-8
-location: /v1/transactions/01a12126-dc2d-761b-978c-5998bc1edc8d
-{"id":"01a12126-dc2d-761b-978c-5998bc1edc8d","kind":"reversal","amount":"5000","currency":"EUR","createdAt":"2026-10-09T14:52:37.294Z","reversedTransactionId":"01a12126-dc49-7187-8274-85e4fe334e84"}
+location: /v1/transactions/01a1213e-9d93-7212-85b1-18153bacb69f
+{"id":"01a1213e-9d93-7212-85b1-18153bacb69f","kind":"reversal","amount":"5000","currency":"EUR","createdAt":"2026-10-09T15:18:34.131Z","reversedTransactionId":"01a1213e-9cf8-7120-bea5-ec65f4649e9d"}
 ```
 
 ### Freeze, unfreeze and close
@@ -288,18 +288,18 @@ call -X POST $BASE/v1/accounts/$C/close -H "Authorization: Bearer $OPERATOR_TOKE
 ```text
 HTTP/1.1 200 OK
 Content-Type: application/json; charset=utf-8
-{"id":"01a12126-dbe3-7510-872d-e1aea0094766","currency":"COP","status":"frozen","balance":"0","createdAt":"2026-10-09T14:52:37.218Z","updatedAt":"2026-10-09T14:52:37.314Z","ownerId":"0192f0a0-0000-7000-8000-00000000d0c1"}
+{"id":"01a1213e-9c8e-71e4-8fb8-410e01a911f2","currency":"COP","status":"frozen","balance":"0","createdAt":"2026-10-09T15:18:33.869Z","updatedAt":"2026-10-09T15:18:34.155Z","ownerId":"0192f0a0-0000-7000-8000-00000000d0c1"}
 HTTP/1.1 200 OK
 Content-Type: application/json; charset=utf-8
-{"id":"01a12126-dbe3-7510-872d-e1aea0094766","currency":"COP","status":"active","balance":"0","createdAt":"2026-10-09T14:52:37.218Z","updatedAt":"2026-10-09T14:52:37.333Z","ownerId":"0192f0a0-0000-7000-8000-00000000d0c1"}
+{"id":"01a1213e-9c8e-71e4-8fb8-410e01a911f2","currency":"COP","status":"active","balance":"0","createdAt":"2026-10-09T15:18:33.869Z","updatedAt":"2026-10-09T15:18:34.176Z","ownerId":"0192f0a0-0000-7000-8000-00000000d0c1"}
 HTTP/1.1 200 OK
 Content-Type: application/json; charset=utf-8
-{"id":"01a12126-dbe3-7510-872d-e1aea0094766","currency":"COP","status":"closed","balance":"0","createdAt":"2026-10-09T14:52:37.218Z","updatedAt":"2026-10-09T14:52:37.351Z","ownerId":"0192f0a0-0000-7000-8000-00000000d0c1"}
+{"id":"01a1213e-9c8e-71e4-8fb8-410e01a911f2","currency":"COP","status":"closed","balance":"0","createdAt":"2026-10-09T15:18:33.869Z","updatedAt":"2026-10-09T15:18:34.197Z","ownerId":"0192f0a0-0000-7000-8000-00000000d0c1"}
 ```
 
 ## Errors
 
-Every error is `application/problem+json` (RFC 9457, [ADR-0016](../adr/0016-error-model.md)) with `type`, `title`, `status`, `detail` and `requestId`, plus `errors` for a validation error, with one entry per field. `title` and `detail` are fixed per type, so match on `type`. No body holds a stack trace, SQL or an internal message.
+Every error is `application/problem+json` (RFC 9457, [ADR-0016](../adr/0016-error-model.md)) with `type`, `title`, `status`, `detail` and `requestId`, plus `errors` for a validation error, with one entry per field. `title` is fixed per type, and so is `detail` except for 400 `malformed-request`, whose `detail` names the part at fault (the body, the `Idempotency-Key`, the cursor or the request), so match on `type`. No body holds a stack trace, SQL or an internal message.
 
 Checks run in one order, and the first failure answers: route, authentication, per-user rate limit, role, media type, body size, malformed request, idempotency, validation, lookup, business rules ([request lifecycle](../../README.md#request-lifecycle)).
 
@@ -346,19 +346,19 @@ call -X POST $BASE/v1/accounts/$A/withdrawals -H "Authorization: Bearer $TOKEN" 
 HTTP/1.1 401 Unauthorized
 Content-Type: application/problem+json
 www-authenticate: Bearer realm="supercool-finances"
-{"type":"/problems/unauthenticated","title":"Unauthenticated","status":401,"detail":"A valid bearer token is required.","requestId":"ca208d02bec0dedc18d12f60807b29c7"}
+{"type":"/problems/unauthenticated","title":"Unauthenticated","status":401,"detail":"A valid bearer token is required.","requestId":"c80e2d1e5f88aca4a54155ddfbe7dfe4"}
 HTTP/1.1 403 Forbidden
 Content-Type: application/problem+json
-{"type":"/problems/forbidden","title":"Forbidden","status":403,"detail":"Your role is not permitted this operation.","requestId":"395769cccde6d687424d837750d509a5"}
+{"type":"/problems/forbidden","title":"Forbidden","status":403,"detail":"Your role is not permitted this operation.","requestId":"7447551e637229e33ce665568f1602fb"}
 HTTP/1.1 404 Not Found
 Content-Type: application/problem+json
-{"type":"/problems/not-found","title":"Not Found","status":404,"detail":"The requested resource does not exist.","requestId":"bf40d6b753d219a982fe692bc88029f1"}
+{"type":"/problems/not-found","title":"Not Found","status":404,"detail":"The requested resource does not exist.","requestId":"aa14c5c77348c30d2d3a147a2a504686"}
 HTTP/1.1 400 Bad Request
 Content-Type: application/problem+json
-{"type":"/problems/malformed-request","title":"Malformed Request","status":400,"detail":"The Idempotency-Key header is missing or malformed.","requestId":"cfdb47634bd9efb49054a678c0921f61"}
+{"type":"/problems/malformed-request","title":"Malformed Request","status":400,"detail":"The Idempotency-Key header is missing or malformed.","requestId":"54f8790074da2bb4f7967aed571480ec"}
 HTTP/1.1 415 Unsupported Media Type
 Content-Type: application/problem+json
-{"type":"/problems/unsupported-media-type","title":"Unsupported Media Type","status":415,"detail":"The request body must be application/json, in UTF-8.","requestId":"74157af02640e5987f000cb3752e7c4e"}
+{"type":"/problems/unsupported-media-type","title":"Unsupported Media Type","status":415,"detail":"The request body must be application/json, in UTF-8.","requestId":"be227efb9c09e090ef506b87b1458749"}
 ```
 
 ```sh
@@ -376,16 +376,16 @@ call -X POST $BASE/v1/accounts/$A/withdrawals -H "Authorization: Bearer $TOKEN" 
 ```text
 HTTP/1.1 422 Unprocessable Entity
 Content-Type: application/problem+json
-{"type":"/problems/validation-error","title":"Validation Error","status":422,"detail":"The request content is not valid; see errors.","requestId":"c5c7671b3d09212f5e21ef324268129a","errors":[{"pointer":"/amount","detail":"Must be a string of decimal digits without sign, leading zero, separator or exponent, from 1 to 9223372036854775807 minor units."}]}
+{"type":"/problems/validation-error","title":"Validation Error","status":422,"detail":"The request content is not valid; see errors.","requestId":"778042ed912252e1c9253ea8548dd31c","errors":[{"pointer":"/amount","detail":"Must be a string of decimal digits without sign, leading zero, separator or exponent, from 1 to 9223372036854775807 minor units."}]}
 HTTP/1.1 422 Unprocessable Entity
 Content-Type: application/problem+json
-{"type":"/problems/idempotency-key-reused","title":"Idempotency Key Reused","status":422,"detail":"This Idempotency-Key was already used for a different request.","requestId":"4467cf1113f680a57993acd32b4c1b08"}
+{"type":"/problems/idempotency-key-reused","title":"Idempotency Key Reused","status":422,"detail":"This Idempotency-Key was already used for a different request.","requestId":"6941b087298f06f2782da00a9dbf1f0d"}
 HTTP/1.1 422 Unprocessable Entity
 Content-Type: application/problem+json
-{"type":"/problems/insufficient-funds","title":"Insufficient Funds","status":422,"detail":"The account balance does not cover the amount.","requestId":"623ccb7a13ddb67021cc6bdc296bb7ca"}
+{"type":"/problems/insufficient-funds","title":"Insufficient Funds","status":422,"detail":"The account balance does not cover the amount.","requestId":"62ab7040d244e781c7cf9bd6bd3fc059"}
 HTTP/1.1 422 Unprocessable Entity
 Content-Type: application/problem+json
-{"type":"/problems/currency-mismatch","title":"Currency Mismatch","status":422,"detail":"The currency does not match the account's currency.","requestId":"9f3acb09e5989d54b45b7d9dda84fb96"}
+{"type":"/problems/currency-mismatch","title":"Currency Mismatch","status":422,"detail":"The currency does not match the account's currency.","requestId":"a6a3ed0079356aed717128e0a29eb40b"}
 ```
 
 ```sh
@@ -403,16 +403,16 @@ call -X POST $BASE/v1/transactions/$REVERSAL/reversals -H "Authorization: Bearer
 ```text
 HTTP/1.1 422 Unprocessable Entity
 Content-Type: application/problem+json
-{"type":"/problems/destination-unavailable","title":"Destination Unavailable","status":422,"detail":"The destination account cannot receive this transfer.","requestId":"5b728bd0915dbde987d56d6dee6052d0"}
+{"type":"/problems/destination-unavailable","title":"Destination Unavailable","status":422,"detail":"The destination account cannot receive this transfer.","requestId":"82bd9af018a1eaeb585bc7dbf59716ea"}
 HTTP/1.1 422 Unprocessable Entity
 Content-Type: application/problem+json
-{"type":"/problems/account-not-active","title":"Account Not Active","status":422,"detail":"The account is frozen or closed.","requestId":"89d2ef6740025a44921984ba9b2fd05b"}
+{"type":"/problems/account-not-active","title":"Account Not Active","status":422,"detail":"The account is frozen or closed.","requestId":"1a8ab5e8f9c680a61f941451c5a231cf"}
 HTTP/1.1 409 Conflict
 Content-Type: application/problem+json
-{"type":"/problems/already-reversed","title":"Already Reversed","status":409,"detail":"The transaction has already been reversed.","requestId":"74f52dd6dd81d6ce6e480fa6a9ff9784"}
+{"type":"/problems/already-reversed","title":"Already Reversed","status":409,"detail":"The transaction has already been reversed.","requestId":"00febd372e32239d8a24d9e25a26bc97"}
 HTTP/1.1 422 Unprocessable Entity
 Content-Type: application/problem+json
-{"type":"/problems/transaction-not-reversible","title":"Transaction Not Reversible","status":422,"detail":"A reversal cannot be reversed.","requestId":"8d187c2de5c60b61f518729379d3382a"}
+{"type":"/problems/transaction-not-reversible","title":"Transaction Not Reversible","status":422,"detail":"A reversal cannot be reversed.","requestId":"931c1cc3d970b16553e88d282bb71309"}
 ```
 
 ## Postman collection
@@ -444,10 +444,10 @@ npx --yes newman@6.2.3 run docs/api/postman/supercool-finances.postman_collectio
 ├─────────────────────────┼─────────────────┼─────────────────┤
 │              assertions │             107 │               0 │
 ├─────────────────────────┴─────────────────┴─────────────────┤
-│ total run duration: 596ms                                   │
+│ total run duration: 623ms                                   │
 ├─────────────────────────────────────────────────────────────┤
 │ total data received: 198.17kB (approx)                      │
 ├─────────────────────────────────────────────────────────────┤
-│ average response time: 4ms [min: 1ms, max: 16ms, s.d.: 2ms] │
+│ average response time: 5ms [min: 2ms, max: 16ms, s.d.: 3ms] │
 └─────────────────────────────────────────────────────────────┘
 ```

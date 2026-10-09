@@ -9,6 +9,7 @@ For operators and contributors: what the service writes to its logs, the metrics
 - [Dashboards](#dashboards)
 - [Health endpoints](#health-endpoints)
 - [Alarms](#alarms)
+- [Alerts without an alarm](#alerts-without-an-alarm)
 - [Error reporting](#error-reporting)
 
 ## Logs
@@ -33,7 +34,7 @@ A transfer, as replica `api-2` logged it (`docker compose logs --no-log-prefix a
 | `res`, `responseTime` | On "request completed": the status and the time to answer, in milliseconds.                                                                                    |
 | `msg`                 | What happened. A 500 is logged with its error and SQLSTATE; a failed readiness check with the check that failed.                                               |
 
-**Correlation ids.** nginx forwards the client's `X-Request-Id`, or sets one, and the service keeps a value that matches `[A-Za-z0-9._:-]{1,128}`, otherwise generates a UUIDv7. The same id is in the response header, in the `requestId` of every problem body and in the audit record of a committed movement. To follow one request across both replicas and nginx:
+**Correlation ids.** nginx forwards the client's `X-Request-Id`, or sets one, and the service keeps a value that matches `[A-Za-z0-9._:-]{1,128}`, otherwise generates a UUIDv7. The same id is in the response header, in the `requestId` of every problem body and in the audit record of a committed movement or status change. To follow one request across both replicas and nginx:
 
 ```sh
 docker compose logs --no-log-prefix api-1 api-2 nginx | grep 6c3bb12c506b95b8c066cdb109ecb790
@@ -64,7 +65,7 @@ Each replica serves Prometheus metrics at `GET /metrics` on its own server, on `
 | `scf_rate_limited_total`                  | counter   | none                                                                                                  | Requests answered 429 by the per-user limit.                                                              |
 | `scf_rate_limit_store_errors_total`       | counter   | none                                                                                                  | Per-user limit checks that failed open because Redis did not answer within `REDIS_COMMAND_TIMEOUT_MS`.    |
 
-Node's default process metrics (CPU, memory, event loop lag, garbage collection) are served too. A sample from `api-1` after the examples of the [API guide](api/README.md):
+Node's default process metrics (CPU, memory, event loop lag, garbage collection) are served too. A sample from `api-1` after the examples of the [API guide](api/README.md), its Postman collection run included:
 
 ```sh
 docker compose exec -T api-1 wget -qO- http://127.0.0.1:9464/metrics | grep -E '^scf_(money|idempotent|lock)'
@@ -75,7 +76,7 @@ scf_money_movements_total{kind="deposit",outcome="applied"} 0
 scf_money_movements_total{kind="deposit",outcome="rejected"} 1
 scf_money_movements_total{kind="deposit",outcome="failed"} 0
 scf_money_movements_total{kind="withdrawal",outcome="applied"} 2
-scf_money_movements_total{kind="withdrawal",outcome="rejected"} 2
+scf_money_movements_total{kind="withdrawal",outcome="rejected"} 1
 scf_money_movements_total{kind="withdrawal",outcome="failed"} 0
 scf_money_movements_total{kind="transfer",outcome="applied"} 0
 scf_money_movements_total{kind="transfer",outcome="rejected"} 0
@@ -84,7 +85,7 @@ scf_money_movements_total{kind="reversal",outcome="applied"} 1
 scf_money_movements_total{kind="reversal",outcome="rejected"} 1
 scf_money_movements_total{kind="reversal",outcome="failed"} 0
 scf_idempotent_replays_total{kind="deposit"} 0
-scf_idempotent_replays_total{kind="withdrawal"} 0
+scf_idempotent_replays_total{kind="withdrawal"} 1
 scf_idempotent_replays_total{kind="transfer"} 1
 scf_idempotent_replays_total{kind="reversal"} 0
 scf_idempotent_replays_total{kind="account_creation"} 0
@@ -113,6 +114,13 @@ In AWS the metrics port stays closed to everything outside the VPC, and nothing 
 | Pool usage                          | `scf_db_pool_connections` by replica and state, and the rate of `scf_db_pool_acquire_timeouts_total`. |
 
 Run `make load` against the profile to watch the stack under load. Prometheus keeps one day of data, inside its container.
+
+Grafana's anonymous visitors cannot write queries, and Prometheus publishes no port, so a PromQL expression of the runbooks or of the [alerts without an alarm](#alerts-without-an-alarm) runs inside the Prometheus container:
+
+```sh
+docker compose exec -T prometheus wget -qO- \
+  --post-data 'query=sum by (lock) (rate(scf_lock_timeouts_total[5m]))' http://localhost:9090/api/v1/query
+```
 
 ## Health endpoints
 
@@ -144,6 +152,25 @@ The alarms are CloudWatch alarms of the AWS deployment, defined in [infra/terraf
 | `rds-storage` (EventBridge rule) | RDS events RDS-EVENT-0225, 0224, 0223 and 0007                             | storage at 80% of the autoscaling maximum, a step would reach it, autoscaling cannot scale, or storage is exhausted | [Database](runbooks/database.md)                 |
 
 Each alarm points at one runbook by subject: the database, capacity, timeouts and 503, or rate limits. Every runbook is indexed in [runbooks/README.md](runbooks/README.md).
+
+## Alerts without an alarm
+
+The situations below have a runbook but no deployed alarm. Section 1.8 of [spec 008](../specs/008-deployment/spec.md) fixes the CloudWatch alarms as exactly those above, the local Prometheus has no alert rules, and in AWS nothing scrapes the replicas' metrics yet (section 6 of spec 008). Each row names the signal that already exists and the condition to watch it for; the thresholds are starting points, to tune against the usual rate. Until one is deployed, an operator watches it: locally on the Grafana dashboard or with the expression in Prometheus, in AWS in CloudWatch Logs Insights or the ECS task's exit code, and in CI through the failing step. Deploying them as alarms is a follow-up that changes section 1.8 of spec 008.
+
+| Alert                        | Signal                                                                                                                  | Fires when                                                                                                                | Runbook                                                        |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `db-pool-exhausted`          | `scf_db_pool_acquire_timeouts_total`; `service unavailable` lines with `cause` `PoolAcquireTimeout`                     | `sum(increase(scf_db_pool_acquire_timeouts_total[5m])) > 0`                                                               | [Timeouts and 503](runbooks/timeouts-and-503.md)               |
+| `idempotency-in-progress`    | `scf_lock_timeouts_total{lock="idempotency"}`; `request completed` lines with `res.statusCode` 409                      | `sum(rate(scf_lock_timeouts_total{lock="idempotency"}[5m])) > 0.1`, 30 in 5 minutes                                       | [Idempotency in progress](runbooks/idempotency-in-progress.md) |
+| `transaction-retries`        | `scf_transaction_retries_total`, `scf_transaction_retries_exhausted_total`; `deadlock detected` in PostgreSQL's log     | `sum(increase(scf_transaction_retries_exhausted_total[5m])) > 0`, or `sum(rate(scf_transaction_retries_total[5m])) > 0.1` | [Retry storm](runbooks/retry-storm.md)                         |
+| `redis-unavailable`          | `scf_rate_limit_store_errors_total`; the `warn` line `Redis unavailable: the per-user rate limit lets requests through` | `sum(increase(scf_rate_limit_store_errors_total[5m])) > 0`, or the line                                                   | [Rate limits](runbooks/rate-limits.md)                         |
+| `reconcile-drift`            | the exit code of `npm run reconcile`                                                                                    | exit code 1: CI's step after the integration tests, or a manual run                                                       | [Reconciliation](runbooks/reconciliation.md)                   |
+| `ledger-write-rejected`      | `request failed` lines with `err.type` `LedgerWriteRejected`                                                            | any                                                                                                                       | [Reconciliation](runbooks/reconciliation.md)                   |
+| `idempotency-cleanup-failed` | the exit code of the task `scf-idempotency-cleanup`; its log group `/scf/idempotency-cleanup`                           | an exit code other than 0, or no run in the last 2 hours                                                                  | [Idempotency cleanup](runbooks/idempotency-cleanup.md)         |
+| `migration-failed`           | the exit code of the task `scf-migrate`; its log group `/scf/migrate`                                                   | an exit code other than 0; the pipeline stops                                                                             | [Deploy and migrate](runbooks/deploy-and-migrate.md)           |
+| `deployment-rolled-back`     | the ECS service's deployment `rolloutState` and events                                                                  | `FAILED`: the circuit breaker rolled the deployment back                                                                  | [Deploy and migrate](runbooks/deploy-and-migrate.md)           |
+| `task-exit-unclean`          | the exit code and `stoppedReason` of an `scf-api` task; a replica's last log lines                                      | exit code 1 or 137 instead of 0                                                                                           | [Shutdown](runbooks/shutdown.md)                               |
+| `secret-rotation`            | none: an operator's decision                                                                                            | the rotation schedule, someone who knew a secret leaves, or a secret reached a log, a ticket or a repository              | [Secret rotation](runbooks/secret-rotation.md)                 |
+| `compromised-account`        | none: a report                                                                                                          | a customer disputes movements, support sees an unusual pattern, or the token issuer reports a breach                      | [Compromised account](runbooks/compromised-account.md)         |
 
 ## Error reporting
 

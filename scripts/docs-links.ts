@@ -198,8 +198,15 @@ export function linkFailures(file: string, text: string, repository: Repository)
       }
     }
     if (anchor === undefined || anchor === '' || !path.endsWith('.md')) continue;
+    let decodedAnchor: string;
+    try {
+      decodedAnchor = decodeURIComponent(anchor);
+    } catch {
+      fail('the anchor is not valid percent-encoding');
+      continue;
+    }
     const anchors = githubAnchors(path === file ? text : repository.read(path));
-    if (!anchors.has(decodeURIComponent(anchor).toLowerCase())) {
+    if (!anchors.has(decodedAnchor.toLowerCase())) {
       fail(`${path} has no heading with the anchor #${anchor}`);
     }
   }
