@@ -71,3 +71,4 @@ The owner role also sets the runtime role's `statement_timeout` and `idle_in_tra
 - Phase 05-schema: create both roles, the grants, the append-only triggers and the role settings.
   - Done in phase 05-schema on 2026-10-08.
 - Phase 12-infra: both credentials in Secrets Manager and in RDS Proxy (section 1.7 of spec 008).
+  - Done in phase 12-infra on 2026-10-09: both credentials are secrets of the `secrets` module; RDS Proxy authenticates only the runtime role, and the owner role's migration task connects to the instance directly, as the owner decided (DEP-R28, DEP-R29).

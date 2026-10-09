@@ -39,6 +39,7 @@ module "database" {
   master_username               = var.db_master_username
   max_allocated_storage_gb      = var.db_max_allocated_storage_gb
   proxy_max_connections_percent = var.db_proxy_max_connections_percent
+  max_connections               = var.db_max_connections
   isolated_subnet_ids           = module.network.isolated_subnet_ids
   database_security_group_id    = module.network.database_security_group_id
   proxy_security_group_id       = module.network.proxy_security_group_id
@@ -69,6 +70,8 @@ module "service" {
   desired_count           = var.desired_count
   min_count               = var.min_tasks
   max_count               = var.max_tasks
+  deployment_max_percent  = var.deployment_maximum_percent
+  stop_timeout_seconds    = var.stop_timeout_seconds
   cpu_target_percent      = 60
   service_port            = var.service_port
   metrics_port            = var.metrics_port

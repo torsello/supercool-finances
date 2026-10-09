@@ -82,3 +82,4 @@ The sizes and settings are those of section 1.7 of spec 008: 0.5 vCPU and 1 GB p
 ### Follow-ups
 
 - Phase 12-infra: the Terraform modules of table 1.3 of spec 008 and `docs/deployment/aws.md` with a cost estimate (DEP-R23).
+  - Done in phase 12-infra on 2026-10-09.

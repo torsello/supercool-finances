@@ -73,3 +73,4 @@ Migrations are SQL files run by node-pg-migrate (ADR-0010) with `MIGRATION_DATAB
 
 - Phase 05-schema: the first migrations and the readiness check against node-pg-migrate's table.
 - Phase 10-runtime and 12-infra: the `migrate` job in `compose.yaml` and the one-off ECS task.
+  - Done in phase 10-runtime on 2026-10-08 (the `migrate` service of `compose.yaml`) and in phase 12-infra on 2026-10-09 (the task definition `scf-migrate` of the `service` module).

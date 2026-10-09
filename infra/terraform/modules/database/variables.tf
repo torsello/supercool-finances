@@ -28,6 +28,11 @@ variable "proxy_max_connections_percent" {
   }
 }
 
+variable "max_connections" {
+  description = "max_connections of the parameter group, a static parameter (SEC-R36)."
+  type        = number
+}
+
 variable "isolated_subnet_ids" {
   type = list(string)
 }

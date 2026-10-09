@@ -80,4 +80,6 @@ Details fixed by spec 007: the per-IP limit keys on the TCP peer, never a client
 ### Follow-ups
 
 - Phase 09-hardening: the per-user limit and the nginx configuration.
+  - Done in phase 09-hardening on 2026-10-08: `src/platform/http/rate-limit.ts` and `docker/nginx/templates/default.conf.template`.
 - Phase 12-infra: the WAF rate-based rule and its policy check (SEC-AC35).
+  - Done in phase 12-infra on 2026-10-09: the rule `per-ip-rate-limit` in `infra/terraform/modules/edge/`, checked by `infra/policies/sec_ac35_waf_rate_limit.yaml` in the CI step `npm run infra:validate`.

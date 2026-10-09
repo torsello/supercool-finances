@@ -27,7 +27,7 @@ locals {
     user                   = "1000"
     readonlyRootFilesystem = true
     portMappings           = [{ containerPort = var.service_port, protocol = "tcp" }]
-    stopTimeout            = 40
+    stopTimeout            = var.stop_timeout_seconds
     healthCheck = {
       command     = ["CMD", "node", "dist/healthcheck.js"]
       interval    = 10

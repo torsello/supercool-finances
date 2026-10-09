@@ -23,6 +23,7 @@ import {
   IdempotencyWaitTimeout,
   LedgerWriteRejected,
   PoolAcquireTimeout,
+  ProxyBorrowTimeout,
   PoolClosed,
   RetriesExhausted,
   StatementTimeout,
@@ -181,6 +182,7 @@ export function toProblem(error: unknown): Problem {
     error instanceof RetriesExhausted ||
     error instanceof StatementTimeout ||
     error instanceof PoolAcquireTimeout ||
+    error instanceof ProxyBorrowTimeout ||
     error instanceof PoolClosed ||
     error instanceof ShuttingDown ||
     error instanceof RequestTimeout

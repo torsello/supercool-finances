@@ -117,3 +117,85 @@ Every deposit, withdrawal, transfer and reversal requires an `Idempotency-Key` h
 4. The same key with another method, path or body answers 422 `/problems/idempotency-key-reused`.
 
 A client that gets a connection error, a 502, 503 or 504, or a 409 `/problems/request-in-progress` retries the same request with the same key, waiting `Retry-After` (200 ms without one), up to 60 times; it never retries any other 4xx. Expired keys are deleted by `npm run idempotency:cleanup`; see the [idempotency cleanup runbook](docs/runbooks/idempotency-cleanup.md). Spec: [`specs/005-idempotency`](specs/005-idempotency/spec.md).
+
+## Request pipeline
+
+Every request is checked in one order, and the first failure answers (SYS-R31):
+
+1. Route: an unknown path answers 404 `/problems/not-found`, with or without credentials, before any credential or body is read (SYS-R32).
+2. Authentication (401), then the per-user rate limit (429), then the role (403): `onRequest` hooks of every `/v1` route, so they answer before the body is read. The role check never looks at ids, so a customer gets the same 403 whatever ids the request names.
+3. Media type (415) and body size (413), from the content-type parser and the body limit; then a malformed request (400): a body that is not JSON, or a missing or malformed `Idempotency-Key` or cursor.
+4. Idempotency: a key that matches a completed request gets its stored response here, before validation and every later check (SYS-R33); the same key with another body answers 422, and one still in progress 409.
+5. Validation (422): the routes' Zod schemas attach their error to the request instead of answering it, and the runner answers it at this step, after the key step on routes that take a key ([ADR-0004](docs/adr/0004-typescript-with-fastify.md), [ADR-0009](docs/adr/0009-idempotency-inside-the-movements-transaction.md)).
+6. Lookup (404), then the business rules (409, 422), inside the movement's database transaction: READ COMMITTED, customer accounts locked one by one in ascending id order, retried on a deadlock or serialization failure ([ADR-0008](docs/adr/0008-read-committed-with-ordered-pessimistic-row-locks.md)). An id in the path that is not a UUID answers 404 at the lookup (SYS-R42).
+
+The answer of a keyed request, its exact bytes with the `requestId`, is stored with its key before the commit, and the handler sends exactly those bytes. The order and where each step lives are in section 5 of [plan 000](specs/000-overview/plan.md).
+
+## Errors
+
+Every error is `application/problem+json` (RFC 9457) with `type`, `title`, `status`, `detail` and `requestId`, and `errors` with one entry per field for a validation error (SYS-R24, [ADR-0016](docs/adr/0016-error-model.md)). `title` and `detail` are fixed per type, so two answers of one type differ only in `requestId`; one 404 body serves every unknown, foreign or system resource and every unknown route. No body holds a stack trace, SQL or an underlying error's message: a 500 is logged with its error and SQLSTATE, and its body says only that the service failed, with the `requestId` to report.
+
+One function, `toProblem` in [`src/platform/http/error-handler.ts`](src/platform/http/error-handler.ts), turns a typed error into its status and type. The transient conditions answer 503 `/problems/service-unavailable` with `Retry-After: 1`, never 500: a lock or pool wait that ran out, retries exhausted, a statement or request timeout, a replica shutting down (SYS-R34). A rejection decided at the lookup step or by a business rule is stored for idempotent replay with its key; validation errors and 5xx are not, and commit nothing. Every type, its statuses and when it is answered are in section 4 of [spec 000](specs/000-overview/spec.md) and in the description of the OpenAPI document; the [timeouts runbook](docs/runbooks/timeouts-and-503.md) explains each 503.
+
+## Test seams
+
+Some tests need faults the production code never produces: a crash after a ledger write, a SQLSTATE on every attempt, a route that throws, a reversal check skipped, an extra member in a response body, a connection destroyed after the commit. `src/` holds only optional hook points for them, which the composition root ([`src/app.ts`](src/app.ts)) never sets; the seams themselves, and their one list, live in [`test/support/test-app.ts`](test/support/test-app.ts) (SYS-R37):
+
+| Seam                              | What it does                                                                                 |
+| --------------------------------- | -------------------------------------------------------------------------------------------- |
+| `unit-of-work-faults`             | Throws after a named write step, rewrites one ledger entry's amount, or raises a SQLSTATE.   |
+| `throwing-route`                  | Adds `GET /v1/test/throw`, which throws an error whose message no response may contain.      |
+| `skip-existing-reversal-check`    | Skips a reversal's check for an existing reversal, so the unique constraint must answer 409. |
+| `extra-response-member`           | Adds a member to every new response body from the key step on, never to a replay.            |
+| `destroy-connection-after-commit` | Destroys the client's connection after the commit, before the answer is written.             |
+
+The app records the seams it attached in `app.testSeams`, and SYS-AC24 checks that the production app has none.
+
+## Configuration
+
+Every setting is an environment variable, validated at startup before the service connects to anything or listens (SEC-R39). An invalid value stops it with exit code 1 and one error that names every invalid variable and its rule, never its value (SEC-R40). The variables, their rules and defaults are in section 1.2 of [`specs/007-security-ops`](specs/007-security-ops/spec.md); [`.env.example`](.env.example) lists them for local use, and `npm run env:sync` adds the missing ones to `.env`. Among the rules:
+
+- The timeouts must fit inside each other: `REQUEST_TIMEOUT_MS` (25000 ms) above the worst case of the lock waits, the pool wait and the retries, and `SHUTDOWN_TIMEOUT_MS` (30000 ms) not below it (SEC-R35). See the [timeouts runbook](docs/runbooks/timeouts-and-503.md).
+- `DB_POOL_MAX` (10) times the replicas, plus one readiness connection each and 10 spare, must fit in the database's connections (SEC-R36).
+- The demo `JWT_SECRET` and `CURSOR_SECRET` of `compose.yaml` are refused when `NODE_ENV` is `production` (DEP-R07). In AWS every secret comes from Secrets Manager, and each database password arrives as `PGPASSWORD` beside a URL that holds none.
+- Secrets, tokens, `Idempotency-Key` values and the passwords of the URLs are redacted from every log line (SEC-R22).
+
+The load balancer reads its own: `RATE_LIMIT_IP_RPS` and `RATE_LIMIT_IP_BURST`. See the [rate limits runbook](docs/runbooks/rate-limits.md).
+
+## Health checks
+
+- `GET /health/live` answers 200 `{"status": "ok"}` while the process runs, checking nothing else (SEC-R23). The image's `HEALTHCHECK`, the ECS container health check and the ALB target group all use it, so a database outage never makes Docker or ECS replace every replica.
+- `GET /health/ready` answers 200 `{"status": "ready"}` only when `SELECT 1` completes within 1000 ms on a connection kept apart from the request pool and every migration the code ships is applied; otherwise 503 `/problems/service-unavailable`, and a `warn` line names the failed check (SEC-R24). It answers 503 from the start of a shutdown (SEC-R26).
+
+Both are outside `/v1` and need no token. On SIGTERM a replica drains for `SHUTDOWN_DRAIN_DELAY_MS`, stops accepting connections, finishes its requests within `SHUTDOWN_TIMEOUT_MS` and exits 0, or 1 if it had to cut work off; see the [shutdown runbook](docs/runbooks/shutdown.md).
+
+## Metrics
+
+Each replica serves Prometheus metrics at `/metrics` on `METRICS_PORT` (9464), a port the load balancer never routes to and no deployment publishes (SEC-R43). Locally: `docker compose exec api-1 wget -qO- http://127.0.0.1:9464/metrics`. Besides Node's process metrics, they count requests by route template and status (`scf_http_request_duration_seconds`), movements by kind and outcome (`scf_money_movements_total`), replays, lock timeouts, transaction retries, the pool's connections and acquire timeouts, and the per-user rate limit and its Redis errors: table 1.4 of [`specs/007-security-ops`](specs/007-security-ops/spec.md).
+
+## AWS deployment
+
+The target architecture is in [`docs/deployment/aws.md`](docs/deployment/aws.md), one section per Terraform module of [`infra/terraform/`](infra/terraform/): an ALB with AWS WAF in public subnets, the service on ECS Fargate with at least two tasks across two zones, RDS PostgreSQL 16 Multi-AZ behind RDS Proxy, ElastiCache Redis, Secrets Manager and CloudWatch alarms (spec 008, ADR-0014, ADR-0015). Migrations run as a one-off task before each deployment, and the idempotency cleanup runs every hour as a scheduled task.
+
+Nothing in this repository applies the Terraform (DEP-R34). `npm run infra:validate` checks it with only Docker: `terraform fmt`, `terraform validate`, `tflint` and `checkov` with the policies of [`infra/policies/`](infra/policies/), each from an image pinned by digest. The document also gives the first deployment, the steps of every deployment, the failure modes and a cost estimate.
+
+## CI
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push, on pull requests to `main` and on demand:
+
+- `ci`: `npm run check`, `npm run openapi:lint`, `npm run infra:validate`, the integration tests against Postgres and Redis, `npm run reconcile` on the test database they leave (LED-AC17), `npm run trace -- --require unit,integration` and `npm run build`. It uploads the unit and integration reports.
+- `e2e`: `npm run test:e2e` on its own Compose project, `scf-e2e`; it uploads the e2e report and prints the stack's logs on failure.
+- `traceability`: after `ci` and `e2e`, `npm run trace -- --require unit,integration,e2e` on the three reports, so every acceptance criterion that must be proven has a passing test at its level.
+- `secret-scan`: gitleaks over the full git history.
+- `security`: `npm audit --audit-level=high`, and trivy on the files, on the configuration and on the runtime image, from the `aquasec/trivy` image pinned by digest, failing on any HIGH or CRITICAL finding.
+
+There is no deploy workflow: the pipeline that builds, pushes and deploys the image lives outside this repository, and [`docs/deployment/aws.md`](docs/deployment/aws.md#every-deployment) describes its steps.
+
+## Runbooks
+
+- [Deploy and migrate](docs/runbooks/deploy-and-migrate.md)
+- [Rate limits](docs/runbooks/rate-limits.md)
+- [Timeouts and 503](docs/runbooks/timeouts-and-503.md)
+- [Shutdown](docs/runbooks/shutdown.md)
+- [Reconciliation](docs/runbooks/reconciliation.md)
+- [Idempotency cleanup](docs/runbooks/idempotency-cleanup.md)

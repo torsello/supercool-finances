@@ -45,6 +45,16 @@ variable "max_count" {
   type = number
 }
 
+variable "deployment_max_percent" {
+  description = "The rollout surge, in percent of the desired count."
+  type        = number
+}
+
+variable "stop_timeout_seconds" {
+  description = "The api container's stopTimeout."
+  type        = number
+}
+
 variable "cpu_target_percent" {
   description = "The average CPU autoscaling keeps the service at."
   type        = number

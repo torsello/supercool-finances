@@ -84,5 +84,6 @@ Reads such as an account's history (ACC-R21, ACC-R22) or a transaction by id (MO
 ### Follow-ups
 
 - Phase 04-plans names the ports of each module (unit of work, account lock, repositories, query services, clock, id generator).
+  - Done in phase 04-plans on 2026-10-08.
 - Phase 06-domain implements the value objects and aggregates with unit tests first.
   - Done in phase 06-domain on 2026-10-08.

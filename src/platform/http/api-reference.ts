@@ -2,28 +2,29 @@ import { PROBLEM_CONTENT_TYPE, PROBLEM_TYPES, type ProblemTypeUri } from './prob
 
 /**
  * The reference text of the OpenAPI document that no route schema holds: every problem type the
- * service answers, the `Idempotency-Key` header and the client retry policy (section 1.5 of spec 008). Each
- * module describes its own operations with `OperationDocs`, and `docs.ts` merges both into the
- * document generated from the route schemas.
+ * service or the load balancer answers, the `Idempotency-Key` header and the client retry policy
+ * (section 1.5 of spec 008). Each module describes its own operations with `OperationDocs`, and
+ * `docs.ts` merges both into the document generated from the route schemas.
  */
 
 /**
- * The problem types of spec 007 that the service answers from 09-hardening but the document does
- * not list yet: they join, with the load balancer's `/problems/upstream-unavailable` (spec 008),
- * the pool wait and the request timeout among the causes of a 503, with the 12-infra docs task of
- * plan 007.
+ * The problem types the load balancer answers itself, never a replica (section 1.5 of spec 008):
+ * nginx renders its own 502, 503 and 504 with the title and detail of the `error_page` locations of
+ * its template. Its 413 and 429 use the service's types (section 1.7 of spec 007).
  */
-export const UNDOCUMENTED_PROBLEM_TYPES = [
-  '/problems/payload-too-large',
-  '/problems/unsupported-media-type',
-  '/problems/rate-limited',
-] as const satisfies readonly ProblemTypeUri[];
+export const LOAD_BALANCER_PROBLEM_TYPES = {
+  '/problems/upstream-unavailable': {
+    statuses: [502, 503, 504],
+    title: 'Upstream Unavailable',
+    detail:
+      'No replica of the service answered; retry later, with the same Idempotency-Key if the request had one.',
+  },
+} as const;
 
-/** The problem types the document lists. */
-export type DocumentedProblemType = Exclude<
-  ProblemTypeUri,
-  (typeof UNDOCUMENTED_PROBLEM_TYPES)[number]
->;
+type LoadBalancerProblemType = keyof typeof LOAD_BALANCER_PROBLEM_TYPES;
+
+/** The problem types the document lists: every type of the registry and the load balancer's. */
+export type DocumentedProblemType = ProblemTypeUri | LoadBalancerProblemType;
 
 interface ProblemReference {
   /** The statuses the type is answered with. */
@@ -32,10 +33,42 @@ interface ProblemReference {
   detail: string;
   /** When the type is answered, as the error catalogues of the specs say. */
   when: string;
+  /** Whether the answer is stored for idempotent replay (section 4 of spec 000). */
+  replay: string;
 }
+
+const STORED = 'yes, with the request’s `Idempotency-Key`';
+const NO_KEY = 'n/a: status changes take no key';
+
+/**
+ * Whether each type is stored for idempotent replay (section 4 of spec 000, section 1.3 of spec
+ * 005): an answer decided at the lookup step (404) or by a business rule (409, or 422 other than
+ * the validation and key-reuse errors) is stored with its key; nothing else is.
+ */
+const REPLAY: Readonly<Partial<Record<DocumentedProblemType, string>>> = {
+  '/problems/not-found': `${STORED}; a path that is not a route, never`,
+  '/problems/invalid-status-transition': NO_KEY,
+  '/problems/account-balance-not-zero': NO_KEY,
+  '/problems/already-reversed': STORED,
+  '/problems/account-not-active': STORED,
+  '/problems/currency-mismatch': STORED,
+  '/problems/insufficient-funds': STORED,
+  '/problems/destination-unavailable': STORED,
+  '/problems/balance-limit-exceeded': STORED,
+  '/problems/transaction-not-reversible': STORED,
+  '/problems/insufficient-funds-for-reversal': STORED,
+  '/problems/service-unavailable':
+    'no, except at the request timeout after the `COMMIT` was sent: if it committed, a retry with the same key gets the stored response',
+  '/problems/upstream-unavailable':
+    'not by the load balancer; if the movement committed, a retry with the same key gets its stored response',
+};
 
 /** When each problem type is answered (section 4 of spec 000 and the catalogues of specs 001 to 008). */
 const WHEN: Readonly<Record<DocumentedProblemType, string>> = {
+  '/problems/unsupported-media-type':
+    'The request has a body and its `Content-Type` is missing or is not `application/json`, in any letter case, alone or with `charset=utf-8`. Answered before the idempotency step: nothing is changed or stored.',
+  '/problems/payload-too-large':
+    'The body is larger than 16384 bytes, by its `Content-Length` or by the bytes received; the service stops reading it. A body above 32 KB gets the same answer from the load balancer. Answered before the idempotency step: nothing is changed or stored.',
   '/problems/malformed-request':
     'The body is not parseable JSON or was cut short, a required header such as `Idempotency-Key` is missing or malformed, or a pagination cursor is invalid. `detail` names what is broken.',
   '/problems/unauthenticated':
@@ -68,24 +101,30 @@ const WHEN: Readonly<Record<DocumentedProblemType, string>> = {
   '/problems/insufficient-funds-for-reversal':
     'A customer account the reversal debits does not hold enough.',
   '/problems/internal-error': 'A defect. The body never holds internals; report the `requestId`.',
+  '/problems/rate-limited':
+    "Too many requests. One user sent more than `RATE_LIMIT_USER_MAX` (300 by default) authenticated requests within a window of `RATE_LIMIT_USER_WINDOW_S` (10 by default) seconds that starts at the user's first request, refused ones and replays included; `Retry-After` is the whole seconds left in the window. Or one client IP passed the per-IP limit in front of the service: nginx answers with `Retry-After: 1`, and AWS WAF with `Retry-After: 60` and a body of content type `application/json` without `requestId`. Nothing is changed or stored: wait `Retry-After` seconds before sending more requests.",
   '/problems/service-unavailable':
-    'A transient condition: an account lock not acquired in time, a deadlock still present after 3 attempts, or a statement timeout. Retry after `Retry-After`, with the same `Idempotency-Key` for a POST.',
+    'A transient condition of a replica, with `Retry-After: 1`: no database connection free within `DB_POOL_ACQUIRE_TIMEOUT_MS`, or in AWS none free at RDS Proxy within its 5 s borrow timeout, an account lock not acquired in time, a deadlock or serialization failure still present after 3 attempts, a statement timeout, the request timeout `REQUEST_TIMEOUT_MS` (25 s by default) reached, or the replica shutting down. Nothing is stored, and the transaction rolls back; only when the request timeout comes after the `COMMIT` was sent does that commit finish, with an outcome unknown to the client. Retry after `Retry-After`, with the same `Idempotency-Key` for a POST, which then gets the stored response if the movement committed.',
+  '/problems/upstream-unavailable':
+    'Answered by the load balancer, not by a replica: no replica answered, one sent a broken response, or none answered in time. Locally nginx answers it as problem details; in AWS the ALB answers its own 502, 503 and 504 as `text/html` without a problem body, `Retry-After` or `X-Request-Id`, so a client keys on the status, as the retry policy does. The outcome of a POST is unknown: retry after `Retry-After` (1 second) with the same `Idempotency-Key`, which answers the stored response if the movement committed.',
 };
 
 function referenceOf(type: DocumentedProblemType): ProblemReference {
-  const { status, title, detail } = PROBLEM_TYPES[type];
-  return { statuses: [status], title, detail, when: WHEN[type] };
+  if (type in LOAD_BALANCER_PROBLEM_TYPES) {
+    const { statuses, title, detail } =
+      LOAD_BALANCER_PROBLEM_TYPES[type as LoadBalancerProblemType];
+    return { statuses, title, detail, when: WHEN[type], replay: REPLAY[type] ?? 'no' };
+  }
+  const { status, title, detail } = PROBLEM_TYPES[type as ProblemTypeUri];
+  return { statuses: [status], title, detail, when: WHEN[type], replay: REPLAY[type] ?? 'no' };
 }
 
-function isDocumented(type: ProblemTypeUri): type is DocumentedProblemType {
-  return !(UNDOCUMENTED_PROBLEM_TYPES as readonly ProblemTypeUri[]).includes(type);
-}
-
-/** Every documented problem type, in the order of the registry. */
+/** Every problem type the document lists: the registry's in its order, then the load balancer's. */
 export const PROBLEM_REFERENCE = Object.fromEntries(
-  (Object.keys(PROBLEM_TYPES) as ProblemTypeUri[])
-    .filter(isDocumented)
-    .map((type) => [type, referenceOf(type)]),
+  [
+    ...(Object.keys(PROBLEM_TYPES) as ProblemTypeUri[]),
+    ...(Object.keys(LOAD_BALANCER_PROBLEM_TYPES) as LoadBalancerProblemType[]),
+  ].map((type) => [type, referenceOf(type)]),
 ) as Readonly<Record<DocumentedProblemType, ProblemReference>>;
 
 /** The ids and times of the examples of every operation. */
@@ -142,12 +181,18 @@ export interface OperationDocs {
 export const SHARED_PROBLEMS: readonly DocumentedProblemType[] = [
   '/problems/unauthenticated',
   '/problems/validation-error',
+  '/problems/rate-limited',
   '/problems/internal-error',
   '/problems/service-unavailable',
+  '/problems/upstream-unavailable',
 ];
 
-/** The problem types every operation with a JSON body can answer. */
-export const BODY_PROBLEMS: readonly DocumentedProblemType[] = ['/problems/malformed-request'];
+/** The problem types every operation with a JSON body can answer (SEC-R10, SEC-R11). */
+export const BODY_PROBLEMS: readonly DocumentedProblemType[] = [
+  '/problems/malformed-request',
+  '/problems/unsupported-media-type',
+  '/problems/payload-too-large',
+];
 
 /** The problem types every operation that takes an `Idempotency-Key` can answer. */
 export const KEY_PROBLEMS: readonly DocumentedProblemType[] = [

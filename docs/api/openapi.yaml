@@ -45,90 +45,152 @@ info:
     otherwise.
 
 
-    **Errors.** Every error answer is `application/problem+json` (RFC 9457),
-    with one of these types:
+    **Errors.** Every error answer is `application/problem+json` (RFC 9457) with
+    `type`, `title`, `status`, `detail` and `requestId`, and `errors` for a
+    validation error; `title` and `detail` are fixed per type, and no body holds
+    a stack trace, SQL or an underlying error's message. Checks run in this
+    order and the first failure answers: route (404), authentication (401),
+    per-user rate limit (429), role (403), media type (415), body size (413),
+    malformed request (400), idempotency (a stored response, 422 or 409),
+    validation (422), lookup (404), business rules (409, 422). A stored answer
+    is replayed with `Idempotent-Replayed: true`; one not stored committed
+    nothing, so a retry with the same key runs the request again, except a 503
+    at the request timeout after the `COMMIT` was sent and a gateway error (502,
+    503 or 504 from the load balancer), whose outcome a retry with the same key
+    reveals: the stored response if the movement committed, a new run otherwise.
+    The types:
 
 
-    | Type | Status | Title | When |
+    | Type | Status | Title | When | Stored for replay |
 
-    | --- | --- | --- | --- |
+    | --- | --- | --- | --- | --- |
 
     | `/problems/not-found` | 404 | Not Found | The path is not a route, or the
     account or transaction does not exist, belongs to another customer, is a
-    system account, or its id is not a UUID. One body for every case. |
+    system account, or its id is not a UUID. One body for every case. | yes,
+    with the request’s `Idempotency-Key`; a path that is not a route, never |
 
     | `/problems/unauthenticated` | 401 | Unauthenticated | No `Authorization:
     Bearer` token, or a token that fails verification: signature, algorithm,
     issuer, audience, expiry or claims. Every case gets the same body and
-    `WWW-Authenticate` header. |
+    `WWW-Authenticate` header. | no |
 
     | `/problems/forbidden` | 403 | Forbidden | The caller’s role is not
-    permitted the operation, whatever ids the request names. |
+    permitted the operation, whatever ids the request names. | no |
 
     | `/problems/malformed-request` | 400 | Malformed Request | The body is not
     parseable JSON or was cut short, a required header such as `Idempotency-Key`
     is missing or malformed, or a pagination cursor is invalid. `detail` names
-    what is broken. |
+    what is broken. | no |
+
+    | `/problems/unsupported-media-type` | 415 | Unsupported Media Type | The
+    request has a body and its `Content-Type` is missing or is not
+    `application/json`, in any letter case, alone or with `charset=utf-8`.
+    Answered before the idempotency step: nothing is changed or stored. | no |
+
+    | `/problems/payload-too-large` | 413 | Payload Too Large | The body is
+    larger than 16384 bytes, by its `Content-Length` or by the bytes received;
+    the service stops reading it. A body above 32 KB gets the same answer from
+    the load balancer. Answered before the idempotency step: nothing is changed
+    or stored. | no |
 
     | `/problems/validation-error` | 422 | Validation Error | The request
     parses, but a body member or query parameter is missing, unknown or
     malformed, including amount and currency. `errors` has one entry per field.
-    |
+    | no |
 
     | `/problems/idempotency-key-reused` | 422 | Idempotency Key Reused | The
     `Idempotency-Key` was already used by the same user for a request with
     another method, path or body. Not stored: use a new key for a new request. |
+    no |
 
     | `/problems/request-in-progress` | 409 | Request In Progress | Another
     request with the same `Idempotency-Key` is still running after
     `IDEMPOTENCY_WAIT_TIMEOUT_MS`. Retry with the same key after `Retry-After`.
-    |
+    | no |
 
     | `/problems/invalid-status-transition` | 409 | Invalid Status Transition |
     The status change is not in the lifecycle: freezing or unfreezing a closed
-    account. |
+    account. | n/a: status changes take no key |
 
     | `/problems/account-balance-not-zero` | 409 | Account Balance Not Zero |
-    Closing an account whose balance is not "0". |
+    Closing an account whose balance is not "0". | n/a: status changes take no
+    key |
 
     | `/problems/already-reversed` | 409 | Already Reversed | The transaction
-    has already been reversed; a transaction is reversed at most once. |
+    has already been reversed; a transaction is reversed at most once. | yes,
+    with the request’s `Idempotency-Key` |
 
     | `/problems/account-not-active` | 422 | Account Not Active | One of the
     caller's own accounts that the movement debits or credits is frozen or
     closed (another customer's frozen or closed destination answers
     `/problems/destination-unavailable`); a reversal is refused only on a closed
-    account. |
+    account. | yes, with the request’s `Idempotency-Key` |
 
     | `/problems/currency-mismatch` | 422 | Currency Mismatch | The request
     currency differs from the account’s, or a transfer to one of the caller’s
-    own accounts in another currency. |
+    own accounts in another currency. | yes, with the request’s
+    `Idempotency-Key` |
 
     | `/problems/insufficient-funds` | 422 | Insufficient Funds | The source
-    balance does not cover the amount. |
+    balance does not cover the amount. | yes, with the request’s
+    `Idempotency-Key` |
 
     | `/problems/destination-unavailable` | 422 | Destination Unavailable | A
     transfer destination that cannot be credited: unknown, a system account,
     another customer’s frozen, closed or other-currency account, or a balance
-    that would exceed 9223372036854775807. One answer for every case. |
+    that would exceed 9223372036854775807. One answer for every case. | yes,
+    with the request’s `Idempotency-Key` |
 
     | `/problems/balance-limit-exceeded` | 422 | Balance Limit Exceeded | A
     deposit or reversal would make a cached balance exceed 9223372036854775807.
-    |
+    | yes, with the request’s `Idempotency-Key` |
 
     | `/problems/transaction-not-reversible` | 422 | Transaction Not Reversible
-    | The transaction is itself a reversal. |
+    | The transaction is itself a reversal. | yes, with the request’s
+    `Idempotency-Key` |
 
     | `/problems/insufficient-funds-for-reversal` | 422 | Insufficient Funds For
     Reversal | A customer account the reversal debits does not hold enough. |
+    yes, with the request’s `Idempotency-Key` |
+
+    | `/problems/rate-limited` | 429 | Rate Limited | Too many requests. One
+    user sent more than `RATE_LIMIT_USER_MAX` (300 by default) authenticated
+    requests within a window of `RATE_LIMIT_USER_WINDOW_S` (10 by default)
+    seconds that starts at the user's first request, refused ones and replays
+    included; `Retry-After` is the whole seconds left in the window. Or one
+    client IP passed the per-IP limit in front of the service: nginx answers
+    with `Retry-After: 1`, and AWS WAF with `Retry-After: 60` and a body of
+    content type `application/json` without `requestId`. Nothing is changed or
+    stored: wait `Retry-After` seconds before sending more requests. | no |
 
     | `/problems/service-unavailable` | 503 | Service Unavailable | A transient
-    condition: an account lock not acquired in time, a deadlock still present
-    after 3 attempts, or a statement timeout. Retry after `Retry-After`, with
-    the same `Idempotency-Key` for a POST. |
+    condition of a replica, with `Retry-After: 1`: no database connection free
+    within `DB_POOL_ACQUIRE_TIMEOUT_MS`, or in AWS none free at RDS Proxy within
+    its 5 s borrow timeout, an account lock not acquired in time, a deadlock or
+    serialization failure still present after 3 attempts, a statement timeout,
+    the request timeout `REQUEST_TIMEOUT_MS` (25 s by default) reached, or the
+    replica shutting down. Nothing is stored, and the transaction rolls back;
+    only when the request timeout comes after the `COMMIT` was sent does that
+    commit finish, with an outcome unknown to the client. Retry after
+    `Retry-After`, with the same `Idempotency-Key` for a POST, which then gets
+    the stored response if the movement committed. | no, except at the request
+    timeout after the `COMMIT` was sent: if it committed, a retry with the same
+    key gets the stored response |
 
     | `/problems/internal-error` | 500 | Internal Error | A defect. The body
-    never holds internals; report the `requestId`. |
+    never holds internals; report the `requestId`. | no |
+
+    | `/problems/upstream-unavailable` | 502, 503, 504 | Upstream Unavailable |
+    Answered by the load balancer, not by a replica: no replica answered, one
+    sent a broken response, or none answered in time. Locally nginx answers it
+    as problem details; in AWS the ALB answers its own 502, 503 and 504 as
+    `text/html` without a problem body, `Retry-After` or `X-Request-Id`, so a
+    client keys on the status, as the retry policy does. The outcome of a POST
+    is unknown: retry after `Retry-After` (1 second) with the same
+    `Idempotency-Key`, which answers the stored response if the movement
+    committed. | not by the load balancer; if the movement committed, a retry
+    with the same key gets its stored response |
 components:
   headers:
     RequestId:
@@ -139,7 +201,8 @@ components:
       example: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
     RetryAfter:
       description: "Seconds to wait before retrying, sent with
-        `/problems/request-in-progress`, `/problems/service-unavailable`. Retry
+        `/problems/request-in-progress`, `/problems/rate-limited`,
+        `/problems/service-unavailable`, `/problems/upstream-unavailable`. Retry
         policy: on a connection error, a 502, 503 or 504, or a 409
         `/problems/request-in-progress`, retry the same request with the same
         `Idempotency-Key`, waiting the `Retry-After` of the response when it has
@@ -241,6 +304,8 @@ components:
             - /problems/unauthenticated
             - /problems/forbidden
             - /problems/malformed-request
+            - /problems/unsupported-media-type
+            - /problems/payload-too-large
             - /problems/validation-error
             - /problems/idempotency-key-reused
             - /problems/request-in-progress
@@ -254,8 +319,10 @@ components:
             - /problems/balance-limit-exceeded
             - /problems/transaction-not-reversible
             - /problems/insufficient-funds-for-reversal
+            - /problems/rate-limited
             - /problems/service-unavailable
             - /problems/internal-error
+            - /problems/upstream-unavailable
         title:
           type: string
           description: A fixed summary of the type.
@@ -474,6 +541,51 @@ paths:
                     detail: A request with this Idempotency-Key is still in progress; retry with the
                       same key.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "413":
+          description: "Payload Too Large, as problem details.
+            `/problems/payload-too-large`: The body is larger than 16384 bytes,
+            by its `Content-Length` or by the bytes received; the service stops
+            reading it. A body above 32 KB gets the same answer from the load
+            balancer. Answered before the idempotency step: nothing is changed
+            or stored."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                payload-too-large:
+                  summary: Payload Too Large
+                  value:
+                    type: /problems/payload-too-large
+                    title: Payload Too Large
+                    status: 413
+                    detail: The request body is larger than 16384 bytes.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "415":
+          description: "Unsupported Media Type, as problem details.
+            `/problems/unsupported-media-type`: The request has a body and its
+            `Content-Type` is missing or is not `application/json`, in any
+            letter case, alone or with `charset=utf-8`. Answered before the
+            idempotency step: nothing is changed or stored."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                unsupported-media-type:
+                  summary: Unsupported Media Type
+                  value:
+                    type: /problems/unsupported-media-type
+                    title: Unsupported Media Type
+                    status: 415
+                    detail: The request body must be application/json, in UTF-8.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "422":
           description: "Unprocessable Entity, as problem details.
             `/problems/idempotency-key-reused`: The `Idempotency-Key` was
@@ -511,6 +623,36 @@ paths:
                     errors:
                       - pointer: /amount
                         detail: Must be a string of decimal digits.
+        "429":
+          description: "Too Many Requests, as problem details. `/problems/rate-limited`:
+            Too many requests. One user sent more than `RATE_LIMIT_USER_MAX`
+            (300 by default) authenticated requests within a window of
+            `RATE_LIMIT_USER_WINDOW_S` (10 by default) seconds that starts at
+            the user's first request, refused ones and replays included;
+            `Retry-After` is the whole seconds left in the window. Or one client
+            IP passed the per-IP limit in front of the service: nginx answers
+            with `Retry-After: 1`, and AWS WAF with `Retry-After: 60` and a body
+            of content type `application/json` without `requestId`. Nothing is
+            changed or stored: wait `Retry-After` seconds before sending more
+            requests."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                rate-limited:
+                  summary: Rate Limited
+                  value:
+                    type: /problems/rate-limited
+                    title: Rate Limited
+                    status: 429
+                    detail: Too many requests; retry after the number of seconds in Retry-After.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "500":
           description: "Internal Server Error, as problem details.
             `/problems/internal-error`: A defect. The body never holds
@@ -531,12 +673,58 @@ paths:
                     status: 500
                     detail: The service failed to process the request.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "502":
+          description: "Bad Gateway, as problem details. `/problems/upstream-unavailable`:
+            Answered by the load balancer, not by a replica: no replica
+            answered, one sent a broken response, or none answered in time.
+            Locally nginx answers it as problem details; in AWS the ALB answers
+            its own 502, 503 and 504 as `text/html` without a problem body,
+            `Retry-After` or `X-Request-Id`, so a client keys on the status, as
+            the retry policy does. The outcome of a POST is unknown: retry after
+            `Retry-After` (1 second) with the same `Idempotency-Key`, which
+            answers the stored response if the movement committed."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 502
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "503":
           description: "Service Unavailable, as problem details.
-            `/problems/service-unavailable`: A transient condition: an account
-            lock not acquired in time, a deadlock still present after 3
-            attempts, or a statement timeout. Retry after `Retry-After`, with
-            the same `Idempotency-Key` for a POST."
+            `/problems/service-unavailable`: A transient condition of a replica,
+            with `Retry-After: 1`: no database connection free within
+            `DB_POOL_ACQUIRE_TIMEOUT_MS`, or in AWS none free at RDS Proxy
+            within its 5 s borrow timeout, an account lock not acquired in time,
+            a deadlock or serialization failure still present after 3 attempts,
+            a statement timeout, the request timeout `REQUEST_TIMEOUT_MS` (25 s
+            by default) reached, or the replica shutting down. Nothing is
+            stored, and the transaction rolls back; only when the request
+            timeout comes after the `COMMIT` was sent does that commit finish,
+            with an outcome unknown to the client. Retry after `Retry-After`,
+            with the same `Idempotency-Key` for a POST, which then gets the
+            stored response if the movement committed.
+            `/problems/upstream-unavailable`: Answered by the load balancer, not
+            by a replica: no replica answered, one sent a broken response, or
+            none answered in time. Locally nginx answers it as problem details;
+            in AWS the ALB answers its own 502, 503 and 504 as `text/html`
+            without a problem body, `Retry-After` or `X-Request-Id`, so a client
+            keys on the status, as the retry policy does. The outcome of a POST
+            is unknown: retry after `Retry-After` (1 second) with the same
+            `Idempotency-Key`, which answers the stored response if the movement
+            committed."
           headers:
             X-Request-Id:
               $ref: "#/components/headers/RequestId"
@@ -555,6 +743,45 @@ paths:
                     status: 503
                     detail: The service could not complete the request in time; retry later, with
                       the same Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 503
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "504":
+          description: "Gateway Timeout, as problem details.
+            `/problems/upstream-unavailable`: Answered by the load balancer, not
+            by a replica: no replica answered, one sent a broken response, or
+            none answered in time. Locally nginx answers it as problem details;
+            in AWS the ALB answers its own 502, 503 and 504 as `text/html`
+            without a problem body, `Retry-After` or `X-Request-Id`, so a client
+            keys on the status, as the retry policy does. The outcome of a POST
+            is unknown: retry after `Retry-After` (1 second) with the same
+            `Idempotency-Key`, which answers the stored response if the movement
+            committed."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 504
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
       parameters:
         - $ref: "#/components/parameters/OptionalIdempotencyKey"
@@ -745,6 +972,36 @@ paths:
                     errors:
                       - pointer: /amount
                         detail: Must be a string of decimal digits.
+        "429":
+          description: "Too Many Requests, as problem details. `/problems/rate-limited`:
+            Too many requests. One user sent more than `RATE_LIMIT_USER_MAX`
+            (300 by default) authenticated requests within a window of
+            `RATE_LIMIT_USER_WINDOW_S` (10 by default) seconds that starts at
+            the user's first request, refused ones and replays included;
+            `Retry-After` is the whole seconds left in the window. Or one client
+            IP passed the per-IP limit in front of the service: nginx answers
+            with `Retry-After: 1`, and AWS WAF with `Retry-After: 60` and a body
+            of content type `application/json` without `requestId`. Nothing is
+            changed or stored: wait `Retry-After` seconds before sending more
+            requests."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                rate-limited:
+                  summary: Rate Limited
+                  value:
+                    type: /problems/rate-limited
+                    title: Rate Limited
+                    status: 429
+                    detail: Too many requests; retry after the number of seconds in Retry-After.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "500":
           description: "Internal Server Error, as problem details.
             `/problems/internal-error`: A defect. The body never holds
@@ -765,12 +1022,58 @@ paths:
                     status: 500
                     detail: The service failed to process the request.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "502":
+          description: "Bad Gateway, as problem details. `/problems/upstream-unavailable`:
+            Answered by the load balancer, not by a replica: no replica
+            answered, one sent a broken response, or none answered in time.
+            Locally nginx answers it as problem details; in AWS the ALB answers
+            its own 502, 503 and 504 as `text/html` without a problem body,
+            `Retry-After` or `X-Request-Id`, so a client keys on the status, as
+            the retry policy does. The outcome of a POST is unknown: retry after
+            `Retry-After` (1 second) with the same `Idempotency-Key`, which
+            answers the stored response if the movement committed."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 502
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "503":
           description: "Service Unavailable, as problem details.
-            `/problems/service-unavailable`: A transient condition: an account
-            lock not acquired in time, a deadlock still present after 3
-            attempts, or a statement timeout. Retry after `Retry-After`, with
-            the same `Idempotency-Key` for a POST."
+            `/problems/service-unavailable`: A transient condition of a replica,
+            with `Retry-After: 1`: no database connection free within
+            `DB_POOL_ACQUIRE_TIMEOUT_MS`, or in AWS none free at RDS Proxy
+            within its 5 s borrow timeout, an account lock not acquired in time,
+            a deadlock or serialization failure still present after 3 attempts,
+            a statement timeout, the request timeout `REQUEST_TIMEOUT_MS` (25 s
+            by default) reached, or the replica shutting down. Nothing is
+            stored, and the transaction rolls back; only when the request
+            timeout comes after the `COMMIT` was sent does that commit finish,
+            with an outcome unknown to the client. Retry after `Retry-After`,
+            with the same `Idempotency-Key` for a POST, which then gets the
+            stored response if the movement committed.
+            `/problems/upstream-unavailable`: Answered by the load balancer, not
+            by a replica: no replica answered, one sent a broken response, or
+            none answered in time. Locally nginx answers it as problem details;
+            in AWS the ALB answers its own 502, 503 and 504 as `text/html`
+            without a problem body, `Retry-After` or `X-Request-Id`, so a client
+            keys on the status, as the retry policy does. The outcome of a POST
+            is unknown: retry after `Retry-After` (1 second) with the same
+            `Idempotency-Key`, which answers the stored response if the movement
+            committed."
           headers:
             X-Request-Id:
               $ref: "#/components/headers/RequestId"
@@ -789,6 +1092,45 @@ paths:
                     status: 503
                     detail: The service could not complete the request in time; retry later, with
                       the same Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 503
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "504":
+          description: "Gateway Timeout, as problem details.
+            `/problems/upstream-unavailable`: Answered by the load balancer, not
+            by a replica: no replica answered, one sent a broken response, or
+            none answered in time. Locally nginx answers it as problem details;
+            in AWS the ALB answers its own 502, 503 and 504 as `text/html`
+            without a problem body, `Retry-After` or `X-Request-Id`, so a client
+            keys on the status, as the retry policy does. The outcome of a POST
+            is unknown: retry after `Retry-After` (1 second) with the same
+            `Idempotency-Key`, which answers the stored response if the movement
+            committed."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 504
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
       security:
         - bearer: []
@@ -971,6 +1313,36 @@ paths:
                     errors:
                       - pointer: /amount
                         detail: Must be a string of decimal digits.
+        "429":
+          description: "Too Many Requests, as problem details. `/problems/rate-limited`:
+            Too many requests. One user sent more than `RATE_LIMIT_USER_MAX`
+            (300 by default) authenticated requests within a window of
+            `RATE_LIMIT_USER_WINDOW_S` (10 by default) seconds that starts at
+            the user's first request, refused ones and replays included;
+            `Retry-After` is the whole seconds left in the window. Or one client
+            IP passed the per-IP limit in front of the service: nginx answers
+            with `Retry-After: 1`, and AWS WAF with `Retry-After: 60` and a body
+            of content type `application/json` without `requestId`. Nothing is
+            changed or stored: wait `Retry-After` seconds before sending more
+            requests."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                rate-limited:
+                  summary: Rate Limited
+                  value:
+                    type: /problems/rate-limited
+                    title: Rate Limited
+                    status: 429
+                    detail: Too many requests; retry after the number of seconds in Retry-After.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "500":
           description: "Internal Server Error, as problem details.
             `/problems/internal-error`: A defect. The body never holds
@@ -991,12 +1363,58 @@ paths:
                     status: 500
                     detail: The service failed to process the request.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "502":
+          description: "Bad Gateway, as problem details. `/problems/upstream-unavailable`:
+            Answered by the load balancer, not by a replica: no replica
+            answered, one sent a broken response, or none answered in time.
+            Locally nginx answers it as problem details; in AWS the ALB answers
+            its own 502, 503 and 504 as `text/html` without a problem body,
+            `Retry-After` or `X-Request-Id`, so a client keys on the status, as
+            the retry policy does. The outcome of a POST is unknown: retry after
+            `Retry-After` (1 second) with the same `Idempotency-Key`, which
+            answers the stored response if the movement committed."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 502
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "503":
           description: "Service Unavailable, as problem details.
-            `/problems/service-unavailable`: A transient condition: an account
-            lock not acquired in time, a deadlock still present after 3
-            attempts, or a statement timeout. Retry after `Retry-After`, with
-            the same `Idempotency-Key` for a POST."
+            `/problems/service-unavailable`: A transient condition of a replica,
+            with `Retry-After: 1`: no database connection free within
+            `DB_POOL_ACQUIRE_TIMEOUT_MS`, or in AWS none free at RDS Proxy
+            within its 5 s borrow timeout, an account lock not acquired in time,
+            a deadlock or serialization failure still present after 3 attempts,
+            a statement timeout, the request timeout `REQUEST_TIMEOUT_MS` (25 s
+            by default) reached, or the replica shutting down. Nothing is
+            stored, and the transaction rolls back; only when the request
+            timeout comes after the `COMMIT` was sent does that commit finish,
+            with an outcome unknown to the client. Retry after `Retry-After`,
+            with the same `Idempotency-Key` for a POST, which then gets the
+            stored response if the movement committed.
+            `/problems/upstream-unavailable`: Answered by the load balancer, not
+            by a replica: no replica answered, one sent a broken response, or
+            none answered in time. Locally nginx answers it as problem details;
+            in AWS the ALB answers its own 502, 503 and 504 as `text/html`
+            without a problem body, `Retry-After` or `X-Request-Id`, so a client
+            keys on the status, as the retry policy does. The outcome of a POST
+            is unknown: retry after `Retry-After` (1 second) with the same
+            `Idempotency-Key`, which answers the stored response if the movement
+            committed."
           headers:
             X-Request-Id:
               $ref: "#/components/headers/RequestId"
@@ -1015,6 +1433,45 @@ paths:
                     status: 503
                     detail: The service could not complete the request in time; retry later, with
                       the same Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 503
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "504":
+          description: "Gateway Timeout, as problem details.
+            `/problems/upstream-unavailable`: Answered by the load balancer, not
+            by a replica: no replica answered, one sent a broken response, or
+            none answered in time. Locally nginx answers it as problem details;
+            in AWS the ALB answers its own 502, 503 and 504 as `text/html`
+            without a problem body, `Retry-After` or `X-Request-Id`, so a client
+            keys on the status, as the retry policy does. The outcome of a POST
+            is unknown: retry after `Retry-After` (1 second) with the same
+            `Idempotency-Key`, which answers the stored response if the movement
+            committed."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 504
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
       security:
         - bearer: []
@@ -1218,6 +1675,36 @@ paths:
                     errors:
                       - pointer: /amount
                         detail: Must be a string of decimal digits.
+        "429":
+          description: "Too Many Requests, as problem details. `/problems/rate-limited`:
+            Too many requests. One user sent more than `RATE_LIMIT_USER_MAX`
+            (300 by default) authenticated requests within a window of
+            `RATE_LIMIT_USER_WINDOW_S` (10 by default) seconds that starts at
+            the user's first request, refused ones and replays included;
+            `Retry-After` is the whole seconds left in the window. Or one client
+            IP passed the per-IP limit in front of the service: nginx answers
+            with `Retry-After: 1`, and AWS WAF with `Retry-After: 60` and a body
+            of content type `application/json` without `requestId`. Nothing is
+            changed or stored: wait `Retry-After` seconds before sending more
+            requests."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                rate-limited:
+                  summary: Rate Limited
+                  value:
+                    type: /problems/rate-limited
+                    title: Rate Limited
+                    status: 429
+                    detail: Too many requests; retry after the number of seconds in Retry-After.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "500":
           description: "Internal Server Error, as problem details.
             `/problems/internal-error`: A defect. The body never holds
@@ -1238,12 +1725,58 @@ paths:
                     status: 500
                     detail: The service failed to process the request.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "502":
+          description: "Bad Gateway, as problem details. `/problems/upstream-unavailable`:
+            Answered by the load balancer, not by a replica: no replica
+            answered, one sent a broken response, or none answered in time.
+            Locally nginx answers it as problem details; in AWS the ALB answers
+            its own 502, 503 and 504 as `text/html` without a problem body,
+            `Retry-After` or `X-Request-Id`, so a client keys on the status, as
+            the retry policy does. The outcome of a POST is unknown: retry after
+            `Retry-After` (1 second) with the same `Idempotency-Key`, which
+            answers the stored response if the movement committed."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 502
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "503":
           description: "Service Unavailable, as problem details.
-            `/problems/service-unavailable`: A transient condition: an account
-            lock not acquired in time, a deadlock still present after 3
-            attempts, or a statement timeout. Retry after `Retry-After`, with
-            the same `Idempotency-Key` for a POST."
+            `/problems/service-unavailable`: A transient condition of a replica,
+            with `Retry-After: 1`: no database connection free within
+            `DB_POOL_ACQUIRE_TIMEOUT_MS`, or in AWS none free at RDS Proxy
+            within its 5 s borrow timeout, an account lock not acquired in time,
+            a deadlock or serialization failure still present after 3 attempts,
+            a statement timeout, the request timeout `REQUEST_TIMEOUT_MS` (25 s
+            by default) reached, or the replica shutting down. Nothing is
+            stored, and the transaction rolls back; only when the request
+            timeout comes after the `COMMIT` was sent does that commit finish,
+            with an outcome unknown to the client. Retry after `Retry-After`,
+            with the same `Idempotency-Key` for a POST, which then gets the
+            stored response if the movement committed.
+            `/problems/upstream-unavailable`: Answered by the load balancer, not
+            by a replica: no replica answered, one sent a broken response, or
+            none answered in time. Locally nginx answers it as problem details;
+            in AWS the ALB answers its own 502, 503 and 504 as `text/html`
+            without a problem body, `Retry-After` or `X-Request-Id`, so a client
+            keys on the status, as the retry policy does. The outcome of a POST
+            is unknown: retry after `Retry-After` (1 second) with the same
+            `Idempotency-Key`, which answers the stored response if the movement
+            committed."
           headers:
             X-Request-Id:
               $ref: "#/components/headers/RequestId"
@@ -1262,6 +1795,45 @@ paths:
                     status: 503
                     detail: The service could not complete the request in time; retry later, with
                       the same Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 503
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "504":
+          description: "Gateway Timeout, as problem details.
+            `/problems/upstream-unavailable`: Answered by the load balancer, not
+            by a replica: no replica answered, one sent a broken response, or
+            none answered in time. Locally nginx answers it as problem details;
+            in AWS the ALB answers its own 502, 503 and 504 as `text/html`
+            without a problem body, `Retry-After` or `X-Request-Id`, so a client
+            keys on the status, as the retry policy does. The outcome of a POST
+            is unknown: retry after `Retry-After` (1 second) with the same
+            `Idempotency-Key`, which answers the stored response if the movement
+            committed."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 504
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
       security:
         - bearer: []
@@ -1468,6 +2040,51 @@ paths:
                     status: 409
                     detail: The account status does not allow this change.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "413":
+          description: "Payload Too Large, as problem details.
+            `/problems/payload-too-large`: The body is larger than 16384 bytes,
+            by its `Content-Length` or by the bytes received; the service stops
+            reading it. A body above 32 KB gets the same answer from the load
+            balancer. Answered before the idempotency step: nothing is changed
+            or stored."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                payload-too-large:
+                  summary: Payload Too Large
+                  value:
+                    type: /problems/payload-too-large
+                    title: Payload Too Large
+                    status: 413
+                    detail: The request body is larger than 16384 bytes.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "415":
+          description: "Unsupported Media Type, as problem details.
+            `/problems/unsupported-media-type`: The request has a body and its
+            `Content-Type` is missing or is not `application/json`, in any
+            letter case, alone or with `charset=utf-8`. Answered before the
+            idempotency step: nothing is changed or stored."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                unsupported-media-type:
+                  summary: Unsupported Media Type
+                  value:
+                    type: /problems/unsupported-media-type
+                    title: Unsupported Media Type
+                    status: 415
+                    detail: The request body must be application/json, in UTF-8.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "422":
           description: "Unprocessable Entity, as problem details.
             `/problems/validation-error`: The request parses, but a body member
@@ -1492,6 +2109,36 @@ paths:
                     errors:
                       - pointer: /amount
                         detail: Must be a string of decimal digits.
+        "429":
+          description: "Too Many Requests, as problem details. `/problems/rate-limited`:
+            Too many requests. One user sent more than `RATE_LIMIT_USER_MAX`
+            (300 by default) authenticated requests within a window of
+            `RATE_LIMIT_USER_WINDOW_S` (10 by default) seconds that starts at
+            the user's first request, refused ones and replays included;
+            `Retry-After` is the whole seconds left in the window. Or one client
+            IP passed the per-IP limit in front of the service: nginx answers
+            with `Retry-After: 1`, and AWS WAF with `Retry-After: 60` and a body
+            of content type `application/json` without `requestId`. Nothing is
+            changed or stored: wait `Retry-After` seconds before sending more
+            requests."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                rate-limited:
+                  summary: Rate Limited
+                  value:
+                    type: /problems/rate-limited
+                    title: Rate Limited
+                    status: 429
+                    detail: Too many requests; retry after the number of seconds in Retry-After.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "500":
           description: "Internal Server Error, as problem details.
             `/problems/internal-error`: A defect. The body never holds
@@ -1512,12 +2159,58 @@ paths:
                     status: 500
                     detail: The service failed to process the request.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "502":
+          description: "Bad Gateway, as problem details. `/problems/upstream-unavailable`:
+            Answered by the load balancer, not by a replica: no replica
+            answered, one sent a broken response, or none answered in time.
+            Locally nginx answers it as problem details; in AWS the ALB answers
+            its own 502, 503 and 504 as `text/html` without a problem body,
+            `Retry-After` or `X-Request-Id`, so a client keys on the status, as
+            the retry policy does. The outcome of a POST is unknown: retry after
+            `Retry-After` (1 second) with the same `Idempotency-Key`, which
+            answers the stored response if the movement committed."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 502
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "503":
           description: "Service Unavailable, as problem details.
-            `/problems/service-unavailable`: A transient condition: an account
-            lock not acquired in time, a deadlock still present after 3
-            attempts, or a statement timeout. Retry after `Retry-After`, with
-            the same `Idempotency-Key` for a POST."
+            `/problems/service-unavailable`: A transient condition of a replica,
+            with `Retry-After: 1`: no database connection free within
+            `DB_POOL_ACQUIRE_TIMEOUT_MS`, or in AWS none free at RDS Proxy
+            within its 5 s borrow timeout, an account lock not acquired in time,
+            a deadlock or serialization failure still present after 3 attempts,
+            a statement timeout, the request timeout `REQUEST_TIMEOUT_MS` (25 s
+            by default) reached, or the replica shutting down. Nothing is
+            stored, and the transaction rolls back; only when the request
+            timeout comes after the `COMMIT` was sent does that commit finish,
+            with an outcome unknown to the client. Retry after `Retry-After`,
+            with the same `Idempotency-Key` for a POST, which then gets the
+            stored response if the movement committed.
+            `/problems/upstream-unavailable`: Answered by the load balancer, not
+            by a replica: no replica answered, one sent a broken response, or
+            none answered in time. Locally nginx answers it as problem details;
+            in AWS the ALB answers its own 502, 503 and 504 as `text/html`
+            without a problem body, `Retry-After` or `X-Request-Id`, so a client
+            keys on the status, as the retry policy does. The outcome of a POST
+            is unknown: retry after `Retry-After` (1 second) with the same
+            `Idempotency-Key`, which answers the stored response if the movement
+            committed."
           headers:
             X-Request-Id:
               $ref: "#/components/headers/RequestId"
@@ -1536,6 +2229,45 @@ paths:
                     status: 503
                     detail: The service could not complete the request in time; retry later, with
                       the same Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 503
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "504":
+          description: "Gateway Timeout, as problem details.
+            `/problems/upstream-unavailable`: Answered by the load balancer, not
+            by a replica: no replica answered, one sent a broken response, or
+            none answered in time. Locally nginx answers it as problem details;
+            in AWS the ALB answers its own 502, 503 and 504 as `text/html`
+            without a problem body, `Retry-After` or `X-Request-Id`, so a client
+            keys on the status, as the retry policy does. The outcome of a POST
+            is unknown: retry after `Retry-After` (1 second) with the same
+            `Idempotency-Key`, which answers the stored response if the movement
+            committed."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 504
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
       security:
         - bearer: []
@@ -1742,6 +2474,51 @@ paths:
                     status: 409
                     detail: The account status does not allow this change.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "413":
+          description: "Payload Too Large, as problem details.
+            `/problems/payload-too-large`: The body is larger than 16384 bytes,
+            by its `Content-Length` or by the bytes received; the service stops
+            reading it. A body above 32 KB gets the same answer from the load
+            balancer. Answered before the idempotency step: nothing is changed
+            or stored."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                payload-too-large:
+                  summary: Payload Too Large
+                  value:
+                    type: /problems/payload-too-large
+                    title: Payload Too Large
+                    status: 413
+                    detail: The request body is larger than 16384 bytes.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "415":
+          description: "Unsupported Media Type, as problem details.
+            `/problems/unsupported-media-type`: The request has a body and its
+            `Content-Type` is missing or is not `application/json`, in any
+            letter case, alone or with `charset=utf-8`. Answered before the
+            idempotency step: nothing is changed or stored."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                unsupported-media-type:
+                  summary: Unsupported Media Type
+                  value:
+                    type: /problems/unsupported-media-type
+                    title: Unsupported Media Type
+                    status: 415
+                    detail: The request body must be application/json, in UTF-8.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "422":
           description: "Unprocessable Entity, as problem details.
             `/problems/validation-error`: The request parses, but a body member
@@ -1766,6 +2543,36 @@ paths:
                     errors:
                       - pointer: /amount
                         detail: Must be a string of decimal digits.
+        "429":
+          description: "Too Many Requests, as problem details. `/problems/rate-limited`:
+            Too many requests. One user sent more than `RATE_LIMIT_USER_MAX`
+            (300 by default) authenticated requests within a window of
+            `RATE_LIMIT_USER_WINDOW_S` (10 by default) seconds that starts at
+            the user's first request, refused ones and replays included;
+            `Retry-After` is the whole seconds left in the window. Or one client
+            IP passed the per-IP limit in front of the service: nginx answers
+            with `Retry-After: 1`, and AWS WAF with `Retry-After: 60` and a body
+            of content type `application/json` without `requestId`. Nothing is
+            changed or stored: wait `Retry-After` seconds before sending more
+            requests."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                rate-limited:
+                  summary: Rate Limited
+                  value:
+                    type: /problems/rate-limited
+                    title: Rate Limited
+                    status: 429
+                    detail: Too many requests; retry after the number of seconds in Retry-After.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "500":
           description: "Internal Server Error, as problem details.
             `/problems/internal-error`: A defect. The body never holds
@@ -1786,12 +2593,58 @@ paths:
                     status: 500
                     detail: The service failed to process the request.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "502":
+          description: "Bad Gateway, as problem details. `/problems/upstream-unavailable`:
+            Answered by the load balancer, not by a replica: no replica
+            answered, one sent a broken response, or none answered in time.
+            Locally nginx answers it as problem details; in AWS the ALB answers
+            its own 502, 503 and 504 as `text/html` without a problem body,
+            `Retry-After` or `X-Request-Id`, so a client keys on the status, as
+            the retry policy does. The outcome of a POST is unknown: retry after
+            `Retry-After` (1 second) with the same `Idempotency-Key`, which
+            answers the stored response if the movement committed."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 502
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "503":
           description: "Service Unavailable, as problem details.
-            `/problems/service-unavailable`: A transient condition: an account
-            lock not acquired in time, a deadlock still present after 3
-            attempts, or a statement timeout. Retry after `Retry-After`, with
-            the same `Idempotency-Key` for a POST."
+            `/problems/service-unavailable`: A transient condition of a replica,
+            with `Retry-After: 1`: no database connection free within
+            `DB_POOL_ACQUIRE_TIMEOUT_MS`, or in AWS none free at RDS Proxy
+            within its 5 s borrow timeout, an account lock not acquired in time,
+            a deadlock or serialization failure still present after 3 attempts,
+            a statement timeout, the request timeout `REQUEST_TIMEOUT_MS` (25 s
+            by default) reached, or the replica shutting down. Nothing is
+            stored, and the transaction rolls back; only when the request
+            timeout comes after the `COMMIT` was sent does that commit finish,
+            with an outcome unknown to the client. Retry after `Retry-After`,
+            with the same `Idempotency-Key` for a POST, which then gets the
+            stored response if the movement committed.
+            `/problems/upstream-unavailable`: Answered by the load balancer, not
+            by a replica: no replica answered, one sent a broken response, or
+            none answered in time. Locally nginx answers it as problem details;
+            in AWS the ALB answers its own 502, 503 and 504 as `text/html`
+            without a problem body, `Retry-After` or `X-Request-Id`, so a client
+            keys on the status, as the retry policy does. The outcome of a POST
+            is unknown: retry after `Retry-After` (1 second) with the same
+            `Idempotency-Key`, which answers the stored response if the movement
+            committed."
           headers:
             X-Request-Id:
               $ref: "#/components/headers/RequestId"
@@ -1810,6 +2663,45 @@ paths:
                     status: 503
                     detail: The service could not complete the request in time; retry later, with
                       the same Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 503
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "504":
+          description: "Gateway Timeout, as problem details.
+            `/problems/upstream-unavailable`: Answered by the load balancer, not
+            by a replica: no replica answered, one sent a broken response, or
+            none answered in time. Locally nginx answers it as problem details;
+            in AWS the ALB answers its own 502, 503 and 504 as `text/html`
+            without a problem body, `Retry-After` or `X-Request-Id`, so a client
+            keys on the status, as the retry policy does. The outcome of a POST
+            is unknown: retry after `Retry-After` (1 second) with the same
+            `Idempotency-Key`, which answers the stored response if the movement
+            committed."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 504
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
       security:
         - bearer: []
@@ -2016,6 +2908,51 @@ paths:
                     status: 409
                     detail: Only an account with a balance of 0 can be closed.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "413":
+          description: "Payload Too Large, as problem details.
+            `/problems/payload-too-large`: The body is larger than 16384 bytes,
+            by its `Content-Length` or by the bytes received; the service stops
+            reading it. A body above 32 KB gets the same answer from the load
+            balancer. Answered before the idempotency step: nothing is changed
+            or stored."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                payload-too-large:
+                  summary: Payload Too Large
+                  value:
+                    type: /problems/payload-too-large
+                    title: Payload Too Large
+                    status: 413
+                    detail: The request body is larger than 16384 bytes.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "415":
+          description: "Unsupported Media Type, as problem details.
+            `/problems/unsupported-media-type`: The request has a body and its
+            `Content-Type` is missing or is not `application/json`, in any
+            letter case, alone or with `charset=utf-8`. Answered before the
+            idempotency step: nothing is changed or stored."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                unsupported-media-type:
+                  summary: Unsupported Media Type
+                  value:
+                    type: /problems/unsupported-media-type
+                    title: Unsupported Media Type
+                    status: 415
+                    detail: The request body must be application/json, in UTF-8.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "422":
           description: "Unprocessable Entity, as problem details.
             `/problems/validation-error`: The request parses, but a body member
@@ -2040,6 +2977,36 @@ paths:
                     errors:
                       - pointer: /amount
                         detail: Must be a string of decimal digits.
+        "429":
+          description: "Too Many Requests, as problem details. `/problems/rate-limited`:
+            Too many requests. One user sent more than `RATE_LIMIT_USER_MAX`
+            (300 by default) authenticated requests within a window of
+            `RATE_LIMIT_USER_WINDOW_S` (10 by default) seconds that starts at
+            the user's first request, refused ones and replays included;
+            `Retry-After` is the whole seconds left in the window. Or one client
+            IP passed the per-IP limit in front of the service: nginx answers
+            with `Retry-After: 1`, and AWS WAF with `Retry-After: 60` and a body
+            of content type `application/json` without `requestId`. Nothing is
+            changed or stored: wait `Retry-After` seconds before sending more
+            requests."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                rate-limited:
+                  summary: Rate Limited
+                  value:
+                    type: /problems/rate-limited
+                    title: Rate Limited
+                    status: 429
+                    detail: Too many requests; retry after the number of seconds in Retry-After.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "500":
           description: "Internal Server Error, as problem details.
             `/problems/internal-error`: A defect. The body never holds
@@ -2060,12 +3027,58 @@ paths:
                     status: 500
                     detail: The service failed to process the request.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "502":
+          description: "Bad Gateway, as problem details. `/problems/upstream-unavailable`:
+            Answered by the load balancer, not by a replica: no replica
+            answered, one sent a broken response, or none answered in time.
+            Locally nginx answers it as problem details; in AWS the ALB answers
+            its own 502, 503 and 504 as `text/html` without a problem body,
+            `Retry-After` or `X-Request-Id`, so a client keys on the status, as
+            the retry policy does. The outcome of a POST is unknown: retry after
+            `Retry-After` (1 second) with the same `Idempotency-Key`, which
+            answers the stored response if the movement committed."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 502
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "503":
           description: "Service Unavailable, as problem details.
-            `/problems/service-unavailable`: A transient condition: an account
-            lock not acquired in time, a deadlock still present after 3
-            attempts, or a statement timeout. Retry after `Retry-After`, with
-            the same `Idempotency-Key` for a POST."
+            `/problems/service-unavailable`: A transient condition of a replica,
+            with `Retry-After: 1`: no database connection free within
+            `DB_POOL_ACQUIRE_TIMEOUT_MS`, or in AWS none free at RDS Proxy
+            within its 5 s borrow timeout, an account lock not acquired in time,
+            a deadlock or serialization failure still present after 3 attempts,
+            a statement timeout, the request timeout `REQUEST_TIMEOUT_MS` (25 s
+            by default) reached, or the replica shutting down. Nothing is
+            stored, and the transaction rolls back; only when the request
+            timeout comes after the `COMMIT` was sent does that commit finish,
+            with an outcome unknown to the client. Retry after `Retry-After`,
+            with the same `Idempotency-Key` for a POST, which then gets the
+            stored response if the movement committed.
+            `/problems/upstream-unavailable`: Answered by the load balancer, not
+            by a replica: no replica answered, one sent a broken response, or
+            none answered in time. Locally nginx answers it as problem details;
+            in AWS the ALB answers its own 502, 503 and 504 as `text/html`
+            without a problem body, `Retry-After` or `X-Request-Id`, so a client
+            keys on the status, as the retry policy does. The outcome of a POST
+            is unknown: retry after `Retry-After` (1 second) with the same
+            `Idempotency-Key`, which answers the stored response if the movement
+            committed."
           headers:
             X-Request-Id:
               $ref: "#/components/headers/RequestId"
@@ -2084,6 +3097,45 @@ paths:
                     status: 503
                     detail: The service could not complete the request in time; retry later, with
                       the same Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 503
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "504":
+          description: "Gateway Timeout, as problem details.
+            `/problems/upstream-unavailable`: Answered by the load balancer, not
+            by a replica: no replica answered, one sent a broken response, or
+            none answered in time. Locally nginx answers it as problem details;
+            in AWS the ALB answers its own 502, 503 and 504 as `text/html`
+            without a problem body, `Retry-After` or `X-Request-Id`, so a client
+            keys on the status, as the retry policy does. The outcome of a POST
+            is unknown: retry after `Retry-After` (1 second) with the same
+            `Idempotency-Key`, which answers the stored response if the movement
+            committed."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 504
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
       security:
         - bearer: []
@@ -2318,6 +3370,51 @@ paths:
                     detail: A request with this Idempotency-Key is still in progress; retry with the
                       same key.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "413":
+          description: "Payload Too Large, as problem details.
+            `/problems/payload-too-large`: The body is larger than 16384 bytes,
+            by its `Content-Length` or by the bytes received; the service stops
+            reading it. A body above 32 KB gets the same answer from the load
+            balancer. Answered before the idempotency step: nothing is changed
+            or stored."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                payload-too-large:
+                  summary: Payload Too Large
+                  value:
+                    type: /problems/payload-too-large
+                    title: Payload Too Large
+                    status: 413
+                    detail: The request body is larger than 16384 bytes.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "415":
+          description: "Unsupported Media Type, as problem details.
+            `/problems/unsupported-media-type`: The request has a body and its
+            `Content-Type` is missing or is not `application/json`, in any
+            letter case, alone or with `charset=utf-8`. Answered before the
+            idempotency step: nothing is changed or stored."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                unsupported-media-type:
+                  summary: Unsupported Media Type
+                  value:
+                    type: /problems/unsupported-media-type
+                    title: Unsupported Media Type
+                    status: 415
+                    detail: The request body must be application/json, in UTF-8.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "422":
           description: "Unprocessable Entity, as problem details.
             `/problems/idempotency-key-reused`: The `Idempotency-Key` was
@@ -2387,6 +3484,36 @@ paths:
                     errors:
                       - pointer: /amount
                         detail: Must be a string of decimal digits.
+        "429":
+          description: "Too Many Requests, as problem details. `/problems/rate-limited`:
+            Too many requests. One user sent more than `RATE_LIMIT_USER_MAX`
+            (300 by default) authenticated requests within a window of
+            `RATE_LIMIT_USER_WINDOW_S` (10 by default) seconds that starts at
+            the user's first request, refused ones and replays included;
+            `Retry-After` is the whole seconds left in the window. Or one client
+            IP passed the per-IP limit in front of the service: nginx answers
+            with `Retry-After: 1`, and AWS WAF with `Retry-After: 60` and a body
+            of content type `application/json` without `requestId`. Nothing is
+            changed or stored: wait `Retry-After` seconds before sending more
+            requests."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                rate-limited:
+                  summary: Rate Limited
+                  value:
+                    type: /problems/rate-limited
+                    title: Rate Limited
+                    status: 429
+                    detail: Too many requests; retry after the number of seconds in Retry-After.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "500":
           description: "Internal Server Error, as problem details.
             `/problems/internal-error`: A defect. The body never holds
@@ -2407,12 +3534,58 @@ paths:
                     status: 500
                     detail: The service failed to process the request.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "502":
+          description: "Bad Gateway, as problem details. `/problems/upstream-unavailable`:
+            Answered by the load balancer, not by a replica: no replica
+            answered, one sent a broken response, or none answered in time.
+            Locally nginx answers it as problem details; in AWS the ALB answers
+            its own 502, 503 and 504 as `text/html` without a problem body,
+            `Retry-After` or `X-Request-Id`, so a client keys on the status, as
+            the retry policy does. The outcome of a POST is unknown: retry after
+            `Retry-After` (1 second) with the same `Idempotency-Key`, which
+            answers the stored response if the movement committed."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 502
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "503":
           description: "Service Unavailable, as problem details.
-            `/problems/service-unavailable`: A transient condition: an account
-            lock not acquired in time, a deadlock still present after 3
-            attempts, or a statement timeout. Retry after `Retry-After`, with
-            the same `Idempotency-Key` for a POST."
+            `/problems/service-unavailable`: A transient condition of a replica,
+            with `Retry-After: 1`: no database connection free within
+            `DB_POOL_ACQUIRE_TIMEOUT_MS`, or in AWS none free at RDS Proxy
+            within its 5 s borrow timeout, an account lock not acquired in time,
+            a deadlock or serialization failure still present after 3 attempts,
+            a statement timeout, the request timeout `REQUEST_TIMEOUT_MS` (25 s
+            by default) reached, or the replica shutting down. Nothing is
+            stored, and the transaction rolls back; only when the request
+            timeout comes after the `COMMIT` was sent does that commit finish,
+            with an outcome unknown to the client. Retry after `Retry-After`,
+            with the same `Idempotency-Key` for a POST, which then gets the
+            stored response if the movement committed.
+            `/problems/upstream-unavailable`: Answered by the load balancer, not
+            by a replica: no replica answered, one sent a broken response, or
+            none answered in time. Locally nginx answers it as problem details;
+            in AWS the ALB answers its own 502, 503 and 504 as `text/html`
+            without a problem body, `Retry-After` or `X-Request-Id`, so a client
+            keys on the status, as the retry policy does. The outcome of a POST
+            is unknown: retry after `Retry-After` (1 second) with the same
+            `Idempotency-Key`, which answers the stored response if the movement
+            committed."
           headers:
             X-Request-Id:
               $ref: "#/components/headers/RequestId"
@@ -2431,6 +3604,45 @@ paths:
                     status: 503
                     detail: The service could not complete the request in time; retry later, with
                       the same Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 503
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "504":
+          description: "Gateway Timeout, as problem details.
+            `/problems/upstream-unavailable`: Answered by the load balancer, not
+            by a replica: no replica answered, one sent a broken response, or
+            none answered in time. Locally nginx answers it as problem details;
+            in AWS the ALB answers its own 502, 503 and 504 as `text/html`
+            without a problem body, `Retry-After` or `X-Request-Id`, so a client
+            keys on the status, as the retry policy does. The outcome of a POST
+            is unknown: retry after `Retry-After` (1 second) with the same
+            `Idempotency-Key`, which answers the stored response if the movement
+            committed."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 504
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
       security:
         - bearer: []
@@ -2676,6 +3888,51 @@ paths:
                     detail: A request with this Idempotency-Key is still in progress; retry with the
                       same key.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "413":
+          description: "Payload Too Large, as problem details.
+            `/problems/payload-too-large`: The body is larger than 16384 bytes,
+            by its `Content-Length` or by the bytes received; the service stops
+            reading it. A body above 32 KB gets the same answer from the load
+            balancer. Answered before the idempotency step: nothing is changed
+            or stored."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                payload-too-large:
+                  summary: Payload Too Large
+                  value:
+                    type: /problems/payload-too-large
+                    title: Payload Too Large
+                    status: 413
+                    detail: The request body is larger than 16384 bytes.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "415":
+          description: "Unsupported Media Type, as problem details.
+            `/problems/unsupported-media-type`: The request has a body and its
+            `Content-Type` is missing or is not `application/json`, in any
+            letter case, alone or with `charset=utf-8`. Answered before the
+            idempotency step: nothing is changed or stored."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                unsupported-media-type:
+                  summary: Unsupported Media Type
+                  value:
+                    type: /problems/unsupported-media-type
+                    title: Unsupported Media Type
+                    status: 415
+                    detail: The request body must be application/json, in UTF-8.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "422":
           description: "Unprocessable Entity, as problem details.
             `/problems/idempotency-key-reused`: The `Idempotency-Key` was
@@ -2745,6 +4002,36 @@ paths:
                     errors:
                       - pointer: /amount
                         detail: Must be a string of decimal digits.
+        "429":
+          description: "Too Many Requests, as problem details. `/problems/rate-limited`:
+            Too many requests. One user sent more than `RATE_LIMIT_USER_MAX`
+            (300 by default) authenticated requests within a window of
+            `RATE_LIMIT_USER_WINDOW_S` (10 by default) seconds that starts at
+            the user's first request, refused ones and replays included;
+            `Retry-After` is the whole seconds left in the window. Or one client
+            IP passed the per-IP limit in front of the service: nginx answers
+            with `Retry-After: 1`, and AWS WAF with `Retry-After: 60` and a body
+            of content type `application/json` without `requestId`. Nothing is
+            changed or stored: wait `Retry-After` seconds before sending more
+            requests."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                rate-limited:
+                  summary: Rate Limited
+                  value:
+                    type: /problems/rate-limited
+                    title: Rate Limited
+                    status: 429
+                    detail: Too many requests; retry after the number of seconds in Retry-After.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "500":
           description: "Internal Server Error, as problem details.
             `/problems/internal-error`: A defect. The body never holds
@@ -2765,12 +4052,58 @@ paths:
                     status: 500
                     detail: The service failed to process the request.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "502":
+          description: "Bad Gateway, as problem details. `/problems/upstream-unavailable`:
+            Answered by the load balancer, not by a replica: no replica
+            answered, one sent a broken response, or none answered in time.
+            Locally nginx answers it as problem details; in AWS the ALB answers
+            its own 502, 503 and 504 as `text/html` without a problem body,
+            `Retry-After` or `X-Request-Id`, so a client keys on the status, as
+            the retry policy does. The outcome of a POST is unknown: retry after
+            `Retry-After` (1 second) with the same `Idempotency-Key`, which
+            answers the stored response if the movement committed."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 502
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "503":
           description: "Service Unavailable, as problem details.
-            `/problems/service-unavailable`: A transient condition: an account
-            lock not acquired in time, a deadlock still present after 3
-            attempts, or a statement timeout. Retry after `Retry-After`, with
-            the same `Idempotency-Key` for a POST."
+            `/problems/service-unavailable`: A transient condition of a replica,
+            with `Retry-After: 1`: no database connection free within
+            `DB_POOL_ACQUIRE_TIMEOUT_MS`, or in AWS none free at RDS Proxy
+            within its 5 s borrow timeout, an account lock not acquired in time,
+            a deadlock or serialization failure still present after 3 attempts,
+            a statement timeout, the request timeout `REQUEST_TIMEOUT_MS` (25 s
+            by default) reached, or the replica shutting down. Nothing is
+            stored, and the transaction rolls back; only when the request
+            timeout comes after the `COMMIT` was sent does that commit finish,
+            with an outcome unknown to the client. Retry after `Retry-After`,
+            with the same `Idempotency-Key` for a POST, which then gets the
+            stored response if the movement committed.
+            `/problems/upstream-unavailable`: Answered by the load balancer, not
+            by a replica: no replica answered, one sent a broken response, or
+            none answered in time. Locally nginx answers it as problem details;
+            in AWS the ALB answers its own 502, 503 and 504 as `text/html`
+            without a problem body, `Retry-After` or `X-Request-Id`, so a client
+            keys on the status, as the retry policy does. The outcome of a POST
+            is unknown: retry after `Retry-After` (1 second) with the same
+            `Idempotency-Key`, which answers the stored response if the movement
+            committed."
           headers:
             X-Request-Id:
               $ref: "#/components/headers/RequestId"
@@ -2789,6 +4122,45 @@ paths:
                     status: 503
                     detail: The service could not complete the request in time; retry later, with
                       the same Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 503
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "504":
+          description: "Gateway Timeout, as problem details.
+            `/problems/upstream-unavailable`: Answered by the load balancer, not
+            by a replica: no replica answered, one sent a broken response, or
+            none answered in time. Locally nginx answers it as problem details;
+            in AWS the ALB answers its own 502, 503 and 504 as `text/html`
+            without a problem body, `Retry-After` or `X-Request-Id`, so a client
+            keys on the status, as the retry policy does. The outcome of a POST
+            is unknown: retry after `Retry-After` (1 second) with the same
+            `Idempotency-Key`, which answers the stored response if the movement
+            committed."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 504
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
       security:
         - bearer: []
@@ -3048,6 +4420,51 @@ paths:
                     detail: A request with this Idempotency-Key is still in progress; retry with the
                       same key.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "413":
+          description: "Payload Too Large, as problem details.
+            `/problems/payload-too-large`: The body is larger than 16384 bytes,
+            by its `Content-Length` or by the bytes received; the service stops
+            reading it. A body above 32 KB gets the same answer from the load
+            balancer. Answered before the idempotency step: nothing is changed
+            or stored."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                payload-too-large:
+                  summary: Payload Too Large
+                  value:
+                    type: /problems/payload-too-large
+                    title: Payload Too Large
+                    status: 413
+                    detail: The request body is larger than 16384 bytes.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "415":
+          description: "Unsupported Media Type, as problem details.
+            `/problems/unsupported-media-type`: The request has a body and its
+            `Content-Type` is missing or is not `application/json`, in any
+            letter case, alone or with `charset=utf-8`. Answered before the
+            idempotency step: nothing is changed or stored."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                unsupported-media-type:
+                  summary: Unsupported Media Type
+                  value:
+                    type: /problems/unsupported-media-type
+                    title: Unsupported Media Type
+                    status: 415
+                    detail: The request body must be application/json, in UTF-8.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "422":
           description: "Unprocessable Entity, as problem details.
             `/problems/idempotency-key-reused`: The `Idempotency-Key` was
@@ -3129,6 +4546,36 @@ paths:
                     errors:
                       - pointer: /amount
                         detail: Must be a string of decimal digits.
+        "429":
+          description: "Too Many Requests, as problem details. `/problems/rate-limited`:
+            Too many requests. One user sent more than `RATE_LIMIT_USER_MAX`
+            (300 by default) authenticated requests within a window of
+            `RATE_LIMIT_USER_WINDOW_S` (10 by default) seconds that starts at
+            the user's first request, refused ones and replays included;
+            `Retry-After` is the whole seconds left in the window. Or one client
+            IP passed the per-IP limit in front of the service: nginx answers
+            with `Retry-After: 1`, and AWS WAF with `Retry-After: 60` and a body
+            of content type `application/json` without `requestId`. Nothing is
+            changed or stored: wait `Retry-After` seconds before sending more
+            requests."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                rate-limited:
+                  summary: Rate Limited
+                  value:
+                    type: /problems/rate-limited
+                    title: Rate Limited
+                    status: 429
+                    detail: Too many requests; retry after the number of seconds in Retry-After.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "500":
           description: "Internal Server Error, as problem details.
             `/problems/internal-error`: A defect. The body never holds
@@ -3149,12 +4596,58 @@ paths:
                     status: 500
                     detail: The service failed to process the request.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "502":
+          description: "Bad Gateway, as problem details. `/problems/upstream-unavailable`:
+            Answered by the load balancer, not by a replica: no replica
+            answered, one sent a broken response, or none answered in time.
+            Locally nginx answers it as problem details; in AWS the ALB answers
+            its own 502, 503 and 504 as `text/html` without a problem body,
+            `Retry-After` or `X-Request-Id`, so a client keys on the status, as
+            the retry policy does. The outcome of a POST is unknown: retry after
+            `Retry-After` (1 second) with the same `Idempotency-Key`, which
+            answers the stored response if the movement committed."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 502
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "503":
           description: "Service Unavailable, as problem details.
-            `/problems/service-unavailable`: A transient condition: an account
-            lock not acquired in time, a deadlock still present after 3
-            attempts, or a statement timeout. Retry after `Retry-After`, with
-            the same `Idempotency-Key` for a POST."
+            `/problems/service-unavailable`: A transient condition of a replica,
+            with `Retry-After: 1`: no database connection free within
+            `DB_POOL_ACQUIRE_TIMEOUT_MS`, or in AWS none free at RDS Proxy
+            within its 5 s borrow timeout, an account lock not acquired in time,
+            a deadlock or serialization failure still present after 3 attempts,
+            a statement timeout, the request timeout `REQUEST_TIMEOUT_MS` (25 s
+            by default) reached, or the replica shutting down. Nothing is
+            stored, and the transaction rolls back; only when the request
+            timeout comes after the `COMMIT` was sent does that commit finish,
+            with an outcome unknown to the client. Retry after `Retry-After`,
+            with the same `Idempotency-Key` for a POST, which then gets the
+            stored response if the movement committed.
+            `/problems/upstream-unavailable`: Answered by the load balancer, not
+            by a replica: no replica answered, one sent a broken response, or
+            none answered in time. Locally nginx answers it as problem details;
+            in AWS the ALB answers its own 502, 503 and 504 as `text/html`
+            without a problem body, `Retry-After` or `X-Request-Id`, so a client
+            keys on the status, as the retry policy does. The outcome of a POST
+            is unknown: retry after `Retry-After` (1 second) with the same
+            `Idempotency-Key`, which answers the stored response if the movement
+            committed."
           headers:
             X-Request-Id:
               $ref: "#/components/headers/RequestId"
@@ -3173,6 +4666,45 @@ paths:
                     status: 503
                     detail: The service could not complete the request in time; retry later, with
                       the same Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 503
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "504":
+          description: "Gateway Timeout, as problem details.
+            `/problems/upstream-unavailable`: Answered by the load balancer, not
+            by a replica: no replica answered, one sent a broken response, or
+            none answered in time. Locally nginx answers it as problem details;
+            in AWS the ALB answers its own 502, 503 and 504 as `text/html`
+            without a problem body, `Retry-After` or `X-Request-Id`, so a client
+            keys on the status, as the retry policy does. The outcome of a POST
+            is unknown: retry after `Retry-After` (1 second) with the same
+            `Idempotency-Key`, which answers the stored response if the movement
+            committed."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 504
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
       security:
         - bearer: []
@@ -3340,6 +4872,36 @@ paths:
                     errors:
                       - pointer: /amount
                         detail: Must be a string of decimal digits.
+        "429":
+          description: "Too Many Requests, as problem details. `/problems/rate-limited`:
+            Too many requests. One user sent more than `RATE_LIMIT_USER_MAX`
+            (300 by default) authenticated requests within a window of
+            `RATE_LIMIT_USER_WINDOW_S` (10 by default) seconds that starts at
+            the user's first request, refused ones and replays included;
+            `Retry-After` is the whole seconds left in the window. Or one client
+            IP passed the per-IP limit in front of the service: nginx answers
+            with `Retry-After: 1`, and AWS WAF with `Retry-After: 60` and a body
+            of content type `application/json` without `requestId`. Nothing is
+            changed or stored: wait `Retry-After` seconds before sending more
+            requests."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                rate-limited:
+                  summary: Rate Limited
+                  value:
+                    type: /problems/rate-limited
+                    title: Rate Limited
+                    status: 429
+                    detail: Too many requests; retry after the number of seconds in Retry-After.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "500":
           description: "Internal Server Error, as problem details.
             `/problems/internal-error`: A defect. The body never holds
@@ -3360,12 +4922,58 @@ paths:
                     status: 500
                     detail: The service failed to process the request.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "502":
+          description: "Bad Gateway, as problem details. `/problems/upstream-unavailable`:
+            Answered by the load balancer, not by a replica: no replica
+            answered, one sent a broken response, or none answered in time.
+            Locally nginx answers it as problem details; in AWS the ALB answers
+            its own 502, 503 and 504 as `text/html` without a problem body,
+            `Retry-After` or `X-Request-Id`, so a client keys on the status, as
+            the retry policy does. The outcome of a POST is unknown: retry after
+            `Retry-After` (1 second) with the same `Idempotency-Key`, which
+            answers the stored response if the movement committed."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 502
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "503":
           description: "Service Unavailable, as problem details.
-            `/problems/service-unavailable`: A transient condition: an account
-            lock not acquired in time, a deadlock still present after 3
-            attempts, or a statement timeout. Retry after `Retry-After`, with
-            the same `Idempotency-Key` for a POST."
+            `/problems/service-unavailable`: A transient condition of a replica,
+            with `Retry-After: 1`: no database connection free within
+            `DB_POOL_ACQUIRE_TIMEOUT_MS`, or in AWS none free at RDS Proxy
+            within its 5 s borrow timeout, an account lock not acquired in time,
+            a deadlock or serialization failure still present after 3 attempts,
+            a statement timeout, the request timeout `REQUEST_TIMEOUT_MS` (25 s
+            by default) reached, or the replica shutting down. Nothing is
+            stored, and the transaction rolls back; only when the request
+            timeout comes after the `COMMIT` was sent does that commit finish,
+            with an outcome unknown to the client. Retry after `Retry-After`,
+            with the same `Idempotency-Key` for a POST, which then gets the
+            stored response if the movement committed.
+            `/problems/upstream-unavailable`: Answered by the load balancer, not
+            by a replica: no replica answered, one sent a broken response, or
+            none answered in time. Locally nginx answers it as problem details;
+            in AWS the ALB answers its own 502, 503 and 504 as `text/html`
+            without a problem body, `Retry-After` or `X-Request-Id`, so a client
+            keys on the status, as the retry policy does. The outcome of a POST
+            is unknown: retry after `Retry-After` (1 second) with the same
+            `Idempotency-Key`, which answers the stored response if the movement
+            committed."
           headers:
             X-Request-Id:
               $ref: "#/components/headers/RequestId"
@@ -3384,6 +4992,45 @@ paths:
                     status: 503
                     detail: The service could not complete the request in time; retry later, with
                       the same Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 503
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "504":
+          description: "Gateway Timeout, as problem details.
+            `/problems/upstream-unavailable`: Answered by the load balancer, not
+            by a replica: no replica answered, one sent a broken response, or
+            none answered in time. Locally nginx answers it as problem details;
+            in AWS the ALB answers its own 502, 503 and 504 as `text/html`
+            without a problem body, `Retry-After` or `X-Request-Id`, so a client
+            keys on the status, as the retry policy does. The outcome of a POST
+            is unknown: retry after `Retry-After` (1 second) with the same
+            `Idempotency-Key`, which answers the stored response if the movement
+            committed."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 504
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
       security:
         - bearer: []
@@ -3622,6 +5269,51 @@ paths:
                     status: 409
                     detail: The transaction has already been reversed.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "413":
+          description: "Payload Too Large, as problem details.
+            `/problems/payload-too-large`: The body is larger than 16384 bytes,
+            by its `Content-Length` or by the bytes received; the service stops
+            reading it. A body above 32 KB gets the same answer from the load
+            balancer. Answered before the idempotency step: nothing is changed
+            or stored."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                payload-too-large:
+                  summary: Payload Too Large
+                  value:
+                    type: /problems/payload-too-large
+                    title: Payload Too Large
+                    status: 413
+                    detail: The request body is larger than 16384 bytes.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "415":
+          description: "Unsupported Media Type, as problem details.
+            `/problems/unsupported-media-type`: The request has a body and its
+            `Content-Type` is missing or is not `application/json`, in any
+            letter case, alone or with `charset=utf-8`. Answered before the
+            idempotency step: nothing is changed or stored."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                unsupported-media-type:
+                  summary: Unsupported Media Type
+                  value:
+                    type: /problems/unsupported-media-type
+                    title: Unsupported Media Type
+                    status: 415
+                    detail: The request body must be application/json, in UTF-8.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "422":
           description: "Unprocessable Entity, as problem details.
             `/problems/idempotency-key-reused`: The `Idempotency-Key` was
@@ -3700,6 +5392,36 @@ paths:
                     errors:
                       - pointer: /amount
                         detail: Must be a string of decimal digits.
+        "429":
+          description: "Too Many Requests, as problem details. `/problems/rate-limited`:
+            Too many requests. One user sent more than `RATE_LIMIT_USER_MAX`
+            (300 by default) authenticated requests within a window of
+            `RATE_LIMIT_USER_WINDOW_S` (10 by default) seconds that starts at
+            the user's first request, refused ones and replays included;
+            `Retry-After` is the whole seconds left in the window. Or one client
+            IP passed the per-IP limit in front of the service: nginx answers
+            with `Retry-After: 1`, and AWS WAF with `Retry-After: 60` and a body
+            of content type `application/json` without `requestId`. Nothing is
+            changed or stored: wait `Retry-After` seconds before sending more
+            requests."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                rate-limited:
+                  summary: Rate Limited
+                  value:
+                    type: /problems/rate-limited
+                    title: Rate Limited
+                    status: 429
+                    detail: Too many requests; retry after the number of seconds in Retry-After.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "500":
           description: "Internal Server Error, as problem details.
             `/problems/internal-error`: A defect. The body never holds
@@ -3720,12 +5442,58 @@ paths:
                     status: 500
                     detail: The service failed to process the request.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "502":
+          description: "Bad Gateway, as problem details. `/problems/upstream-unavailable`:
+            Answered by the load balancer, not by a replica: no replica
+            answered, one sent a broken response, or none answered in time.
+            Locally nginx answers it as problem details; in AWS the ALB answers
+            its own 502, 503 and 504 as `text/html` without a problem body,
+            `Retry-After` or `X-Request-Id`, so a client keys on the status, as
+            the retry policy does. The outcome of a POST is unknown: retry after
+            `Retry-After` (1 second) with the same `Idempotency-Key`, which
+            answers the stored response if the movement committed."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 502
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
         "503":
           description: "Service Unavailable, as problem details.
-            `/problems/service-unavailable`: A transient condition: an account
-            lock not acquired in time, a deadlock still present after 3
-            attempts, or a statement timeout. Retry after `Retry-After`, with
-            the same `Idempotency-Key` for a POST."
+            `/problems/service-unavailable`: A transient condition of a replica,
+            with `Retry-After: 1`: no database connection free within
+            `DB_POOL_ACQUIRE_TIMEOUT_MS`, or in AWS none free at RDS Proxy
+            within its 5 s borrow timeout, an account lock not acquired in time,
+            a deadlock or serialization failure still present after 3 attempts,
+            a statement timeout, the request timeout `REQUEST_TIMEOUT_MS` (25 s
+            by default) reached, or the replica shutting down. Nothing is
+            stored, and the transaction rolls back; only when the request
+            timeout comes after the `COMMIT` was sent does that commit finish,
+            with an outcome unknown to the client. Retry after `Retry-After`,
+            with the same `Idempotency-Key` for a POST, which then gets the
+            stored response if the movement committed.
+            `/problems/upstream-unavailable`: Answered by the load balancer, not
+            by a replica: no replica answered, one sent a broken response, or
+            none answered in time. Locally nginx answers it as problem details;
+            in AWS the ALB answers its own 502, 503 and 504 as `text/html`
+            without a problem body, `Retry-After` or `X-Request-Id`, so a client
+            keys on the status, as the retry policy does. The outcome of a POST
+            is unknown: retry after `Retry-After` (1 second) with the same
+            `Idempotency-Key`, which answers the stored response if the movement
+            committed."
           headers:
             X-Request-Id:
               $ref: "#/components/headers/RequestId"
@@ -3744,6 +5512,45 @@ paths:
                     status: 503
                     detail: The service could not complete the request in time; retry later, with
                       the same Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 503
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
+                    requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
+        "504":
+          description: "Gateway Timeout, as problem details.
+            `/problems/upstream-unavailable`: Answered by the load balancer, not
+            by a replica: no replica answered, one sent a broken response, or
+            none answered in time. Locally nginx answers it as problem details;
+            in AWS the ALB answers its own 502, 503 and 504 as `text/html`
+            without a problem body, `Retry-After` or `X-Request-Id`, so a client
+            keys on the status, as the retry policy does. The outcome of a POST
+            is unknown: retry after `Retry-After` (1 second) with the same
+            `Idempotency-Key`, which answers the stored response if the movement
+            committed."
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+              examples:
+                upstream-unavailable:
+                  summary: Upstream Unavailable
+                  value:
+                    type: /problems/upstream-unavailable
+                    title: Upstream Unavailable
+                    status: 504
+                    detail: No replica of the service answered; retry later, with the same
+                      Idempotency-Key if the request had one.
                     requestId: 0199c3a2-7b10-7c4e-9a52-3f1e2d4c5b60
       security:
         - bearer: []

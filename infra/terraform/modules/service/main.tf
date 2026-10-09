@@ -39,7 +39,7 @@ resource "aws_ecs_service" "api" {
 
   # A rolling deployment that keeps 100% of the desired count healthy (DEP-R27).
   deployment_minimum_healthy_percent = 100
-  deployment_maximum_percent         = 200
+  deployment_maximum_percent         = var.deployment_max_percent
   health_check_grace_period_seconds  = 30
   availability_zone_rebalancing      = "ENABLED"
 

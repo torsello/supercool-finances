@@ -21,6 +21,9 @@ resource "aws_acm_certificate_validation" "this" {
   certificate_arn = aws_acm_certificate.this.arn
 }
 
+# Internet-facing on purpose, the only resource the internet reaches (DEP-R25, DEP-AC16), so
+# trivy's check for a public load balancer is ignored.
+#trivy:ignore:AVD-AWS-0053
 resource "aws_lb" "this" {
   #checkov:skip=CKV_AWS_91:Access logs need an S3 bucket that section 1.7 of spec 008 does not define; WAF logs and the ALB metrics of section 1.8 cover the edge (ADR-0014).
   #checkov:skip=CKV2_AWS_76:The web ACL holds the managed rule groups section 1.7 of spec 008 names, the known-bad-inputs group (Log4j) among them, and not AnonymousIpList (ADR-0013).
@@ -97,14 +100,34 @@ resource "aws_wafv2_web_acl" "this" {
     allow {}
   }
 
+  # The body of the per-IP rule's 429: the problem details of SEC-R01 without requestId, which WAF
+  # cannot add, and as application/json, the closest content type WAF can send (section 1.6 of
+  # spec 007).
+  custom_response_body {
+    key          = "rate-limited"
+    content_type = "APPLICATION_JSON"
+    content      = "{\"type\":\"/problems/rate-limited\",\"title\":\"Rate Limited\",\"status\":429,\"detail\":\"Too many requests; retry after the number of seconds in Retry-After.\"}"
+  }
+
   # SEC-R45: per client IP over a 1-minute window, which allows no burst, so the limit is
-  # 60 x RATE_LIMIT_IP_RPS (section 1.6 of spec 007).
+  # 60 x RATE_LIMIT_IP_RPS (section 1.6 of spec 007). It answers 429 with Retry-After: 60, the
+  # window; the managed rule groups below still answer 403.
   rule {
     name     = "per-ip-rate-limit"
     priority = 0
 
     action {
-      block {}
+      block {
+        custom_response {
+          response_code            = 429
+          custom_response_body_key = "rate-limited"
+
+          response_header {
+            name  = "Retry-After"
+            value = "60"
+          }
+        }
+      }
     }
 
     statement {

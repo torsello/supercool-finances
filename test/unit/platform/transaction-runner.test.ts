@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   AccountLockTimeout,
   IdempotencyWaitTimeout,
+  ProxyBorrowTimeout,
   RetriesExhausted,
 } from '../../../src/platform/db/errors.js';
 import { toProblem } from '../../../src/platform/http/error-handler.js';
@@ -69,7 +70,52 @@ function setup(random = 0.5) {
 
 const BEGIN = 'BEGIN ISOLATION LEVEL READ COMMITTED';
 
+/** RDS Proxy's answer when no database connection is free within its borrow timeout. */
+function proxyBorrowTimeout(): pg.DatabaseError {
+  const error = databaseError('08000');
+  error.message = 'Timed-out waiting to acquire database connection';
+  return error;
+}
+
 describe('transaction runner', () => {
+  it("SEC-AC39 a movement whose BEGIN or later statement meets RDS Proxy's borrow timeout (08000) answers 503 with Retry-After: 1, is not retried, sends no ROLLBACK and destroys its connection", async () => {
+    for (const failing of [BEGIN, 'INSERT']) {
+      const { runner, client, delays } = setup(0.5);
+      const query = client.query.bind(client);
+      client.query = (text: string) => {
+        if (text === failing) {
+          client.statements.push(text);
+          return Promise.reject(proxyBorrowTimeout());
+        }
+        return query(text);
+      };
+      let attempts = 0;
+      const error = await runner
+        .run(
+          async (work) => {
+            attempts += 1;
+            await work.query('INSERT');
+          },
+          { retry: 'movement' },
+        )
+        .then(
+          () => undefined,
+          (refused: unknown) => refused,
+        );
+
+      expect(error, failing).toBeInstanceOf(ProxyBorrowTimeout);
+      const problem = toProblem(error);
+      expect(problem.status).toBe(503);
+      expect(problem.type).toBe('/problems/service-unavailable');
+      expect(problem.headers['retry-after']).toBe('1');
+      expect(attempts).toBe(failing === BEGIN ? 0 : 1);
+      expect(delays).toEqual([]);
+      expect(client.statements).toEqual(failing === BEGIN ? [BEGIN] : [BEGIN, 'INSERT']);
+      expect(client.releases).toHaveLength(1);
+      expect(client.releases[0]).toBeInstanceOf(Error);
+    }
+  });
+
   it('SYS-R18 bounds the wait before retries 1 to 7 at 10, 20, 40, 80, 160, 200 and 200 ms', () => {
     expect([1, 2, 3, 4, 5, 6, 7].map(backoffBound)).toEqual([10, 20, 40, 80, 160, 200, 200]);
   });

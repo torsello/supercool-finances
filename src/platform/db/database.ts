@@ -3,7 +3,7 @@ import pg from 'pg';
 import { CLIENT_SIDE_LIMIT_MS, RequestTimeout, type RunScope } from '../http/request-timeout.js';
 import { PoolAcquireTimeout, PoolClosed } from './errors.js';
 import type { Database } from './schema.js';
-import { classifyDatabaseError } from './sqlstate.js';
+import { classifyDatabaseError, isProxyBorrowTimeout } from './sqlstate.js';
 
 /** pg's array of `text`, whose parser keeps every element a string (or null). */
 const TEXT_ARRAY_OID = 1009;
@@ -157,6 +157,8 @@ async function raceDeadline<T>(work: Promise<T>, scope: RunScope | undefined): P
  */
 function readConnection(client: pg.PoolClient, scope: RunScope | undefined): PostgresPoolClient {
   let inFlight: Promise<unknown> = Promise.resolve();
+  // Set by RDS Proxy's borrow timeout: the connection is then destroyed, not reused (SEC-R49).
+  let broken: Error | undefined;
   let released = false;
   let limit: unknown;
   // Once only, and never throwing: it runs from timers and promise callbacks, where an error would
@@ -186,6 +188,9 @@ function readConnection(client: pg.PoolClient, scope: RunScope | undefined): Pos
     try {
       return await raceDeadline(statement, scope);
     } catch (error) {
+      if (isProxyBorrowTimeout(error)) {
+        broken ??= new Error('the database proxy found no connection in time', { cause: error });
+      }
       throw classifyDatabaseError(error, 'work');
     }
   };
@@ -200,7 +205,7 @@ function readConnection(client: pg.PoolClient, scope: RunScope | undefined): Pos
         }, CLIENT_SIDE_LIMIT_MS);
       }
       void inFlight.then(() => {
-        release();
+        release(broken);
       });
     },
   };

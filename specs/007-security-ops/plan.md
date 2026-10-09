@@ -79,46 +79,47 @@ The not-ready body is the same whatever check failed; only the `warn` log line n
 
 ## 6. Acceptance criteria
 
-| AC       | Level       | Phase        | Test file                                                      |
-| -------- | ----------- | ------------ | -------------------------------------------------------------- |
-| SEC-AC01 | e2e         | 11-e2e       | `test/e2e/edge-rate-limit.test.ts`                             |
-| SEC-AC02 | integration | 09-hardening | `test/integration/security/user-rate-limit.test.ts`            |
-| SEC-AC03 | integration | 09-hardening | `test/integration/security/user-rate-limit.test.ts`            |
-| SEC-AC04 | e2e         | 11-e2e       | `test/e2e/user-rate-limit.test.ts`                             |
-| SEC-AC05 | e2e         | 11-e2e       | `test/e2e/no-rate-limited.test.ts`                             |
-| SEC-AC06 | integration | 09-hardening | `test/integration/security/redis-down.test.ts`                 |
-| SEC-AC07 | integration | 09-hardening | `test/integration/security/body-limits.test.ts`                |
-| SEC-AC08 | integration | 09-hardening | `test/integration/security/body-limits.test.ts`                |
-| SEC-AC09 | integration | 09-hardening | `test/integration/security/body-limits.test.ts`                |
-| SEC-AC10 | e2e         | 11-e2e       | `test/e2e/edge.test.ts`                                        |
-| SEC-AC11 | integration | 09-hardening | `test/integration/security/headers.test.ts`                    |
-| SEC-AC12 | integration | 09-hardening | `test/integration/security/cors.test.ts`                       |
-| SEC-AC13 | integration | 09-hardening | `test/integration/security/cors.test.ts`                       |
-| SEC-AC14 | integration | 09-hardening | `test/integration/security/trusted-proxies.test.ts`            |
-| SEC-AC15 | e2e         | 11-e2e       | `test/e2e/correlation-id.test.ts`                              |
-| SEC-AC16 | integration | 08-api       | `test/integration/security/json-logs.test.ts`                  |
-| SEC-AC17 | integration | 09-hardening | `test/integration/security/redaction.test.ts`                  |
-| SEC-AC18 | integration | 09-hardening | `test/integration/security/health.test.ts`                     |
-| SEC-AC19 | integration | 09-hardening | `test/integration/security/health.test.ts`                     |
-| SEC-AC20 | integration | 09-hardening | `test/integration/security/shutdown.test.ts`                   |
-| SEC-AC21 | unit        | 09-hardening | `test/unit/platform/shutdown.test.ts`                          |
-| SEC-AC22 | integration | 09-hardening | `test/integration/security/database-sessions.test.ts`          |
-| SEC-AC23 | integration | 09-hardening | `test/integration/security/database-sessions.test.ts`          |
-| SEC-AC24 | integration | 09-hardening | `test/integration/security/statement-timeout.test.ts`          |
-| SEC-AC25 | unit        | 09-hardening | `test/unit/platform/request-timeout.test.ts`                   |
-| SEC-AC26 | unit        | 10-runtime   | `test/unit/deployment/timeouts.test.ts`                        |
-| SEC-AC27 | integration | 09-hardening | `test/integration/security/pool.test.ts`                       |
-| SEC-AC28 | integration | 09-hardening | `test/integration/security/pool.test.ts`                       |
-| SEC-AC29 | unit        | 10-runtime   | `test/unit/deployment/pool-budget.test.ts`                     |
-| SEC-AC30 | unit        | 09-hardening | `test/unit/platform/config.test.ts`                            |
-| SEC-AC31 | integration | 09-hardening | `test/integration/security/startup.test.ts`                    |
-| SEC-AC32 | integration | 09-hardening | `test/integration/security/metrics.test.ts`                    |
-| SEC-AC33 | unit        | 10-runtime   | `test/unit/deployment/metrics-port.test.ts`                    |
-| SEC-AC34 | integration | 08-api       | `test/integration/security/api-docs.test.ts`                   |
-| SEC-AC35 | ci          | 12-infra     | CI step `npm run infra:validate` in `.github/workflows/ci.yml` |
-| SEC-AC36 | unit        | 10-runtime   | `test/unit/deployment/timeouts.test.ts`                        |
-| SEC-AC37 | integration | 05-schema    | `test/integration/platform/session-functions.test.ts`          |
-| SEC-AC38 | unit        | 09-hardening | `test/unit/platform/request-timeout.test.ts`                   |
+| AC       | Level       | Phase        | Test file                                                                               |
+| -------- | ----------- | ------------ | --------------------------------------------------------------------------------------- |
+| SEC-AC01 | e2e         | 11-e2e       | `test/e2e/edge-rate-limit.test.ts`                                                      |
+| SEC-AC02 | integration | 09-hardening | `test/integration/security/user-rate-limit.test.ts`                                     |
+| SEC-AC03 | integration | 09-hardening | `test/integration/security/user-rate-limit.test.ts`                                     |
+| SEC-AC04 | e2e         | 11-e2e       | `test/e2e/user-rate-limit.test.ts`                                                      |
+| SEC-AC05 | e2e         | 11-e2e       | `test/e2e/no-rate-limited.test.ts`                                                      |
+| SEC-AC06 | integration | 09-hardening | `test/integration/security/redis-down.test.ts`                                          |
+| SEC-AC07 | integration | 09-hardening | `test/integration/security/body-limits.test.ts`                                         |
+| SEC-AC08 | integration | 09-hardening | `test/integration/security/body-limits.test.ts`                                         |
+| SEC-AC09 | integration | 09-hardening | `test/integration/security/body-limits.test.ts`                                         |
+| SEC-AC10 | e2e         | 11-e2e       | `test/e2e/edge.test.ts`                                                                 |
+| SEC-AC11 | integration | 09-hardening | `test/integration/security/headers.test.ts`                                             |
+| SEC-AC12 | integration | 09-hardening | `test/integration/security/cors.test.ts`                                                |
+| SEC-AC13 | integration | 09-hardening | `test/integration/security/cors.test.ts`                                                |
+| SEC-AC14 | integration | 09-hardening | `test/integration/security/trusted-proxies.test.ts`                                     |
+| SEC-AC15 | e2e         | 11-e2e       | `test/e2e/correlation-id.test.ts`                                                       |
+| SEC-AC16 | integration | 08-api       | `test/integration/security/json-logs.test.ts`                                           |
+| SEC-AC17 | integration | 09-hardening | `test/integration/security/redaction.test.ts`                                           |
+| SEC-AC18 | integration | 09-hardening | `test/integration/security/health.test.ts`                                              |
+| SEC-AC19 | integration | 09-hardening | `test/integration/security/health.test.ts`                                              |
+| SEC-AC20 | integration | 09-hardening | `test/integration/security/shutdown.test.ts`                                            |
+| SEC-AC21 | unit        | 09-hardening | `test/unit/platform/shutdown.test.ts`                                                   |
+| SEC-AC22 | integration | 09-hardening | `test/integration/security/database-sessions.test.ts`                                   |
+| SEC-AC23 | integration | 09-hardening | `test/integration/security/database-sessions.test.ts`                                   |
+| SEC-AC24 | integration | 09-hardening | `test/integration/security/statement-timeout.test.ts`                                   |
+| SEC-AC25 | unit        | 09-hardening | `test/unit/platform/request-timeout.test.ts`                                            |
+| SEC-AC26 | unit        | 10-runtime   | `test/unit/deployment/timeouts.test.ts`                                                 |
+| SEC-AC27 | integration | 09-hardening | `test/integration/security/pool.test.ts`                                                |
+| SEC-AC28 | integration | 09-hardening | `test/integration/security/pool.test.ts`                                                |
+| SEC-AC29 | unit        | 10-runtime   | `test/unit/deployment/pool-budget.test.ts`                                              |
+| SEC-AC30 | unit        | 09-hardening | `test/unit/platform/config.test.ts`                                                     |
+| SEC-AC31 | integration | 09-hardening | `test/integration/security/startup.test.ts`                                             |
+| SEC-AC32 | integration | 09-hardening | `test/integration/security/metrics.test.ts`                                             |
+| SEC-AC33 | unit        | 10-runtime   | `test/unit/deployment/metrics-port.test.ts`                                             |
+| SEC-AC34 | integration | 08-api       | `test/integration/security/api-docs.test.ts`                                            |
+| SEC-AC35 | ci          | 12-infra     | CI step `npm run infra:validate` in `.github/workflows/ci.yml`                          |
+| SEC-AC36 | unit        | 10-runtime   | `test/unit/deployment/timeouts.test.ts`                                                 |
+| SEC-AC37 | integration | 05-schema    | `test/integration/platform/session-functions.test.ts`                                   |
+| SEC-AC38 | unit        | 09-hardening | `test/unit/platform/request-timeout.test.ts`                                            |
+| SEC-AC39 | unit        | 12-infra     | `test/unit/platform/transaction-runner.test.ts`, `test/unit/platform/read-pool.test.ts` |
 
 Notes:
 

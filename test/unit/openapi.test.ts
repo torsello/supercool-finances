@@ -3,8 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp } from '../../src/app.js';
 import { loadConfig } from '../../src/platform/config/config.js';
 import {
+  LOAD_BALANCER_PROBLEM_TYPES,
   PROBLEM_REFERENCE,
-  UNDOCUMENTED_PROBLEM_TYPES,
 } from '../../src/platform/http/api-reference.js';
 import { PROBLEM_TYPES } from '../../src/platform/http/problem.js';
 import { OPENAPI_PATH, renderOpenApiYaml } from '../../scripts/openapi.js';
@@ -106,49 +106,50 @@ describe('the OpenAPI document (SEC-R44)', () => {
     }
   });
 
-  it('SEC-R44 documents every problem type of the registry with its status, title and detail', () => {
-    for (const [type, reference] of Object.entries(PROBLEM_REFERENCE)) {
-      const problem = PROBLEM_TYPES[type as keyof typeof PROBLEM_REFERENCE];
-      expect(reference.statuses, type).toContain(problem.status);
+  it('SEC-R44 documents every problem type of the registry and of the load balancer with its status, title and detail', async () => {
+    for (const [type, problem] of Object.entries(PROBLEM_TYPES)) {
+      const reference = PROBLEM_REFERENCE[type as keyof typeof PROBLEM_TYPES];
+      expect(reference.statuses, type).toEqual([problem.status]);
       expect(reference.title, type).toBe(problem.title);
       expect(reference.detail, type).toBe(problem.detail);
     }
+    // The load balancer's own types read as nginx renders them (section 1.5 of spec 008).
+    const template = await readFile('docker/nginx/templates/default.conf.template', 'utf8');
+    for (const [type, reference] of Object.entries(LOAD_BALANCER_PROBLEM_TYPES)) {
+      for (const status of reference.statuses) {
+        expect(template, `${type} ${String(status)}`).toContain(
+          `return ${String(status)} '${JSON.stringify({ type, title: reference.title, status, detail: reference.detail }).slice(0, -1)},"requestId":`,
+        );
+      }
+    }
+    expect(Object.keys(PROBLEM_REFERENCE).sort()).toEqual(
+      [...Object.keys(PROBLEM_TYPES), ...Object.keys(LOAD_BALANCER_PROBLEM_TYPES)].sort(),
+    );
+    const operations = Object.values(document.paths).flatMap((item) => Object.values(item));
     const documented = new Set(
-      Object.values(document.paths)
-        .flatMap((item) => Object.values(item))
+      operations
         .flatMap((operation) => Object.values(operation.responses))
         .flatMap((response) => Object.values(response.content ?? {}))
         .flatMap((media) => Object.values(media.examples ?? {}))
         .map((example) => (example.value as { type?: string }).type),
     );
     expect([...documented].sort()).toEqual(Object.keys(PROBLEM_REFERENCE).sort());
-    // Every type of the registry is documented, except those of spec 007 that the 12-infra docs
-    // task adds.
-    expect(
-      Object.keys(PROBLEM_TYPES)
-        .filter((type) => !(type in PROBLEM_REFERENCE))
-        .sort(),
-    ).toEqual([...UNDOCUMENTED_PROBLEM_TYPES].sort());
-    // Only what the service answers today: the 413, 415 and 429 types of spec 007 and the load
-    // balancer's upstream-unavailable join with the 12-infra docs task of plan 007, as do the pool
-    // wait and the request timeout among the causes of a 503.
-    const text = JSON.stringify(document);
-    for (const type of [
-      '/problems/payload-too-large',
-      '/problems/unsupported-media-type',
-      '/problems/rate-limited',
-      '/problems/upstream-unavailable',
-    ]) {
-      expect(text, type).not.toContain(type);
-    }
-    for (const status of ['413', '415', '429', '502', '504']) {
-      for (const item of Object.values(document.paths)) {
-        for (const operation of Object.values(item)) {
-          expect(operation.responses, status).not.toHaveProperty(status);
-        }
+    // Every operation can be rate limited and can meet the load balancer's gateway errors; every
+    // operation with a body can be refused for its media type or its size (spec 007).
+    for (const operation of operations) {
+      const name = operation.operationId ?? '';
+      for (const status of ['429', '502', '503', '504']) {
+        expect(operation.responses, `${name} ${status}`).toHaveProperty(status);
+      }
+      for (const status of ['413', '415']) {
+        expect(operation.responses[status] !== undefined, `${name} ${status}`).toBe(
+          operation.requestBody !== undefined,
+        );
       }
     }
-    expect(text).not.toContain('no database connection free');
-    expect(text).not.toContain('request timeout');
+    // The 503 names its causes: the pool wait and the request timeout among them (SEC-R33, SEC-R37).
+    const unavailable = PROBLEM_REFERENCE['/problems/service-unavailable'].when;
+    expect(unavailable).toContain('DB_POOL_ACQUIRE_TIMEOUT_MS');
+    expect(unavailable).toContain('REQUEST_TIMEOUT_MS');
   });
 });

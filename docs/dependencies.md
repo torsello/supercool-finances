@@ -43,3 +43,11 @@ A new dependency needs an ADR or the owner's approval recorded here (AGENTS.md Â
 | `pino-pretty`            | Readable local logs.                                                                                          | 08-api        |
 | `@redocly/cli`           | OpenAPI linting and bundling.                                                                                 | 08-api        |
 | `yaml`                   | Parses `compose.yaml` in the deployment unit tests (plan 007 section 8). Approved by the owner on 2026-10-08. | 10-runtime    |
+
+## CI tools
+
+Tools CI runs outside `package.json`, each pinned by version and digest or checksum. Terraform, tflint and checkov run through `npm run infra:validate` (ADR-0015), and gitleaks in the job `secret-scan` (spec 008, DEP-R36).
+
+| Tool    | Purpose                                                                                                                                                                                                                                                                    | First used in |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| `trivy` | The job `security` of `.github/workflows/ci.yml`: `trivy fs`, `trivy config` and `trivy image` of the runtime stage, failing on HIGH and CRITICAL, from the `aquasec/trivy` image pinned by version and digest. Approved by the owner on 2026-10-09 (plan 000 section 11). | 12-infra      |

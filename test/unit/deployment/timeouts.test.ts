@@ -3,6 +3,8 @@ import { KEEP_ALIVE_TIMEOUT_MS } from '../../../src/app.js';
 import { ConfigError, loadConfig, type Environment } from '../../../src/platform/config/config.js';
 import {
   checkRequestTimeouts,
+  checkTerraformRequestTimeout,
+  terraformApiConfig,
   findDirectives,
   nginxTimeMs,
   onlyArgument,
@@ -10,6 +12,7 @@ import {
   readCompose,
   readNginxTemplate,
   readRepositoryFile,
+  readTerraform,
 } from '../../support/deployment.js';
 import { shippedMigrations } from '../../support/migrations.js';
 
@@ -118,5 +121,49 @@ describe('the timeout layers', () => {
       expect(check.problems).toHaveLength(1);
       expect(check.problems[0]).toContain('REQUEST_TIMEOUT_MS');
     }
+
+    // AWS: the api container's REQUEST_TIMEOUT_MS against the ALB's idle timeout of 60 s.
+    expect(checkTerraformRequestTimeout(readTerraform())).toEqual({
+      replica: 'aws:api',
+      requestTimeoutMs: 25000,
+      loadBalancerTimeoutMs: 60_000,
+      problems: [],
+    });
+
+    // Read from the Terraform, not assumed: a copy whose ALB idle timeout is 25 s fails the check.
+    const variablesPath = 'infra/terraform/variables.tf';
+    const variables = readRepositoryFile(variablesPath);
+    const idleTimeout = /(variable "alb_idle_timeout_seconds" \{[^}]*default\s*=\s*)60\b/;
+    expect(variables).toMatch(idleTimeout);
+    const lowered = checkTerraformRequestTimeout(
+      readTerraform({ [variablesPath]: variables.replace(idleTimeout, '$125') }),
+    );
+    expect(lowered.loadBalancerTimeoutMs).toBe(25_000);
+    expect(lowered.problems).toHaveLength(1);
+    expect(lowered.problems[0]).toContain('REQUEST_TIMEOUT_MS');
+  });
+
+  it('SEC-AC29 SEC-AC36 the AWS checks refuse a budget variable of the api container they cannot read, instead of falling back to its default', () => {
+    const path = 'infra/terraform/modules/service/task_definitions.tf';
+    const original = readRepositoryFile(path);
+    const cases = [
+      [
+        'tostring(var.request_timeout_ms)',
+        'tostring(var.request_timeout_ms + 0)',
+        'REQUEST_TIMEOUT_MS',
+      ],
+      ['tostring(var.db_pool_max)', 'tostring(max(var.db_pool_max, 1))', 'DB_POOL_MAX'],
+      [
+        '{ name = "SHUTDOWN_TIMEOUT_MS", value = tostring(var.shutdown_timeout_ms) }',
+        '{ value = tostring(var.shutdown_timeout_ms), name = "SHUTDOWN_TIMEOUT_MS" }',
+        'SHUTDOWN_TIMEOUT_MS',
+      ],
+    ] as const;
+    for (const [written, changed, variable] of cases) {
+      expect(original).toContain(written);
+      const copy = readTerraform({ [path]: original.replace(written, changed) });
+      expect(() => terraformApiConfig(copy), variable).toThrow(variable);
+    }
+    expect(terraformApiConfig(readTerraform()).requestTimeoutMs).toBe(25000);
   });
 });

@@ -12691,3 +12691,217 @@
   run.
 
 ✻ Brewed for 5m 44s · done 3:04 AM
+
+❯ /export docs/ai/transcripts/12-infra-part1.txt                                
+  ⎿  Conversation exported to: /Users/matiastorsello/supercool-finances/docs/ai/
+     transcripts/12-infra-part1.txt
+
+❯ SEC-AC24 failed again at 4889 ms: the colima VM's clock runs slightly fast    
+  against the host's after drift, so Postgres's 5 s statement_timeout lasts     
+  less than 5 s on the host clock. Instead of widening the tolerance, measure   
+  the elapsed time on the database's own clock: read clock_timestamp() from a   
+  separate session just before sending the read and again just after its 503,   
+  and assert that at least 5000 ms passed on that clock; keep the SQLSTATE      
+  57014 log assertion and every other assertion, and drop the 50 ms host-clock  
+  tolerance and its comment in favour of one explaining this. Change nothing    
+  else, and run that test file five times in a row.                             
+                                                                                
+  after finish run /ship terraform for aws                                      
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Bash(python3 - <<'EOF'
+      p='test/integration/security/statement-timeout.test.ts'…)
+  ⎿  lint-ok
+     run 1:       Tests  1 passed (1)
+     run 2:       Tests  1 passed (1)
+     … +3 lines (ctrl+o to expand)
+  ⎿  Updated test/integration/security/statement-timeout.test.ts (+17 -7)
+      16  
+      17        const built = buildProductionApp({ env: { DATABASE_URL: s
+          cratch.runtimeUrl } });
+      18        const session = new pg.Client({ connectionString: scratch
+          .ownerUrl });
+      19 +      const clock = new pg.Client({ connectionString: scratch.o
+         +wnerUrl });                                                    
+      20        await session.connect();
+      21 +      await clock.connect();                                   
+      22 +      /** The database server's own time, in milliseconds, from
+         + a session outside the test's lock. */                         
+      23 +      const databaseNow = async (): Promise<number> => {       
+      24 +        const result = await clock.query<{ now: string }>(     
+      25 +          'SELECT (extract(epoch FROM clock_timestamp()) * 1000
+         +)::text AS now',                                               
+      26 +        );                                                     
+      27 +        return Number(result.rows[0]?.now);                    
+      28 +      };                                                       
+      29        try {
+      30          await built.app.ready();
+      31          await session.query('BEGIN');
+     ...
+      37              headers: { ...bearer(tokenFor(c1Id, 'customer')), '
+          x-request-id': reqId },
+      38            });
+      39  
+      31 -        const started = performance.now();                     
+      40 +        const started = await databaseNow();                   
+      41          const blocked = await read('statement-timeout-read');
+      33 -        const elapsed = performance.now() - started;           
+      42 +        const elapsed = (await databaseNow()) - started;       
+      43          await session.query('ROLLBACK');
+      44  
+      45          expect(blocked.statusCode).toBe(503);
+      46          expect(problemOf(blocked).type).toBe('/problems/service
+          -unavailable');
+      47          expect(blocked.headers['retry-after']).toBe('1');
+      39 -        // statement_timeout runs on the database server's cloc
+         -k. Under Docker Desktop, Postgres runs                         
+      40 -        // in a Linux VM whose clock can run slightly fast agai
+         -nst the host's, so the host measures                           
+      41 -        // up to a few tens of milliseconds less than 5 s. The 
+         -50 ms tolerance absorbs that drift;                            
+      42 -        // the log line with SQLSTATE 57014 below proves it was
+         - statement_timeout that answered.                              
+      43 -        expect(elapsed).toBeGreaterThanOrEqual(5000 - 50);     
+      48 +        // statement_timeout runs on the database server's cloc
+         +k, which in a Docker VM can drift from                         
+      49 +        // the host's, so the elapsed time is measured on that 
+         +clock, with clock_timestamp() read                             
+      50 +        // from a separate session just before the read and jus
+         +t after its 503. The log line with                             
+      51 +        // SQLSTATE 57014 below proves it was statement_timeout
+         + that answered.                                                
+      52 +        expect(elapsed).toBeGreaterThanOrEqual(5000);          
+      53          const unavailable = built.logs
+     … 9 more lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ The test file passed all five runs, and lint is clean. Running /ship now:
+
+⏺ Skill(ship)
+  ⎿  Successfully loaded skill · 12 tools allowed · claude-sonnet-5-5
+
+⏺ Bash(npm run check 2>&1 | tail -6)
+  ⎿   Test Files  61 passed (61)
+           Tests  363 passed (363)
+        Start at  03:07:04
+     … +5 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ Bash(npm run infra:up)
+  ⎿  > supercool-finances@0.1.0 infra:up
+     > docker compose up -d --wait postgres redis
+     … +6 lines (ctrl+o to expand)
+
+⏺ Bash(npm run test:integration 2>&1 | grep -E "FAIL|Tests |Test Files")
+  ⎿   Test Files  136 passed (136)
+           Tests  335 passed (335)
+  ⎿  (timeout 10m)
+
+⏺ Bash(npm run trace -- --require unit,integration 2>&1 | tail -2)
+  ⎿  225 ACs in 9 specs: 213 covered, 12 pending, 0 missing, 0 unverified.
+     Test reports read: unit, integration, e2e.
+
+⏺ Bash(checkov -d infra/terraform --quiet --compact)
+  ⎿  terraform scan results:
+
+     Passed checks: 334, Failed checks: 0, Skipped checks: 24
+     … +4 lines (ctrl+o to expand)
+  ⎿  (timeout 5m)
+
+⏺ All gates pass. Docs check: no new ADRs, the transcript row exists. Staging:
+
+⏺ Bash(git add -A)
+  ⎿  (No output)
+
+⏺ Bash(git status --short)
+  ⎿  M  .dockerignore
+     M  .gitignore
+     M  Dockerfile
+     … +142 lines (ctrl+o to expand)
+
+⏺ Nothing to unstage. Committing:
+
+⏺ Bash(git commit -q -F - <<'EOF'
+      feat(infra): terraform for aws with validated checkov policies…)
+  ⎿  (No output)
+
+⏺ Bash(gitleaks git --no-banner --redact --log-opts="origin/main..HEAD")
+  ⎿  Error: Exit code 1
+     3:09AM INF 1 commits scanned.
+     3:09AM INF scanned ~1291050 bytes (1.29 MB) in 1.88s
+     3:09AM WRN leaks found: 1
+
+⏺ Gitleaks found one leak in the new commit. Finding its file and line without
+  printing the value:
+
+⏺ Bash(gitleaks git --no-banner --redact --log-opts="origin/main..HEAD"
+      --report-format json --report-path /tmp/scf-leaks.json)
+  ⎿  Error: Exit code 1
+     3:09AM INF 1 commits scanned.
+     3:09AM INF scanned ~1291050 bytes (1.29 MB) in 1.86s
+     3:09AM WRN leaks found: 1
+
+⏺ Bash(python3 -c "import
+      json;[print(f['RuleID'],f['File'],f['StartLine'],f['Commit'][:7]) for f in
+      json.load(open('/tmp/scf-leaks.json'))]")
+  ⎿  generic-api-key docs/ai/transcripts/12-infra-part1.txt 166 9b85971
+⏺ The finding is in a transcript in the new commit, so per the skill I redact it
+  and amend.
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ It is the AWS provider docs' example token, not a real secret; the skill still
+  says to redact transcript findings.
+
+⏺ Update(docs/ai/transcripts/12-infra-part1.txt)
+  ⎿  Added 1 line, removed 1 line
+      163  
+      164  ⏺ Bash(cd /private/tmp/claude-501/-Users-matiastorsello-superc
+           ool-finances/6d8f2
+      165        ee0-c377-4cdb-ab8c-578965e620ba/scratchpad && mkdir -p p
+           rov && cd prov &&
+      166 -      curl -sL http…)  ⎿  213:  auth_token                 = "
+          -abcdefgh1234567890"                                           
+      166 +      curl -sL http…)  ⎿  213:  auth_token                 = "
+          +<redacted>"                                                   
+      167       214:  auth_token_update_strategy = "ROTATE"
+      168       218:~> When adding a new `auth_token` to a previously pas
+           swordless rep
+      169       … +42 lines (ctrl+o to expand)
+
+⏺ Bash(git add docs/ai/transcripts/12-infra-part1.txt)
+  ⎿  (No output)
+
+⏺ Bash(git commit -q --amend --no-edit)
+  ⎿  (No output)
+
+⏺ Bash(gitleaks git --no-banner --redact --log-opts="origin/main..HEAD")
+  ⎿  3:09AM INF 1 commits scanned.
+     3:09AM INF scanned ~1291042 bytes (1.29 MB) in 1.87s
+     3:09AM INF no leaks found
+
+⏺ Bash(git push -u origin HEAD)
+  ⎿  remote:
+     remote: Create a pull request for 'phase/12-infra' on GitHub by visiti
+     ng:
+     … +6 lines (ctrl+o to expand)
+
+⏺ Bash(git log --oneline -1)
+  ⎿  21015ef feat(infra): terraform for aws with validated checkov policies
+
+⏺ - Commit: 21015ef feat(infra): terraform for aws with validated checkov 
+    policies, pushed as the new branch origin/phase/12-infra.
+  - Gates: all passed. npm run check 363 unit tests, npm run test:integration
+    335 including SEC-AC24 (which also passed 5 runs in a row after the
+    database-clock fix), trace 213 covered and 0 missing, checkov 0 failures.
+  - Covers: DEP-AC14, DEP-AC24, DEP-AC27, DEP-AC29, DEP-AC30, SEC-AC17,
+    SEC-AC30.
+  - Secret scan: gitleaks flagged one line of
+    docs/ai/transcripts/12-infra-part1.txt, the AWS provider docs' example
+    auth_token, not a real secret. I replaced it with <redacted> and amended the
+    commit before pushing; the rescan found nothing.
+  - No pull request: the description doesn't start with "close phase 12", so
+    none was opened.
+
+✻ Brewed for 3m 34s · done 3:09 AM

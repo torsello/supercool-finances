@@ -91,13 +91,37 @@ variable "min_tasks" {
 }
 
 variable "max_tasks" {
-  description = "Autoscaling maximum; with DB_POOL_MAX it bounds the connections to RDS Proxy (SEC-R36)."
+  description = "Autoscaling maximum; with the rollout surge and DB_POOL_MAX it bounds the connections to RDS Proxy (SEC-R36)."
   type        = number
   default     = 6
+
+  validation {
+    condition     = var.max_tasks >= var.min_tasks
+    error_message = "max_tasks must not be below min_tasks."
+  }
+
+  # The connection budget of SEC-R36, a deployment's surge included (section 1.9 of spec 007):
+  # 6 x 200 / 100 = 12 tasks, 12 x (10 + 1) + 10 = 142 < 200 - 3 with the defaults.
+  validation {
+    condition     = floor(var.max_tasks * var.deployment_maximum_percent / 100) * (var.db_pool_max + 1) + 10 < var.db_max_connections - 3
+    error_message = "A rollout at max_tasks x deployment_maximum_percent / 100 tasks needs tasks x (db_pool_max + 1) + 10 connections, which must stay below db_max_connections - 3 (SEC-R36)."
+  }
+}
+
+variable "deployment_maximum_percent" {
+  description = "The ECS service's surge during a rollout, in percent of the desired count; counted in the connection budget (SEC-R36)."
+  type        = number
+  default     = 200
+}
+
+variable "db_max_connections" {
+  description = "max_connections of the RDS parameter group, a static parameter applied at the next reboot (SEC-R36)."
+  type        = number
+  default     = 200
 }
 
 variable "db_pool_max" {
-  description = "DB_POOL_MAX: 6 tasks x (10 + 1) = 66 connections to RDS Proxy (SEC-R36)."
+  description = "DB_POOL_MAX: in a rollout at 6 tasks x 200%, 12 x (10 + 1) = 132 connections to RDS Proxy (SEC-R36)."
   type        = number
   default     = 10
 }
@@ -135,10 +159,23 @@ variable "shutdown_timeout_ms" {
   type        = number
   default     = 30000
 
+  # The service exits on its own 5 s after the drain and the shutdown timeout (src/main.ts), so
+  # ECS's SIGKILL at stopTimeout must come later still (DEP-R27).
   validation {
-    condition     = var.shutdown_drain_delay_ms + var.shutdown_timeout_ms < 40000
-    error_message = "The task definition's stopTimeout of 40 s must exceed SHUTDOWN_DRAIN_DELAY_MS + SHUTDOWN_TIMEOUT_MS (DEP-R27)."
+    condition     = var.shutdown_drain_delay_ms + var.shutdown_timeout_ms + 5000 < var.stop_timeout_seconds * 1000
+    error_message = "SHUTDOWN_DRAIN_DELAY_MS + SHUTDOWN_TIMEOUT_MS + 5000 ms must stay below the task definition's stopTimeout (DEP-R27)."
   }
+
+  validation {
+    condition     = var.shutdown_timeout_ms >= var.request_timeout_ms
+    error_message = "SHUTDOWN_TIMEOUT_MS must not be less than REQUEST_TIMEOUT_MS (SEC-R35), or every task refuses its configuration."
+  }
+}
+
+variable "stop_timeout_seconds" {
+  description = "The api container's stopTimeout, before ECS sends SIGKILL (DEP-R27)."
+  type        = number
+  default     = 40
 }
 
 variable "log_level" {

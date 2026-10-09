@@ -3,6 +3,7 @@ import {
   AccountLockTimeout,
   IdempotencyWaitTimeout,
   LedgerWriteRejected,
+  ProxyBorrowTimeout,
   StatementTimeout,
 } from './errors.js';
 
@@ -43,6 +44,17 @@ export function sqlstateOf(error: unknown): string | undefined {
   return error instanceof Error ? sqlstateOf(error.cause) : undefined;
 }
 
+/** RDS Proxy's answer when its `connection_borrow_timeout` runs out (SEC-R49). */
+const PROXY_BORROW_TIMEOUT = '08000';
+
+/**
+ * Whether a statement failed with RDS Proxy's borrow timeout, after which its connection is never
+ * used again: it is destroyed on release, without a ROLLBACK (SEC-R49).
+ */
+export function isProxyBorrowTimeout(error: unknown): boolean {
+  return sqlstateOf(error) === PROXY_BORROW_TIMEOUT;
+}
+
 /** A deadlock or serialization failure, which the runner retries for movements (SYS-R18). */
 export function isRetryable(error: unknown): boolean {
   return error instanceof pg.DatabaseError && RETRYABLE.has(error.code ?? '');
@@ -75,6 +87,7 @@ export function classifyDatabaseError(error: unknown, step: DatabaseStep): unkno
       : new AccountLockTimeout({ cause: error });
   }
   if (error.code === '57014') return new StatementTimeout({ cause: error });
+  if (error.code === PROXY_BORROW_TIMEOUT) return new ProxyBorrowTimeout({ cause: error });
   if (error.code !== undefined && isLedgerCheck(error)) {
     return new LedgerWriteRejected(error.code, error.constraint, { cause: error });
   }

@@ -62,7 +62,7 @@ No task for this spec: `REPLICA_ID` and `MIGRATION_DATABASE_URL` are validated b
 - [x] Write the `service` module (service, migration, bootstrap and cleanup task definitions, autoscaling, the hourly schedule) and its policies.
 - [x] Write the `database`, `cache` and `secrets` modules and their policies.
 - [x] Write the `observability` module with the log groups and the alarms of section 1.8, and its policies.
-- [ ] Add the CI step `npm run infra:validate` to the `ci` job, passing on the modules above: DEP-AC15, DEP-AC16, DEP-AC17, DEP-AC18, DEP-AC19, DEP-AC20, DEP-AC21, DEP-AC22, DEP-AC23, DEP-AC26 and DEP-AC28.
+- [x] Add the CI step `npm run infra:validate` to the `ci` job, passing on the modules above: DEP-AC15, DEP-AC16, DEP-AC17, DEP-AC18, DEP-AC19, DEP-AC20, DEP-AC21, DEP-AC22, DEP-AC23, DEP-AC26 and DEP-AC28.
 - [x] Test first: DEP-AC24 in `test/unit/deployment/no-terraform-apply.test.ts`.
 - [x] Test first: DEP-AC14 in `test/unit/deployment/aws-doc.test.ts`; then `docs/deployment/aws.md`, with the bootstrap run, the two-pass apply and the refresh of the RDS CA bundle.
-- [ ] Update the docs: in AGENTS.md, `npm run infra:validate` in the commands table, from 12-infra, and `infra/policies/`, `certs/` and `docs/deployment/` in the repository map; the README sections on running the stack, seeding, minting tokens with Docker only and the AWS architecture; a runbook `docs/runbooks/deploy-and-migrate.md`; and the follow-ups closed in ADR-0014, ADR-0015, ADR-0019 and ADR-0020.
+- [x] Update the docs: in AGENTS.md, `npm run infra:validate` in the commands table, from 12-infra, and `infra/policies/`, `certs/` and `docs/deployment/` in the repository map; the README sections on running the stack, seeding, minting tokens with Docker only and the AWS architecture; a runbook `docs/runbooks/deploy-and-migrate.md`; and the follow-ups closed in ADR-0014, ADR-0015, ADR-0019 and ADR-0020.

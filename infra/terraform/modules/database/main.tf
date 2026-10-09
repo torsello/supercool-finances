@@ -57,6 +57,16 @@ resource "aws_db_parameter_group" "this" {
     value = "1"
   }
 
+  # The connection budget of SEC-R36, a deployment's surge included: 6 tasks x 200% = 12 tasks,
+  # 12 x (DB_POOL_MAX 10 + 1) + 10 = 142 of the 197 usable connections (section 1.9 of spec 007).
+  # db.t4g.medium's default is far higher; RDS Proxy keeps at most 90% of it (DEP-R29). A static
+  # parameter: it takes effect at the next reboot.
+  parameter {
+    name         = "max_connections"
+    value        = tostring(var.max_connections)
+    apply_method = "pending-reboot"
+  }
+
   # No statement log holds a bind parameter, such as the bootstrap's password verifiers
   # (section 1.7 of spec 008).
   parameter {
@@ -172,6 +182,10 @@ resource "aws_db_proxy_default_target_group" "this" {
     # which connect to the instance directly (DEP-R29).
     max_connections_percent      = var.proxy_max_connections_percent
     max_idle_connections_percent = 50
+    # Seconds a statement waits for a database connection before the proxy answers SQLSTATE
+    # 08000, which the service answers 503 (SEC-R49): well inside REQUEST_TIMEOUT_MS, beside the
+    # lock and pool waits, instead of AWS's default of 120 s (section 1.1 of spec 007).
+    connection_borrow_timeout = 5
   }
 }
 
