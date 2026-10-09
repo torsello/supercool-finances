@@ -75,3 +75,13 @@ These tasks run in the cross-spec order of plan 000 section 1 for 08-api: authen
 - [x] Add the WAF rate-based rule check to the policies run by `npm run infra:validate`, once plan 008 has added that CI step, so the step proves SEC-AC35.
 - [x] Update the docs: a runbook per operational answer (`docs/runbooks/rate-limits.md`, `docs/runbooks/timeouts-and-503.md`, `docs/runbooks/shutdown.md`), the README sections on configuration, health checks and metrics, the OpenAPI 413, 415, 429 and 503 responses, and the follow-ups closed in ADR-0013 and ADR-0019.
 - [x] Test first: SEC-AC39 in `test/unit/platform/transaction-runner.test.ts` and `test/unit/platform/read-pool.test.ts`; then `ProxyBorrowTimeout` for SQLSTATE 08000 in `src/platform/db/errors.ts` and `sqlstate.ts`, mapped to 503 in `error-handler.ts`, with the connection destroyed and no `ROLLBACK` in the transaction runner and the read pool (SEC-R49); and `connection_borrow_timeout` 5 on RDS Proxy in the `database` module.
+
+## 12b-observability
+
+- [x] Test first: SEC-AC40 in `test/unit/platform/config.test.ts`; then `SENTRY_DSN` in `src/platform/config/config.ts`, and its redaction in `src/platform/logging/logger.ts` (SEC-R22).
+- [x] Test first: SEC-AC43 in `test/unit/platform/error-event.test.ts`; then `src/platform/error-reporting/event.ts`.
+- [x] Test first: SEC-AC46 in `test/unit/platform/error-reporter.test.ts`; then `src/platform/error-reporting/reporter.ts` with its injected clock and transport, and the shutdown coordinator leaving it out of what it waits for.
+- [x] Add `test/support/fake-sentry.ts`, with `test/integration/support/fake-sentry.test.ts` proving it records envelopes, holds them for a given time and refuses them (SEC-R50).
+- [x] Test first: SEC-AC41, SEC-AC42 and SEC-AC44 in `test/integration/security/error-reporting.test.ts`; then the reporter in the composition root, its startup line, and the call from `logFailure`.
+- [x] Test first: SEC-AC45 in `test/integration/security/error-reporting-unavailable.test.ts`; then the transition lines of the reporter.
+- [x] Update the docs: a README section on error reporting (off by default, how to turn it on, exactly what is sent), `SENTRY_DSN=` empty in `.env.example`, the AWS note of section 1.10 in `docs/deployment/aws.md`, and the follow-up closed in ADR-0023.

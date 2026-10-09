@@ -12,7 +12,10 @@ import {
   composeOk,
   downStack,
   LONG_RUNNING,
+  OBSERVABILITY,
   PROJECT,
+  projectContainers,
+  serviceOf,
   serviceStates,
 } from './support/stack.js';
 import { nanos, StartupTimeline } from './support/timeline.js';
@@ -102,6 +105,9 @@ describe('the stack starts from a fresh clone', () => {
       ExitCode: 0,
     });
     expect(states.some((state) => state.Service === 'tools')).toBe(false);
+    // The observability profile is never started by `up` (DEP-R42).
+    const started = (await projectContainers()).map(serviceOf);
+    for (const service of OBSERVABILITY) expect(started, service).not.toContain(service);
 
     const ready = await send({ url: '/health/ready' });
     expect(ready.status).toBe(200);

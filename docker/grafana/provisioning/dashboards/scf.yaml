@@ -1,0 +1,10 @@
+# The dashboards of docker/grafana/dashboards/, which no change from the UI can overwrite (DEP-R44).
+apiVersion: 1
+
+providers:
+  - name: scf
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/dashboards

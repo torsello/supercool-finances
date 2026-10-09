@@ -501,4 +501,42 @@ describe('the configuration of spec 007', () => {
       expect(failure({ [variable]: value }).problems[0]?.variable, variable).toBe(variable);
     }
   });
+
+  it('SEC-AC40 loads SENTRY_DSN unset, empty, https or http to a loopback host, and refuses every other value by name and never with its value', () => {
+    expect(load({}).sentryDsn).toBeUndefined();
+    expect(load({ SENTRY_DSN: '' }).sentryDsn).toBeUndefined();
+    for (const value of [
+      'https://pk-41f2@errors.example/42',
+      'https://pk-41f2@errors.example:8443/42',
+    ]) {
+      expect(load({ SENTRY_DSN: value }).sentryDsn, value).toBe(value);
+    }
+    for (const value of [
+      'http://pk-41f2@127.0.0.1:9000/1',
+      'http://pk-41f2@[::1]:9000/1',
+      'http://pk-41f2@localhost:9000/1',
+    ]) {
+      expect(load({ SENTRY_DSN: value, NODE_ENV: 'production' }).sentryDsn, value).toBe(value);
+    }
+    for (const value of [
+      'http://pk-41f2@errors.example/42',
+      'http://pk-41f2@127.0.0.2:9000/1',
+      'errors.example/42',
+      'ftp://pk-41f2@errors.example/42',
+      'https://errors.example/42',
+      'https://pk-41f2:pw-41f2@errors.example/42',
+      'https://pk-41f2@errors.example/',
+      'https://pk-41f2@errors.example/abc',
+      'https://pk-41f2@errors.example/42?x=1',
+    ]) {
+      const error = failure({ SENTRY_DSN: value });
+      expect(error.problems, value).toEqual([
+        { variable: 'SENTRY_DSN', rule: expect.stringContaining('https://') as unknown },
+      ]);
+      const text = JSON.stringify({ message: error.message, problems: error.problems });
+      for (const part of ['pk-41f2', 'pw-41f2', 'errors.example']) {
+        expect(text, value).not.toContain(part);
+      }
+    }
+  });
 });

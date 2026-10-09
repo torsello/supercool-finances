@@ -37,7 +37,8 @@ function stagesOf(text: string): Stage[] {
 }
 
 /** An image reference with a version tag and a digest, such as `node:24.21.0-alpine@sha256:...`. */
-const PINNED = /^[a-z0-9./_-]+:[0-9][A-Za-z0-9._-]*@sha256:[0-9a-f]{64}$/;
+// A version tag, such as `16.15-alpine` or Prometheus's `v3.15.0`, and a digest (DEP-R22).
+const PINNED = /^[a-z0-9./_-]+:v?[0-9][A-Za-z0-9._-]*@sha256:[0-9a-f]{64}$/;
 
 /** The sources of a COPY, without its flags and destination. */
 function copySources(args: string): { from: string | undefined; sources: string[] } {

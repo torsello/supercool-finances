@@ -11,7 +11,7 @@ TOOLS = $(COMPOSE) build --quiet tools && $(COMPOSE) run --rm tools
 SUB ?= 0192f0a0-0000-7000-8000-00000000d0c1
 ROLE ?= customer
 
-.PHONY: up down logs seed token test reconcile e2e load
+.PHONY: up down logs seed token test reconcile e2e load observability
 
 # Builds the image, the tools image included, and starts the stack, returning once every service
 # is healthy. The tools service is not started: seed, token and reconcile run it on demand.
@@ -19,9 +19,14 @@ up:
 	$(COMPOSE) --profile tools build
 	$(COMPOSE) up --wait
 
+# The stack of `up` plus Prometheus and Grafana, the observability profile of section 1.9 of spec
+# 008 (DEP-R42); Grafana is then at http://localhost:3030. `make down` stops them too.
+observability:
+	$(COMPOSE) --profile observability up --build --wait
+
 # Stops the stack and keeps the database volume; `docker compose down -v` deletes it too.
 down:
-	$(COMPOSE) down
+	$(COMPOSE) --profile observability down
 
 logs:
 	$(COMPOSE) logs --follow

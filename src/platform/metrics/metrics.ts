@@ -156,6 +156,21 @@ export class Metrics {
   }
 }
 
+/** The part of a request that names its route. */
+export interface RoutedRequest {
+  readonly is404: boolean;
+  readonly routeOptions: { readonly url?: string | undefined };
+}
+
+/**
+ * A request's route template, such as `/v1/accounts/:id`, never the path as received, or
+ * `unmatched` for a path that is not a route (SEC-R42); also the route of an error report
+ * (section 1.10 of spec 007).
+ */
+export function routeOf(request: RoutedRequest): string {
+  return request.is404 ? UNMATCHED_ROUTE : (request.routeOptions.url ?? UNMATCHED_ROUTE);
+}
+
 /**
  * Observes every response of `app` in `scf_http_request_duration_seconds`, labelled with the route
  * template, such as `/v1/accounts/:id`, never the path as received, and `unmatched` for a path
@@ -163,8 +178,7 @@ export class Metrics {
  */
 export function registerRequestMetrics(app: FastifyInstance, metrics: Metrics): void {
   app.addHook('onResponse', (request, reply, done) => {
-    const route = request.is404 ? UNMATCHED_ROUTE : (request.routeOptions.url ?? UNMATCHED_ROUTE);
-    metrics.request(request.method, route, reply.statusCode, reply.elapsedTime / 1000);
+    metrics.request(request.method, routeOf(request), reply.statusCode, reply.elapsedTime / 1000);
     done();
   });
 }

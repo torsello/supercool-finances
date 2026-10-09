@@ -22,7 +22,9 @@ describe('compose.yaml', () => {
       nginx: { condition: 'service_started' },
     });
     expect(compose.service('tools').profiles).toEqual(['tools']);
-    for (const service of compose.services.filter((service) => service.name !== 'tools')) {
+    // The observability profile's services start only with it (DEP-R42, DEP-AC31).
+    const onDemand = ['tools', 'prometheus', 'grafana'];
+    for (const service of compose.services.filter((service) => !onDemand.includes(service.name))) {
       expect(service.profiles, service.name).toEqual([]);
     }
   });
@@ -31,7 +33,17 @@ describe('compose.yaml', () => {
     const compose = readCompose();
 
     expect(compose.services.map((service) => service.name).sort()).toEqual(
-      ['api-1', 'api-2', 'migrate', 'nginx', 'postgres', 'redis', 'tools'].sort(),
+      [
+        'api-1',
+        'api-2',
+        'grafana',
+        'migrate',
+        'nginx',
+        'postgres',
+        'prometheus',
+        'redis',
+        'tools',
+      ].sort(),
     );
     expect(compose.service('migrate').buildTarget).toBe('runtime');
     expect(compose.service('migrate').entrypoint).toEqual(['node', 'dist/cli/migrate.js', 'up']);
@@ -90,6 +102,8 @@ describe('compose.yaml', () => {
       { service: 'api-1', hostIp: '127.0.0.1', hostPort: '3001', containerPort: '3000' },
       { service: 'api-2', hostIp: '127.0.0.1', hostPort: '3002', containerPort: '3000' },
       { service: 'nginx', hostIp: '127.0.0.1', hostPort: '8080', containerPort: '8080' },
+      // Only with the profile observability (section 1.9 of spec 008).
+      { service: 'grafana', hostIp: '127.0.0.1', hostPort: '3030', containerPort: '3000' },
     ]);
     for (const service of compose.services) expect(service.expose, service.name).toEqual([]);
   });

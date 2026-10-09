@@ -140,7 +140,7 @@ describe('the deployment reader', () => {
     const compose = readCompose();
     const template = readNginxTemplate();
 
-    expect(compose.services.length).toBe(7);
+    expect(compose.services.length).toBe(9);
     expect(compose.service('nginx').ports).toEqual([
       { hostIp: '127.0.0.1', hostPort: '8080', containerPort: '8080' },
     ]);

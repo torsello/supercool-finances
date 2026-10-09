@@ -49,4 +49,14 @@ describe('the secret scrubber', () => {
     });
     expect(scrub('{"level":30,"time":2026}')).toBe('{"level":30,"time":2026}');
   });
+
+  it('SEC-R22 replaces SENTRY_DSN and its public key, wherever a string value holds them', () => {
+    const dsn = 'https://pk-scrub-7781@errors.example/42';
+    const scrub = secretScrubber({ ...SECRETS, sentryDsn: dsn });
+    const line = `${JSON.stringify({ msg: 'reporting', dsn, key: 'pk-scrub-7781' })}\n`;
+
+    const parsed = JSON.parse(scrub(line)) as Record<string, unknown>;
+
+    expect(parsed).toEqual({ msg: 'reporting', dsn: '[Redacted]', key: '[Redacted]' });
+  });
 });

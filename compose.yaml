@@ -8,6 +8,7 @@ name: supercool-finances
 # the whole network when its subnet overlaps another network of the host. Every port is published on
 # 127.0.0.1 only, and METRICS_PORT never (DEP-R08, SEC-R43). Every image is pinned by version and
 # digest (DEP-R22). `npm run infra:up` starts only postgres and redis, for the tests on the host.
+# Error reporting is never on here: compose.error-reporting.yaml turns it on (DEP-R46).
 
 # The variables of the replicas, also given to the tools service (section 1.4). The demo secrets
 # are the visibly fake values of DEP-R35, which the service refuses when NODE_ENV is production
@@ -170,6 +171,66 @@ services:
         condition: service_started
     healthcheck:
       disable: true
+
+  # The observability profile of section 1.9 of spec 008, never started by `up` (DEP-R42): run
+  # `docker compose --profile observability up --build --wait`, or `make observability`.
+  # Prometheus scrapes METRICS_PORT of both replicas inside this network and publishes no port, so
+  # METRICS_PORT stays internal (DEP-R43, SEC-R43); its data lives in the container for 1 day.
+  prometheus:
+    image: prom/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e
+    profiles: [observability]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=1d
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks: [scf]
+    depends_on:
+      api-1:
+        condition: service_healthy
+      api-2:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:9090/-/ready']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # Grafana on 127.0.0.1:3030 only, anonymous and read-only: visitors are Viewers, nobody can sign
+  # in, and the datasource and the dashboard are provisioned so no visitor can change them. It calls
+  # nothing outside the machine: no usage reports, update checks, news, Gravatar or plugin
+  # downloads (DEP-R44).
+  grafana:
+    image: grafana/grafana:13.2.3@sha256:b28bae15e219c998fb0e0424ed724930cc61b1f61fb404d47c862f9a23f9e572
+    profiles: [observability]
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: 'true'
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_AUTH_DISABLE_LOGIN_FORM: 'true'
+      GF_AUTH_BASIC_ENABLED: 'false'
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: 'false'
+      GF_NEWS_NEWS_FEED_ENABLED: 'false'
+      GF_SECURITY_DISABLE_GRAVATAR: 'true'
+      GF_PLUGINS_PREINSTALL_DISABLED: 'true'
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/dashboards/scf-overview.json
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/grafana/dashboards:/etc/grafana/dashboards:ro
+    networks: [scf]
+    ports:
+      - '127.0.0.1:3030:3000'
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:3000/api/health']
+      interval: 2s
+      timeout: 3s
+      retries: 60
 
 networks:
   # A fixed subnet, so nginx can have a fixed address that TRUSTED_PROXY_CIDRS names (SEC-AC10).

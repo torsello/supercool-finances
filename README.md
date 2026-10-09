@@ -158,7 +158,8 @@ Every setting is an environment variable, validated at startup before the servic
 - The timeouts must fit inside each other: `REQUEST_TIMEOUT_MS` (25000 ms) above the worst case of the lock waits, the pool wait and the retries, and `SHUTDOWN_TIMEOUT_MS` (30000 ms) not below it (SEC-R35). See the [timeouts runbook](docs/runbooks/timeouts-and-503.md).
 - `DB_POOL_MAX` (10) times the replicas, plus one readiness connection each and 10 spare, must fit in the database's connections (SEC-R36).
 - The demo `JWT_SECRET` and `CURSOR_SECRET` of `compose.yaml` are refused when `NODE_ENV` is `production` (DEP-R07). In AWS every secret comes from Secrets Manager, and each database password arrives as `PGPASSWORD` beside a URL that holds none.
-- Secrets, tokens, `Idempotency-Key` values and the passwords of the URLs are redacted from every log line (SEC-R22).
+- Secrets, tokens, `Idempotency-Key` values, the passwords of the URLs and `SENTRY_DSN` are redacted from every log line (SEC-R22).
+- `SENTRY_DSN` is empty or unset by default, which turns error reporting off; see [Error reporting](#error-reporting).
 
 The load balancer reads its own: `RATE_LIMIT_IP_RPS` and `RATE_LIMIT_IP_BURST`. See the [rate limits runbook](docs/runbooks/rate-limits.md).
 
@@ -172,6 +173,33 @@ Both are outside `/v1` and need no token. On SIGTERM a replica drains for `SHUTD
 ## Metrics
 
 Each replica serves Prometheus metrics at `/metrics` on `METRICS_PORT` (9464), a port the load balancer never routes to and no deployment publishes (SEC-R43). Locally: `docker compose exec api-1 wget -qO- http://127.0.0.1:9464/metrics`. Besides Node's process metrics, they count requests by route template and status (`scf_http_request_duration_seconds`), movements by kind and outcome (`scf_money_movements_total`), replays, lock timeouts, transaction retries, the pool's connections and acquire timeouts, and the per-user rate limit and its Redis errors: table 1.4 of [`specs/007-security-ops`](specs/007-security-ops/spec.md).
+
+## Observability profile
+
+An optional Compose profile adds Prometheus and Grafana to the local stack; `docker compose up` never starts it ([ADR-0023](docs/adr/0023-optional-observability-off-by-default.md), section 1.9 of [`specs/008-deployment`](specs/008-deployment/spec.md)).
+
+```sh
+make observability        # or: docker compose --profile observability up --build --wait
+open http://localhost:3030 # Grafana, anonymous and read-only
+make down                 # stops the stack and the profile, keeping the database volume
+```
+
+Prometheus scrapes `/metrics` of `api-1` and `api-2` on `METRICS_PORT` inside the compose network every 5 seconds and publishes no port, so `METRICS_PORT` stays internal. Grafana, on `127.0.0.1:3030` only, lets anonymous visitors view and nobody sign in or change anything, and calls nothing outside the machine. Its dashboard shows, from the metrics above: the replicas scraped, requests and errors by status class, p50, p95 and p99 latency of the `/v1` routes, money movements by kind and outcome, lock timeouts, idempotent replays, rate-limited requests and pool usage. Run `npm run load` or `make load` against it to watch the stack under load.
+
+## Error reporting
+
+Off by default: the demo and the tests need no key and send nothing outside the machine. With `SENTRY_DSN` set, each replica reports every request answered 500 (`/problems/internal-error`) to that Sentry-compatible endpoint (Sentry, self-hosted Sentry or GlitchTip), written by the service's own client with Node's `fetch` (section 1.10 of [`specs/007-security-ops`](specs/007-security-ops/spec.md), ADR-0023). Nothing else is reported: no 4xx, no 503, no error outside a request.
+
+A report holds only the correlation id (`requestId`, which finds the request's log lines), the route template, the method, the replica, the SQLSTATE when there is one, the error's type, its stack frames and its message, scrubbed of secrets, the request's token and key, JWT-shaped tokens, UUIDs and every run of digits. It never holds a header (so neither `Authorization` nor `Idempotency-Key`), a query string, a body, a client address, an amount, an account id, a token or a secret. Reporting never changes or delays an answer: a send is abandoned after 2 s, at most 20 reports wait per replica, and a failure is dropped and logged once when sending starts failing and once when it works again.
+
+`compose.yaml` never passes `SENTRY_DSN`, so a value left in the shell or a stray `.env` sends nothing. To turn it on for the local stack, add the override file, which refuses to start without one:
+
+```sh
+SENTRY_DSN=https://<public key>@<host>/<project id> \
+  docker compose -f compose.yaml -f compose.error-reporting.yaml up --build --wait
+```
+
+The DSN must use `https://`, except for `127.0.0.1`, `[::1]` or `localhost`. In AWS error reporting stays off: the tasks have no outbound internet path (`docs/deployment/aws.md`).
 
 ## AWS deployment
 

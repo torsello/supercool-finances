@@ -36,12 +36,23 @@ function formsOf(secret: string): string[] {
 }
 
 /** The password of a URL, as written in it and decoded; none when it has none or is not a URL. */
-function urlPasswords(value: string): string[] {
+export function urlPasswords(value: string): string[] {
   try {
     const { password } = new URL(value);
     return password === '' ? [] : [password, decodeURIComponent(password)];
   } catch {
     return [];
+  }
+}
+
+/** A DSN and its public key, the user name of the URL; none when unset. */
+export function dsnSecrets(dsn: string | undefined): string[] {
+  if (dsn === undefined || dsn === '') return [];
+  try {
+    const { username } = new URL(dsn);
+    return username === '' ? [dsn] : [dsn, username, decodeURIComponent(username)];
+  } catch {
+    return [dsn];
   }
 }
 
@@ -53,14 +64,16 @@ export interface LogSecrets {
   redisUrl: string;
   /** `PGPASSWORD`, when the database URL leaves the password to it. */
   databasePassword?: string | undefined;
+  /** `SENTRY_DSN`, when error reporting is on: the whole DSN and its public key. */
+  sentryDsn?: string | undefined;
 }
 
 /** A JSON string token, and the colon that makes it a key. */
 const STRING_TOKEN = /"(?:[^"\\]|\\.)*"(\s*:)?/g;
 
 /**
- * Replaces in a log line every form of `JWT_SECRET`, `CURSOR_SECRET`, `PGPASSWORD` and the
- * passwords of `DATABASE_URL` and `REDIS_URL` with `[Redacted]`, wherever a string value holds them, such as an
+ * Replaces in a log line every form of `JWT_SECRET`, `CURSOR_SECRET`, `PGPASSWORD`, `SENTRY_DSN`
+ * and its public key, and the passwords of `DATABASE_URL` and `REDIS_URL` with `[Redacted]`, wherever a string value holds them, such as an
  * error a driver built from its connection settings (SEC-R22). Keys and numbers are never touched,
  * so the line stays valid JSON even for a password such as "30" (SEC-R21). Longer values first,
  * so a secret that contains another is replaced whole.
@@ -72,6 +85,7 @@ export function secretScrubber(secrets: LogSecrets): (line: string) => string {
     secrets.databasePassword ?? '',
     ...urlPasswords(secrets.databaseUrl),
     ...urlPasswords(secrets.redisUrl),
+    ...dsnSecrets(secrets.sentryDsn),
   ]
     .filter((value) => value !== '')
     .flatMap(formsOf);
