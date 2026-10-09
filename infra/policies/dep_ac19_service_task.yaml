@@ -1,0 +1,41 @@
+# The only secrets the service reads are JWT_SECRET, CURSOR_SECRET, the runtime role's password
+# and the Redis URL (DEP-R31).
+metadata:
+  id: 'SCF_DEP_AC19_SERVICE_TASK'
+  name: "DEP-AC19, DEP-AC20, DEP-AC26, DEP-AC28: the ECS service runs the service's own task definition: no one-off command, the runtime role's secret only, and RDS Proxy as its database host"
+  category: 'GENERAL_SECURITY'
+definition:
+  and:
+    - cond_type: 'filter'
+      attribute: 'resource_type'
+      operator: 'within'
+      value: ['aws_ecs_service']
+    - cond_type: 'connection'
+      resource_types: ['aws_ecs_service']
+      connected_resource_types: ['aws_ecs_task_definition']
+      operator: 'one_exists'
+    - cond_type: 'attribute'
+      resource_types: ['aws_ecs_task_definition']
+      attribute: 'container_definitions'
+      operator: 'not_regex_match'
+      value: '.*dist/cli/.*'
+    - cond_type: 'attribute'
+      resource_types: ['aws_ecs_task_definition']
+      attribute: 'container_definitions'
+      operator: 'regex_match'
+      value: ".*'portMappings'.*"
+    - cond_type: 'attribute'
+      resource_types: ['aws_ecs_task_definition']
+      attribute: 'container_definitions'
+      operator: 'not_regex_match'
+      value: '.*''valueFrom'': ''(?!aws_secretsmanager_secret\.(jwt_secret|cursor_secret|db_runtime|redis)\.arn).*'
+    - cond_type: 'attribute'
+      resource_types: ['aws_ecs_task_definition']
+      attribute: 'container_definitions'
+      operator: 'regex_match'
+      value: '.*''name'': ''PGPASSWORD'', ''valueFrom'': ''aws_secretsmanager_secret\.db_runtime\.arn:password::''.*'
+    - cond_type: 'attribute'
+      resource_types: ['aws_ecs_task_definition']
+      attribute: 'container_definitions'
+      operator: 'regex_match'
+      value: '.*''name'': ''DATABASE_URL'', ''value'': ''postgres://scf_app@aws_db_proxy\.this\.endpoint:5432/[a-z_]+\?sslmode[=:]verify-full''.*'

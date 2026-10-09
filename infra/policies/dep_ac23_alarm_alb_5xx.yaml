@@ -1,0 +1,49 @@
+metadata:
+  id: 'SCF_DEP_AC23_ALARM_ALB_5XX'
+  name: 'DEP-AC23: the alarm ALB 5xx above 1% of requests over 5 minutes exists'
+  category: 'GENERAL_SECURITY'
+definition:
+  and:
+    - cond_type: 'filter'
+      attribute: 'resource_type'
+      operator: 'within'
+      value: ['aws_sns_topic']
+    - cond_type: 'connection'
+      resource_types: ['aws_sns_topic']
+      connected_resource_types: ['aws_cloudwatch_metric_alarm']
+      operator: 'one_exists'
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_metric_alarm']
+      attribute: 'threshold'
+      operator: 'equals'
+      value: 1
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_metric_alarm']
+      attribute: 'comparison_operator'
+      operator: 'equals'
+      value: 'GreaterThanThreshold'
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_metric_alarm']
+      attribute: "metric_query[?(@.id == 'percent')].expression"
+      operator: 'jsonpath_equals'
+      value: '100 * (FILL(elb5xx, 0) + FILL(target5xx, 0)) / requests'
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_metric_alarm']
+      attribute: "metric_query[?(@.id == 'elb5xx')].metric.metric_name"
+      operator: 'jsonpath_equals'
+      value: 'HTTPCode_ELB_5XX_Count'
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_metric_alarm']
+      attribute: "metric_query[?(@.id == 'elb5xx')].metric.period"
+      operator: 'jsonpath_equals'
+      value: 300
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_metric_alarm']
+      attribute: "metric_query[?(@.id == 'target5xx')].metric.metric_name"
+      operator: 'jsonpath_equals'
+      value: 'HTTPCode_Target_5XX_Count'
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_metric_alarm']
+      attribute: "metric_query[?(@.id == 'requests')].metric.metric_name"
+      operator: 'jsonpath_equals'
+      value: 'RequestCount'

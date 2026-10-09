@@ -1,0 +1,16 @@
+metadata:
+  id: 'SCF_DEP_AC20_PROXY_HOST'
+  name: 'DEP-AC20: every task definition with a DATABASE_URL reaches PostgreSQL through RDS Proxy, never the instance'
+  category: 'GENERAL_SECURITY'
+definition:
+  or:
+    - cond_type: 'attribute'
+      resource_types: ['aws_ecs_task_definition']
+      attribute: 'container_definitions'
+      operator: 'not_regex_match'
+      value: ".*'name': 'DATABASE_URL'.*"
+    - cond_type: 'attribute'
+      resource_types: ['aws_ecs_task_definition']
+      attribute: 'container_definitions'
+      operator: 'regex_match'
+      value: '.*''name'': ''DATABASE_URL'', ''value'': ''postgres://scf_app@aws_db_proxy\.this\.endpoint:5432/[a-z_]+\?sslmode[=:]verify-full''.*'

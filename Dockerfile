@@ -7,7 +7,8 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY . .
-# Compiles src/ to dist/ and copies migrations/*.sql to dist/migrations/ (plan 007 section 1).
+# Compiles src/ to dist/ and copies migrations/*.sql to dist/migrations/ (plan 007 section 1) and
+# the RDS CA bundle to dist/certs/ (DEP-R41).
 RUN npm run build
 
 # Tools stage: the build stage's /app plus gitleaks, the tools image of compose.yaml, which runs

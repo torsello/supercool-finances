@@ -1,0 +1,20 @@
+metadata:
+  id: 'SCF_DEP_AC16_ROUTES'
+  name: 'DEP-AC16: only the public route table routes to a gateway'
+  category: 'NETWORKING'
+definition:
+  or:
+    - and:
+        - cond_type: 'attribute'
+          resource_types: ['aws_route']
+          attribute: 'gateway_id'
+          operator: 'not_exists'
+        - cond_type: 'attribute'
+          resource_types: ['aws_route']
+          attribute: 'nat_gateway_id'
+          operator: 'not_exists'
+    - cond_type: 'attribute'
+      resource_types: ['aws_route']
+      attribute: '$.route_table_id'
+      operator: 'jsonpath_equals'
+      value: 'aws_route_table.public.id'

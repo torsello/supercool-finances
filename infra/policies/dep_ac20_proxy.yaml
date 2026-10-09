@@ -1,0 +1,22 @@
+# With a second auth block, auth becomes a list and $.auth.secret_arn matches nothing, so this
+# fails.
+metadata:
+  id: 'SCF_DEP_AC20_PROXY'
+  name: "DEP-AC20: RDS Proxy requires TLS and authenticates with one secret, the runtime role's"
+  category: 'GENERAL_SECURITY'
+definition:
+  and:
+    - cond_type: 'attribute'
+      resource_types: ['aws_db_proxy']
+      attribute: 'require_tls'
+      operator: 'is_true'
+    - cond_type: 'attribute'
+      resource_types: ['aws_db_proxy']
+      attribute: 'engine_family'
+      operator: 'equals'
+      value: 'POSTGRESQL'
+    - cond_type: 'attribute'
+      resource_types: ['aws_db_proxy']
+      attribute: '$.auth.secret_arn'
+      operator: 'jsonpath_equals'
+      value: 'aws_secretsmanager_secret.db_runtime.arn'

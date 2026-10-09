@@ -1,0 +1,23 @@
+# log_parameter_max_length 0 keeps the bootstrap's password verifiers out of the statement log
+# (section 1.7 of spec 008).
+metadata:
+  id: 'SCF_DEP_AC20_PARAMETER_GROUP'
+  name: 'DEP-AC20: the PostgreSQL 16 parameter group requires TLS and logs no bind parameter'
+  category: 'GENERAL_SECURITY'
+definition:
+  and:
+    - cond_type: 'attribute'
+      resource_types: ['aws_db_parameter_group']
+      attribute: 'family'
+      operator: 'equals'
+      value: 'postgres16'
+    - cond_type: 'attribute'
+      resource_types: ['aws_db_parameter_group']
+      attribute: "parameter[?(@.name == 'rds.force_ssl')].value"
+      operator: 'jsonpath_equals'
+      value: '1'
+    - cond_type: 'attribute'
+      resource_types: ['aws_db_parameter_group']
+      attribute: "parameter[?(@.name == 'log_parameter_max_length')].value"
+      operator: 'jsonpath_equals'
+      value: '0'

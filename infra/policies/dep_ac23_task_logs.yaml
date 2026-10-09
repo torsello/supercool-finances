@@ -1,0 +1,10 @@
+metadata:
+  id: 'SCF_DEP_AC23_TASK_LOGS'
+  name: 'DEP-AC23: every task definition logs to its CloudWatch log group, /<name>/<task>'
+  category: 'GENERAL_SECURITY'
+definition:
+  cond_type: 'attribute'
+  resource_types: ['aws_ecs_task_definition']
+  attribute: 'container_definitions'
+  operator: 'regex_match'
+  value: '.*''logConfiguration'': \{''logDriver'': ''awslogs'', ''options'': \{''awslogs-group'': ''/[a-z0-9-]+/(api|migrate|bootstrap|idempotency-cleanup)''.*'

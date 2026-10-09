@@ -1,0 +1,20 @@
+# SCF_DEP_AC26_SCHEDULE makes every schedule target the cleanup task definition.
+metadata:
+  id: 'SCF_DEP_AC26_SCHEDULE_EXISTS'
+  name: 'DEP-AC26: a schedule runs the cleanup every hour'
+  category: 'GENERAL_SECURITY'
+definition:
+  and:
+    - cond_type: 'filter'
+      attribute: 'resource_type'
+      operator: 'within'
+      value: ['aws_ecs_cluster']
+    - cond_type: 'connection'
+      resource_types: ['aws_ecs_cluster']
+      connected_resource_types: ['aws_scheduler_schedule']
+      operator: 'one_exists'
+    - cond_type: 'attribute'
+      resource_types: ['aws_scheduler_schedule']
+      attribute: 'schedule_expression'
+      operator: 'equals'
+      value: 'rate(1 hour)'

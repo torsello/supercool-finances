@@ -1,0 +1,26 @@
+metadata:
+  id: 'SCF_DEP_AC18_CONTAINERS'
+  name: 'DEP-AC18: every task definition is Fargate and runs its container as uid 1000, with a read-only root file system and NODE_ENV production'
+  category: 'GENERAL_SECURITY'
+definition:
+  and:
+    - cond_type: 'attribute'
+      resource_types: ['aws_ecs_task_definition']
+      attribute: 'requires_compatibilities'
+      operator: 'contains'
+      value: 'FARGATE'
+    - cond_type: 'attribute'
+      resource_types: ['aws_ecs_task_definition']
+      attribute: 'container_definitions'
+      operator: 'regex_match'
+      value: ".*'readonlyRootFilesystem': True.*"
+    - cond_type: 'attribute'
+      resource_types: ['aws_ecs_task_definition']
+      attribute: 'container_definitions'
+      operator: 'regex_match'
+      value: ".*'user': '1000'.*"
+    - cond_type: 'attribute'
+      resource_types: ['aws_ecs_task_definition']
+      attribute: 'container_definitions'
+      operator: 'regex_match'
+      value: '.*\{''name'': ''NODE_ENV'', ''value'': ''production''\}.*'

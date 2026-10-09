@@ -1,0 +1,14 @@
+metadata:
+  id: 'SCF_DEP_AC16_EGRESS'
+  name: 'DEP-AC16: no egress rule is open to an address range, so none to 0.0.0.0/0 or ::/0'
+  category: 'NETWORKING'
+definition:
+  and:
+    - cond_type: 'attribute'
+      resource_types: ['aws_vpc_security_group_egress_rule']
+      attribute: 'cidr_ipv4'
+      operator: 'not_exists'
+    - cond_type: 'attribute'
+      resource_types: ['aws_vpc_security_group_egress_rule']
+      attribute: 'cidr_ipv6'
+      operator: 'not_exists'

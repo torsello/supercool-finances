@@ -70,6 +70,7 @@ These tasks run in the cross-spec order of plan 000 section 1 for 08-api: authen
 
 ## 12-infra
 
+- [x] Test first: extend SEC-AC30 in `test/unit/platform/config.test.ts` and SEC-AC17 in `test/integration/security/redaction.test.ts` with `PGPASSWORD`; then its rule in `src/platform/config/config.ts` and its redaction in `src/platform/logging/logger.ts`.
 - [ ] Extend `test/unit/deployment/pool-budget.test.ts` and `test/unit/deployment/timeouts.test.ts` to the Terraform variables for tasks, `DB_POOL_MAX`, the parameter group, `REQUEST_TIMEOUT_MS` and the ALB idle timeout, keeping SEC-AC29 and SEC-AC36 whole.
 - [ ] Add the WAF rate-based rule check to the policies run by `npm run infra:validate`, once plan 008 has added that CI step, so the step proves SEC-AC35.
 - [ ] Update the docs: a runbook per operational answer (`docs/runbooks/rate-limits.md`, `docs/runbooks/timeouts-and-503.md`, `docs/runbooks/shutdown.md`), the README sections on configuration, health checks and metrics, the OpenAPI 413, 415, 429 and 503 responses, and the follow-ups closed in ADR-0013 and ADR-0019.

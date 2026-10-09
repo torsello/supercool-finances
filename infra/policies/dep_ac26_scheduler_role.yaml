@@ -1,0 +1,43 @@
+# The policy named run-cleanup is the scheduler role's; every other role policy passes.
+metadata:
+  id: 'SCF_DEP_AC26_SCHEDULER_ROLE'
+  name: "DEP-AC26: the schedule's role may only run the cleanup task definition on the cluster and pass its two roles"
+  category: 'GENERAL_SECURITY'
+definition:
+  or:
+    - cond_type: 'attribute'
+      resource_types: ['aws_iam_role_policy']
+      attribute: 'name'
+      operator: 'not_equals'
+      value: 'run-cleanup'
+    - and:
+        - cond_type: 'attribute'
+          resource_types: ['aws_iam_role_policy']
+          attribute: 'policy'
+          operator: 'regex_match'
+          value: ".*'Action': 'ecs:RunTask'.*"
+        - cond_type: 'attribute'
+          resource_types: ['aws_iam_role_policy']
+          attribute: 'policy'
+          operator: 'regex_match'
+          value: ".*'Action': 'iam:PassRole'.*"
+        - cond_type: 'attribute'
+          resource_types: ['aws_iam_role_policy']
+          attribute: 'policy'
+          operator: 'not_regex_match'
+          value: ".*'Action': '(?!ecs:RunTask'|iam:PassRole').*"
+        - cond_type: 'attribute'
+          resource_types: ['aws_iam_role_policy']
+          attribute: 'policy'
+          operator: 'regex_match'
+          value: '.*aws_ecs_task_definition\.cleanup\.arn_without_revision.*'
+        - cond_type: 'attribute'
+          resource_types: ['aws_iam_role_policy']
+          attribute: 'policy'
+          operator: 'regex_match'
+          value: '.*''ecs:cluster'': ''aws_ecs_cluster\.this\.arn''.*'
+        - cond_type: 'attribute'
+          resource_types: ['aws_iam_role_policy']
+          attribute: 'policy'
+          operator: 'not_regex_match'
+          value: '.*''Resource'': ''\*''.*'

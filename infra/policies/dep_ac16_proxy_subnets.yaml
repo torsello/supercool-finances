@@ -1,0 +1,10 @@
+metadata:
+  id: 'SCF_DEP_AC16_PROXY_SUBNETS'
+  name: 'DEP-AC16: RDS Proxy lives in the isolated subnets'
+  category: 'NETWORKING'
+definition:
+  cond_type: 'attribute'
+  resource_types: ['aws_db_proxy']
+  attribute: '$.vpc_subnet_ids'
+  operator: 'jsonpath_equals'
+  value: 'aws_subnet.isolated[*].id'

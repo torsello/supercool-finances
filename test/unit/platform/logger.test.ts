@@ -98,3 +98,23 @@ describe('the replica id in the logs', () => {
     ]);
   });
 });
+
+describe('the secrets in the logs', () => {
+  it('SEC-R22 a line that holds PGPASSWORD, as it is or percent-encoded, gets [Redacted] in its place', async () => {
+    const logs = new LogCapture();
+    const app = appWith(
+      { DATABASE_URL: 'postgres://scf_app@127.0.0.1:1/unused', PGPASSWORD: 'pg pw/4417' },
+      logs,
+    );
+    try {
+      await app.ready();
+      app.log.info({ detail: 'pg pw/4417', encoded: 'pg%20pw%2F4417' }, 'holds pg pw/4417');
+    } finally {
+      await app.close();
+    }
+    const text = logs.text();
+    expect(text).toContain('[Redacted]');
+    expect(text).not.toContain('pg pw/4417');
+    expect(text).not.toContain('pg%20pw%2F4417');
+  });
+});

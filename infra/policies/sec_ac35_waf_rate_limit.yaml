@@ -1,0 +1,27 @@
+# Section 1.6 of spec 007: WAF counts over fixed windows and allows no burst, so the limit is
+# 60 x RATE_LIMIT_IP_RPS over a 1-minute window; RATE_LIMIT_IP_RPS defaults to 500.
+metadata:
+  id: 'SCF_SEC_AC35_WAF_RATE_LIMIT'
+  name: 'SEC-AC35: the per-IP rule blocks, aggregated by IP, over 60 seconds, at 60 x RATE_LIMIT_IP_RPS (500) = 30000 requests'
+  category: 'NETWORKING'
+definition:
+  and:
+    - cond_type: 'attribute'
+      resource_types: ['aws_wafv2_web_acl']
+      attribute: "rule[?(@.name == 'per-ip-rate-limit')].statement.rate_based_statement.aggregate_key_type"
+      operator: 'jsonpath_equals'
+      value: 'IP'
+    - cond_type: 'attribute'
+      resource_types: ['aws_wafv2_web_acl']
+      attribute: "rule[?(@.name == 'per-ip-rate-limit')].statement.rate_based_statement.evaluation_window_sec"
+      operator: 'jsonpath_equals'
+      value: 60
+    - cond_type: 'attribute'
+      resource_types: ['aws_wafv2_web_acl']
+      attribute: "rule[?(@.name == 'per-ip-rate-limit')].statement.rate_based_statement.limit"
+      operator: 'jsonpath_equals'
+      value: 30000
+    - cond_type: 'attribute'
+      resource_types: ['aws_wafv2_web_acl']
+      attribute: "rule[?(@.name == 'per-ip-rate-limit')].action.block"
+      operator: 'jsonpath_exists'

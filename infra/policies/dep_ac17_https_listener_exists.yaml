@@ -1,0 +1,24 @@
+metadata:
+  id: 'SCF_DEP_AC17_HTTPS_LISTENER'
+  name: 'DEP-AC17: the ALB has an HTTPS listener on 443'
+  category: 'NETWORKING'
+definition:
+  and:
+    - cond_type: 'filter'
+      attribute: 'resource_type'
+      operator: 'within'
+      value: ['aws_lb']
+    - cond_type: 'connection'
+      resource_types: ['aws_lb']
+      connected_resource_types: ['aws_lb_listener']
+      operator: 'one_exists'
+    - cond_type: 'attribute'
+      resource_types: ['aws_lb_listener']
+      attribute: 'port'
+      operator: 'equals'
+      value: 443
+    - cond_type: 'attribute'
+      resource_types: ['aws_lb_listener']
+      attribute: 'protocol'
+      operator: 'equals'
+      value: 'HTTPS'

@@ -1,0 +1,24 @@
+# Checkov writes = inside these strings as :, and a list of one element as that element, so the
+# patterns accept both forms.
+metadata:
+  id: 'SCF_DEP_AC19_MIGRATION_TASK'
+  name: "DEP-AC19: the migration task definition runs the migrations as the owner role, straight to the RDS instance with verify-full and the RDS CA bundle, with the owner role's password as its only secret"
+  category: 'GENERAL_SECURITY'
+definition:
+  or:
+    - cond_type: 'attribute'
+      resource_types: ['aws_ecs_task_definition']
+      attribute: 'container_definitions'
+      operator: 'not_regex_match'
+      value: '.*dist/cli/migrate\.js.*'
+    - and:
+        - cond_type: 'attribute'
+          resource_types: ['aws_ecs_task_definition']
+          attribute: 'container_definitions'
+          operator: 'regex_match'
+          value: '.*''name'': ''MIGRATION_DATABASE_URL'', ''value'': ''postgres://scf_owner@aws_db_instance\.this\.address:5432/[a-z_]+\?sslmode[=:]verify-full&sslrootcert[=:]/app/dist/certs/rds-global-bundle\.pem''.*'
+        - cond_type: 'attribute'
+          resource_types: ['aws_ecs_task_definition']
+          attribute: 'container_definitions'
+          operator: 'regex_match'
+          value: '.*''secrets'': (\{''name'': ''PGPASSWORD'', ''valueFrom'': ''aws_secretsmanager_secret\.db_owner\.arn:password::''\}|\[\{''name'': ''PGPASSWORD'', ''valueFrom'': ''aws_secretsmanager_secret\.db_owner\.arn:password::''\}\]), .*'

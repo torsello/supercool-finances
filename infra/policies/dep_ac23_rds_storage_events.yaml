@@ -1,0 +1,49 @@
+# Section 1.8 of spec 008: RDS storage running out under storage autoscaling is signalled by RDS
+# events, not a metric threshold. Checkov writes = inside strings as :, which these patterns allow.
+metadata:
+  id: 'SCF_DEP_AC23_RDS_STORAGE_EVENTS'
+  name: 'DEP-AC23: an EventBridge rule picks the RDS events of storage running out: RDS-EVENT-0007, 0223, 0224 and 0225 of the instance'
+  category: 'GENERAL_SECURITY'
+definition:
+  or:
+    - cond_type: 'attribute'
+      resource_types: ['aws_cloudwatch_event_rule']
+      attribute: 'name'
+      operator: 'not_equals'
+      value: 'scf-rds-storage'
+    - and:
+        - cond_type: 'attribute'
+          resource_types: ['aws_cloudwatch_event_rule']
+          attribute: 'event_pattern'
+          operator: 'regex_match'
+          value: '.*aws\.rds.*'
+        - cond_type: 'attribute'
+          resource_types: ['aws_cloudwatch_event_rule']
+          attribute: 'event_pattern'
+          operator: 'regex_match'
+          value: '.*RDS DB Instance Event.*'
+        - cond_type: 'attribute'
+          resource_types: ['aws_cloudwatch_event_rule']
+          attribute: 'event_pattern'
+          operator: 'regex_match'
+          value: '.*aws_db_instance\.this\.arn.*'
+        - cond_type: 'attribute'
+          resource_types: ['aws_cloudwatch_event_rule']
+          attribute: 'event_pattern'
+          operator: 'regex_match'
+          value: '.*RDS-EVENT-0007.*'
+        - cond_type: 'attribute'
+          resource_types: ['aws_cloudwatch_event_rule']
+          attribute: 'event_pattern'
+          operator: 'regex_match'
+          value: '.*RDS-EVENT-0223.*'
+        - cond_type: 'attribute'
+          resource_types: ['aws_cloudwatch_event_rule']
+          attribute: 'event_pattern'
+          operator: 'regex_match'
+          value: '.*RDS-EVENT-0224.*'
+        - cond_type: 'attribute'
+          resource_types: ['aws_cloudwatch_event_rule']
+          attribute: 'event_pattern'
+          operator: 'regex_match'
+          value: '.*RDS-EVENT-0225.*'
