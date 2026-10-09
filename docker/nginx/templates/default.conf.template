@@ -1,0 +1,161 @@
+# The local load balancer (spec 007 sections 1.6 and 1.7, spec 008 section 1.5), included inside
+# the http block of nginx.conf. The image's envsubst step replaces ${RATE_LIMIT_IP_RPS} and
+# ${RATE_LIMIT_IP_BURST}, set in compose.yaml; it replaces only variables of its environment, so
+# nginx's own variables are left alone.
+
+# No version in the Server header (SEC-R15).
+server_tokens off;
+
+# Round robin over both replicas on PORT, never METRICS_PORT (DEP-R15, SEC-R43), with upstream
+# keep-alive below the service's 65 s (SEC-R34). The replicas have fixed addresses on the stack's
+# network (compose.yaml), listed here without `resolve`: nginx passes a failed request to the other
+# replica only if the upstream's servers have not changed since the request started, and `resolve`
+# would change them when a stopped replica's name stops resolving, losing that retry. A replica
+# that restarts keeps its address, so it is found again (DEP-AC10, DEP-AC11).
+upstream scf_api {
+    zone scf_api 64k;
+    server ${API_1_ADDRESS}:3000;
+    server ${API_2_ADDRESS}:3000;
+    keepalive 32;
+    keepalive_timeout 60s;
+}
+
+# Per client IP, keyed on the TCP peer, never on a header the client sends (SEC-R01, SEC-R02).
+limit_req_zone $binary_remote_addr zone=per_ip:10m rate=${RATE_LIMIT_IP_RPS}r/s;
+
+# The correlation id forwarded: the client's X-Request-Id unchanged when present and not empty,
+# nginx's own 32-hex-character id otherwise (SEC-R20).
+map $http_x_request_id $scf_request_id {
+    ''      $request_id;
+    default $http_x_request_id;
+}
+
+# The correlation id of nginx's own problem details: the client's only when it is made of the
+# characters SYS-R21 allows, so it can never break the JSON body; the service does the same.
+map $http_x_request_id $scf_problem_request_id {
+    '~^[A-Za-z0-9._:-]{1,128}$' $http_x_request_id;
+    default                     $request_id;
+}
+
+# One JSON object per line, with the path and never the query string, which may carry a token
+# (SEC-R46); the id forwarded and the X-Request-Id of the response (SEC-R20).
+log_format scf escape=json
+    '{"time":"$time_iso8601","msg":"request","remoteAddr":"$remote_addr",'
+    '"method":"$request_method","path":"$uri","status":$status,'
+    '"bytes":$body_bytes_sent,"durationSeconds":$request_time,'
+    '"requestId":"$scf_request_id","responseRequestId":"$sent_http_x_request_id",'
+    '"upstream":"$upstream_addr","upstreamStatus":"$upstream_status"}';
+
+server {
+    listen 8080;
+    access_log /var/log/nginx/access.log scf;
+
+    # A body up to 32 KB reaches the service, which answers above 16384 bytes itself (SEC-R13).
+    client_max_body_size 32k;
+
+    # Requests within the burst pass at once, the excess is refused at once with 429 (SEC-R01).
+    limit_req zone=per_ip burst=${RATE_LIMIT_IP_BURST} nodelay;
+    limit_req_status 429;
+
+    # nginx's own errors as problem details; the service's own answers pass through unchanged.
+    # A request nginx's parser refuses (a bad request, a header or URI too large, a client too
+    # slow) is a 400 malformed request, as the service answers one its HTTP parser refuses; "=400"
+    # makes the status 400 whatever the original code. An internal URI, not a named location,
+    # since a request line nginx could not parse has no URI to carry to a named location.
+    error_page 400 408 414 494 =400 /_nginx/malformed-request;
+    # nginx's own 404, answered only for its internal locations, as the service's not-found.
+    error_page 404 @not_found;
+    error_page 413 @payload_too_large;
+    error_page 429 @rate_limited;
+    error_page 502 @bad_gateway;
+    error_page 503 @service_unavailable;
+    error_page 504 @gateway_timeout;
+
+    location / {
+        proxy_pass http://scf_api;
+        proxy_http_version 1.1;
+        proxy_set_header Connection '';
+        proxy_set_header Host $host;
+        # Replaces any X-Forwarded-For the client sent with its TCP address (SEC-R19).
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Request-Id $scf_request_id;
+
+        # Inside the compose network a connection is established in milliseconds, and a stopped
+        # container drops packets instead of refusing them: 2 s ends the wait for a replica that
+        # is gone and passes the request to the other one (section 1.7 of spec 007, DEP-R15).
+        proxy_connect_timeout 2s;
+        # Above REQUEST_TIMEOUT_MS (25 s), so the service always answers first (SEC-R34).
+        proxy_read_timeout 30s;
+        proxy_send_timeout 30s;
+
+        # The other replica is tried on a connection error or a timeout, at most once. nginx does
+        # this for a POST only before any of it was sent, since non_idempotent is not listed: only
+        # the client's retry with the same Idempotency-Key is safe after that (DEP-R15).
+        proxy_next_upstream error timeout;
+        proxy_next_upstream_tries 2;
+    }
+
+    location = /_nginx/malformed-request {
+        internal;
+        default_type application/problem+json;
+        add_header X-Request-Id $scf_problem_request_id always;
+        return 400 '{"type":"/problems/malformed-request","title":"Malformed Request","status":400,"detail":"The request is malformed.","requestId":"$scf_problem_request_id"}';
+    }
+
+    location @not_found {
+        default_type application/problem+json;
+        add_header X-Request-Id $scf_problem_request_id always;
+        return 404 '{"type":"/problems/not-found","title":"Not Found","status":404,"detail":"The requested resource does not exist.","requestId":"$scf_problem_request_id"}';
+    }
+
+    location @payload_too_large {
+        default_type application/problem+json;
+        add_header X-Request-Id $scf_problem_request_id always;
+        return 413 '{"type":"/problems/payload-too-large","title":"Payload Too Large","status":413,"detail":"The request body is larger than 16384 bytes.","requestId":"$scf_problem_request_id"}';
+    }
+
+    location @rate_limited {
+        default_type application/problem+json;
+        add_header X-Request-Id $scf_problem_request_id always;
+        add_header Retry-After 1 always;
+        return 429 '{"type":"/problems/rate-limited","title":"Rate Limited","status":429,"detail":"Too many requests; retry after the number of seconds in Retry-After.","requestId":"$scf_problem_request_id"}';
+    }
+
+    # No replica answered, or one answered with a broken response, or none in time: the outcome of
+    # a POST is unknown until it is retried with the same Idempotency-Key (DEP-R16).
+    location @bad_gateway {
+        default_type application/problem+json;
+        add_header X-Request-Id $scf_problem_request_id always;
+        add_header Retry-After 1 always;
+        return 502 '{"type":"/problems/upstream-unavailable","title":"Upstream Unavailable","status":502,"detail":"No replica of the service answered; retry later, with the same Idempotency-Key if the request had one.","requestId":"$scf_problem_request_id"}';
+    }
+
+    location @service_unavailable {
+        default_type application/problem+json;
+        add_header X-Request-Id $scf_problem_request_id always;
+        add_header Retry-After 1 always;
+        return 503 '{"type":"/problems/upstream-unavailable","title":"Upstream Unavailable","status":503,"detail":"No replica of the service answered; retry later, with the same Idempotency-Key if the request had one.","requestId":"$scf_problem_request_id"}';
+    }
+
+    location @gateway_timeout {
+        default_type application/problem+json;
+        add_header X-Request-Id $scf_problem_request_id always;
+        add_header Retry-After 1 always;
+        return 504 '{"type":"/problems/upstream-unavailable","title":"Upstream Unavailable","status":504,"detail":"No replica of the service answered; retry later, with the same Idempotency-Key if the request had one.","requestId":"$scf_problem_request_id"}';
+    }
+}
+
+# The container's healthcheck in compose.yaml: on loopback only, never published or proxied.
+server {
+    listen 127.0.0.1:8081;
+    access_log off;
+
+    location = /nginx-health {
+        return 204;
+    }
+
+    location / {
+        return 404;
+    }
+}

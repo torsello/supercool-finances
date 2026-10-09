@@ -1,5 +1,6 @@
 # gitleaks configuration, read from the repository root by the CI job `secret-scan` and by /ship.
-# Every default rule still applies.
+# Every default rule still applies. The allowlist holds only the anchored values DEP-R36 of spec 008
+# names, which DEP-AC25 checks.
 [extend]
 useDefault = true
 

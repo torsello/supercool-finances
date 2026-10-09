@@ -129,7 +129,7 @@ Notes:
 - SEC-AC20 and SEC-AC31 run the production build (`npm run build`, then `node dist/main.js`) as a child process.
 - SEC-AC22 and SEC-AC23 capture statements by wrapping `pg`'s client `query` inside the test process (`test/support/sql-capture.ts`). That is test wiring around the driver, not one of the five app seams of SYS-R37. SEC-AC23 reads `lock_timeout` on the app's only pool connection through the pool the composition root exposes on the app instance.
 - SEC-AC05 is a claim about the whole e2e run. Every e2e HTTP helper appends each response's status to `reports/e2e-responses.jsonl`, tagged with the test file. A custom Vitest sequencer runs `no-rate-limited.test.ts` after every other e2e file except `edge-rate-limit.test.ts`, which runs last (section 1.6). The test then fails on any 429 outside SEC-AC04's file.
-- SEC-AC10 needs `TRUSTED_PROXY_CIDRS` set in `compose.yaml` to the stack's network, which `compose.yaml` fixes with an explicit subnet (plan 008), so the service logs the address nginx forwards, nginx's own peer.
+- SEC-AC10 needs `TRUSTED_PROXY_CIDRS` set in `compose.yaml` to nginx's fixed address as a `/32`, on the explicit subnet of plan 008 whose `ip_range` keeps every other container off that address, so the service logs the address nginx forwards, nginx's own peer, and ignores an `X-Forwarded-For` sent straight to a replica's host port.
 - Integration tests of the other specs build the app with `RATE_LIMIT_USER_MAX` "1000000" (section 1.6); `test/support/app.ts` sets it by default from 09-hardening on.
 
 ## 7. ACs that cannot be tested as written

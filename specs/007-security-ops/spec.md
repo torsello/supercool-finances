@@ -115,7 +115,7 @@ CORS is handled by `@fastify/cors`, approved by the owner and recorded in `docs/
 ### 1.7 Load balancer
 
 - **Body size.** nginx's `client_max_body_size` is 32k, so a body up to 32 KB reaches the service, which answers a body above 16384 bytes with the problem details of SEC-R10. A body above 32 KB gets nginx's own 413, rendered as problem details with type `/problems/payload-too-large` by an `error_page 413` location, as for 429.
-- **Timeouts.** nginx `proxy_read_timeout` and `proxy_send_timeout` are 30 s and its upstream `keepalive_timeout` is 60 s; in AWS the ALB idle timeout is 60 s. The service's keep-alive timeout is 65 s, longer than both, so the service never closes a connection that the load balancer is about to reuse, which would show up as random 502s (SEC-R34).
+- **Timeouts.** nginx `proxy_connect_timeout` is 2 s: inside the compose network a connection is established in milliseconds, and a stopped container drops packets instead of refusing them, so a longer wait would only delay passing the request to the other replica (DEP-R15). nginx `proxy_read_timeout` and `proxy_send_timeout` are 30 s and its upstream `keepalive_timeout` is 60 s; in AWS the ALB idle timeout is 60 s. The service's keep-alive timeout is 65 s, longer than both, so the service never closes a connection that the load balancer is about to reuse, which would show up as random 502s (SEC-R34).
 
 ### 1.8 Health and shutdown
 

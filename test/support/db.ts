@@ -181,13 +181,15 @@ export interface ScratchDatabase {
 }
 
 /**
- * Creates an empty database as the owner role, migrates it to the latest migration, runs `body`
- * and drops the database afterwards, also when `body` fails (plan 000 section 9, ADR-0020). The
- * body must close every connection it opens before it returns: the owner role cannot end the
- * runtime role's sessions, so a database with an open session cannot be dropped.
+ * Creates an empty database as the owner role, migrates it to the latest migration unless
+ * `migrated` is false, runs `body` and drops the database afterwards, also when `body` fails (plan
+ * 000 section 9, ADR-0020). The body must close every connection it opens before it returns: the
+ * owner role cannot end the runtime role's sessions, so a database with an open session cannot be
+ * dropped.
  */
 export async function withScratchDatabase<T>(
   body: (scratch: ScratchDatabase) => T | Promise<T>,
+  options: { migrated?: boolean } = {},
 ): Promise<T> {
   const ownerUrl = requireEnv('TEST_MIGRATION_DATABASE_URL');
   const runtimeUrl = requireEnv('TEST_DATABASE_URL');
@@ -204,7 +206,7 @@ export async function withScratchDatabase<T>(
         runtimeUrl: withDatabase(runtimeUrl, name),
         ownerUrl: withDatabase(ownerUrl, name),
       };
-      await migrate(scratch.ownerUrl, 'up');
+      if (options.migrated ?? true) await migrate(scratch.ownerUrl, 'up');
       return await body(scratch);
     } finally {
       await admin.query(`DROP DATABASE IF EXISTS ${name}`);

@@ -6,6 +6,43 @@ Balance service for SuperCool Finances: customer accounts, a double-entry ledger
 
 ## Quick start
 
+### Run it with Docker only
+
+Prerequisite: Docker Engine 24 or later with Compose v2.20 or later. No Node, no `.env` file: `compose.yaml` holds visibly fake demo values, which the service refuses when `NODE_ENV` is `production`.
+
+```sh
+# Build the image and start Postgres, Redis, the migrations, two replicas and nginx;
+# returns once every service is healthy. The API is on http://localhost:8080 (Swagger UI at /docs).
+docker compose up --build --wait
+
+# Create the demo users' accounts and deposits through the API, and print them as JSON.
+# Running it again changes nothing. Each tools command first rebuilds the tools image
+# (from the cache when nothing changed), so it never runs older sources than the stack.
+docker compose build --quiet tools && docker compose run --rm tools npm run --silent seed
+
+# Mint a token for demo-customer-1 and list their accounts (2500.00 EUR and 1000.00 USD).
+TOKEN=$(docker compose build --quiet tools && docker compose run --rm tools npm run --silent token -- --sub 0192f0a0-0000-7000-8000-00000000d0c1 --role customer)
+curl -s http://localhost:8080/v1/accounts -H "Authorization: Bearer $TOKEN"
+
+# Transfer 10.50 EUR from one of their accounts to another account in EUR: use the ids printed by the seed.
+curl -s -X POST http://localhost:8080/v1/accounts/<EUR account id>/transfers \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: my-first-transfer' \
+  -d '{"destinationAccountId": "<destination account id>", "amount": "1050", "currency": "EUR"}'
+
+# Check every balance against the ledger, then stop the stack (add -v to delete the database).
+docker compose build --quiet tools && docker compose run --rm tools npm run --silent reconcile
+docker compose down
+```
+
+The demo users are `demo-operator` (`0192f0a0-0000-7000-8000-00000000d0f1`, role `operator`) and `demo-customer-1` to `demo-customer-3` (`0192f0a0-0000-7000-8000-00000000d0c1` to `...d0c3`, role `customer`); a token is valid for 15 minutes. nginx balances requests round robin over `api-1` and `api-2`, and every log line of a replica carries its `replicaId`, so `docker compose logs api-1 api-2` shows which replica served each `X-Request-Id`. Only `127.0.0.1` is published: nginx on 8080, the replicas on 3001 and 3002, Postgres on 55432 and Redis on 6379.
+
+The stack's network is `10.210.0.0/24`, with nginx at the fixed address `10.210.0.10`, the only one the replicas trust for `X-Forwarded-For`, and the replicas at `10.210.0.11` and `10.210.0.12`. If another network of the host already uses that range, `docker compose up` fails with `invalid pool request: Pool overlaps with other one on this address space`. Then set `SCF_SUBNET_PREFIX` to three other octets, for example `SCF_SUBNET_PREFIX=10.211.0 docker compose up --build --wait` (and the same variable for every later command of that stack, or once in a `.env` file); it moves the subnet, the fixed addresses and the trusted address together.
+
+With `make`, the same commands are `make up`, `make seed`, `make token` (or `make token SUB=<uuid> ROLE=operator`), `make reconcile`, `make logs` and `make down`; `make test` runs the whole suite in the tools image: `npm run check`, the integration tests against the stack's Postgres and Redis, and `npm run trace -- --require unit,integration`.
+
+### Develop on the host
+
 Prerequisites: Node 24 (the version in `.nvmrc`, for example with `nvm use`) and Docker.
 
 ```sh

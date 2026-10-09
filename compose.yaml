@@ -1,12 +1,63 @@
 name: supercool-finances
 
+# The local stack of spec 008 (table 1.1): `docker compose up --build --wait` builds the service
+# image and starts PostgreSQL, Redis, the one-shot migrate job, two replicas and nginx, with no
+# .env file (DEP-R01, DEP-R06). Values are literals, so a stray .env cannot change the demo; only
+# the rate limits and the network's address prefix are tunables written as ${VAR:-default}
+# (section 1.4). SCF_SUBNET_PREFIX, the first three octets of the network (default 10.210.0), moves
+# the whole network when its subnet overlaps another network of the host. Every port is published on
+# 127.0.0.1 only, and METRICS_PORT never (DEP-R08, SEC-R43). Every image is pinned by version and
+# digest (DEP-R22). `npm run infra:up` starts only postgres and redis, for the tests on the host.
+
+# The variables of the replicas, also given to the tools service (section 1.4). The demo secrets
+# are the visibly fake values of DEP-R35, which the service refuses when NODE_ENV is production
+# (DEP-R07).
+x-service-environment: &service-environment
+  NODE_ENV: development
+  PORT: '3000'
+  METRICS_PORT: '9464'
+  LOG_LEVEL: info
+  # The runtime role (DEP-R05, ADR-0018); the password is the local-only one of
+  # docker/postgres/init.
+  DATABASE_URL: postgres://scf_app:scf_app_local_only@postgres:5432/supercool_dev
+  REDIS_URL: redis://redis:6379
+  JWT_SECRET: demo-only-jwt-secret-for-docker-compose-00000000
+  JWT_ISSUER: supercool-finances-local
+  JWT_AUDIENCE: supercool-finances-api
+  CURSOR_SECRET: demo-only-cursor-secret-for-docker-compose-00000
+  RATE_LIMIT_USER_MAX: ${RATE_LIMIT_USER_MAX:-300}
+  RATE_LIMIT_USER_WINDOW_S: ${RATE_LIMIT_USER_WINDOW_S:-10}
+  # nginx's fixed address only, so the service takes the client address from the X-Forwarded-For
+  # that nginx sets, and a client calling a replica directly on its host port cannot set its own
+  # (SEC-R18, SEC-R19).
+  TRUSTED_PROXY_CIDRS: ${SCF_SUBNET_PREFIX:-10.210.0}.10/32
+
+# The owner role, for the migrations only, never given to the replicas (DEP-R05).
+x-migration-database-url: &migration-database-url postgres://scf_owner:scf_owner_local_only@postgres:5432/supercool_dev
+
+# The two replicas share this definition and differ only in REPLICA_ID and host port, so each can
+# be stopped or killed by name (section 1.1).
+x-api: &api
+  build:
+    context: .
+    target: runtime
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+    redis:
+      condition: service_started
+  # Longer than SHUTDOWN_DRAIN_DELAY_MS + SHUTDOWN_TIMEOUT_MS (32 s), so Docker never kills a
+  # replica before its shutdown deadline (DEP-R20). The healthcheck is the image's (DEP-R21).
+  stop_grace_period: 40s
+
 services:
   postgres:
-    image: postgres:16.15-alpine
+    image: postgres:16.15-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
     environment:
       POSTGRES_USER: postgres
       # Local-only superuser password; never used outside Docker Compose.
       POSTGRES_PASSWORD: postgres_local_only
+    networks: [scf]
     ports:
       - '127.0.0.1:55432:5432'
     volumes:
@@ -22,7 +73,8 @@ services:
       retries: 30
 
   redis:
-    image: redis:7.4.11-alpine
+    image: redis:7.4.11-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+    networks: [scf]
     ports:
       - '127.0.0.1:6379:6379'
     healthcheck:
@@ -30,6 +82,104 @@ services:
       interval: 2s
       timeout: 3s
       retries: 30
+
+  # One-shot job: applies every pending migration as the owner role, then exits; 0 when there is
+  # nothing to apply, so `up` can be repeated on the same volume (DEP-R04).
+  migrate:
+    build:
+      context: .
+      target: runtime
+    entrypoint: ['node', 'dist/cli/migrate.js', 'up']
+    environment:
+      MIGRATION_DATABASE_URL: *migration-database-url
+    networks: [scf]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+
+  api-1:
+    <<: *api
+    environment:
+      <<: *service-environment
+      REPLICA_ID: api-1
+    networks:
+      scf:
+        # Fixed, so nginx lists it without re-resolving its name (DEP-R15).
+        ipv4_address: ${SCF_SUBNET_PREFIX:-10.210.0}.11
+    ports:
+      - '127.0.0.1:3001:3000'
+
+  api-2:
+    <<: *api
+    environment:
+      <<: *service-environment
+      REPLICA_ID: api-2
+    networks:
+      scf:
+        ipv4_address: ${SCF_SUBNET_PREFIX:-10.210.0}.12
+    ports:
+      - '127.0.0.1:3002:3000'
+
+  # The load balancer (section 1.5, spec 007 sections 1.6 and 1.7): the image renders
+  # templates/default.conf.template with these variables into conf.d.
+  nginx:
+    image: nginx:1.28.3-alpine@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236
+    environment:
+      RATE_LIMIT_IP_RPS: ${RATE_LIMIT_IP_RPS:-500}
+      RATE_LIMIT_IP_BURST: ${RATE_LIMIT_IP_BURST:-1000}
+      # The replicas' fixed addresses, the servers of the upstream.
+      API_1_ADDRESS: ${SCF_SUBNET_PREFIX:-10.210.0}.11
+      API_2_ADDRESS: ${SCF_SUBNET_PREFIX:-10.210.0}.12
+    networks:
+      scf:
+        # The only address the replicas trust for X-Forwarded-For (TRUSTED_PROXY_CIDRS).
+        ipv4_address: ${SCF_SUBNET_PREFIX:-10.210.0}.10
+    ports:
+      - '127.0.0.1:8080:8080'
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/templates:/etc/nginx/templates:ro
+    depends_on:
+      api-1:
+        condition: service_healthy
+      api-2:
+        condition: service_healthy
+    healthcheck:
+      # nginx's own loopback-only status server, never published or proxied.
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8081/nginx-health']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # The tools stage of the image: the build stage's dependencies and sources, plus gitleaks. Runs
+  # the seed, the token script and the other npm scripts against the stack with only Docker on the
+  # host (DEP-R09), as `docker compose run --rm tools npm run <script>`. Never started by `up`.
+  tools:
+    build:
+      context: .
+      target: tools
+    profiles: [tools]
+    environment:
+      <<: *service-environment
+      MIGRATION_DATABASE_URL: *migration-database-url
+    networks: [scf]
+    depends_on:
+      nginx:
+        condition: service_started
+    healthcheck:
+      disable: true
+
+networks:
+  # A fixed subnet, so nginx can have a fixed address that TRUSTED_PROXY_CIDRS names (SEC-AC10).
+  # Other containers get addresses from ip_range only, so none can take the fixed addresses of nginx
+  # and the replicas.
+  scf:
+    ipam:
+      config:
+        - subnet: ${SCF_SUBNET_PREFIX:-10.210.0}.0/24
+          ip_range: ${SCF_SUBNET_PREFIX:-10.210.0}.128/25
 
 volumes:
   postgres-data:

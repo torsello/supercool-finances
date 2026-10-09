@@ -3,9 +3,10 @@ import { isIPv4, isIPv6 } from 'node:net';
 /**
  * The service's configuration, read from environment variables once and validated before anything
  * connects or listens (plan 000 section 4, SEC-R39): every variable of section 1.2 of spec 007, of
- * specs 002, 003, 005 and 006, `REPLICA_ID` and `MIGRATION_DATABASE_URL` (spec 008), and the
- * timeout budget of SEC-R35. Every invalid variable is collected into one `ConfigError` that names
- * it with its rule and never its value (SEC-R40, AUT-R18).
+ * specs 002, 003, 005 and 006, `REPLICA_ID` and `MIGRATION_DATABASE_URL` (spec 008), the
+ * timeout budget of SEC-R35, and the demo secrets refused in production (DEP-R07). Every invalid
+ * variable is collected into one `ConfigError` that names it with its rule and never its value
+ * (SEC-R40, AUT-R18).
  */
 
 export type Environment = Readonly<Record<string, string | undefined>>;
@@ -251,6 +252,35 @@ function isOrigin(value: string, nodeEnv: NodeEnv): boolean {
 
 const REPLICA_ID = /^[A-Za-z0-9._-]{1,64}$/;
 
+/** A valid `REPLICA_ID`: 1 to 64 characters of `A-Z a-z 0-9 . _ -` (DEP-R14, SEC-R39). */
+export function isReplicaId(value: string): boolean {
+  return REPLICA_ID.test(value);
+}
+
+/**
+ * The demo `JWT_SECRET` and `CURSOR_SECRET` committed in `compose.yaml`: visibly fake 48-byte
+ * values that gitleaks does not flag (DEP-R35), refused when `NODE_ENV` is `production` (DEP-R07).
+ */
+export const DEMO_SECRETS = {
+  JWT_SECRET: 'demo-only-jwt-secret-for-docker-compose-00000000',
+  CURSOR_SECRET: 'demo-only-cursor-secret-for-docker-compose-00000',
+} as const;
+
+/**
+ * Refuses, in production, `JWT_SECRET` or `CURSOR_SECRET` equal to any of the demo values, its own
+ * or the other's, naming the variable and never its value (DEP-R07).
+ */
+function refuseDemoSecrets(reader: Reader, env: Environment, nodeEnv: NodeEnv): void {
+  if (nodeEnv !== 'production') return;
+  const demos: readonly string[] = Object.values(DEMO_SECRETS);
+  for (const variable of Object.keys(DEMO_SECRETS)) {
+    const value = env[variable];
+    if (value !== undefined && demos.includes(value)) {
+      reader.refuse(variable, 'not a demo value of compose.yaml when NODE_ENV is production');
+    }
+  }
+}
+
 /** The variables of the request-timeout budget of SEC-R35, the request timeout first. */
 const BUDGET_VARIABLES = [
   'REQUEST_TIMEOUT_MS',
@@ -375,8 +405,10 @@ export function loadConfig(env: Environment): Config {
       'comma-separated origins (scheme, lowercase host and optional port, no path), https:// or http:// only when NODE_ENV is not production, or empty; never *',
       (item) => isOrigin(item, nodeEnv),
     ),
-    replicaId: reader.optional('REPLICA_ID', '1 to 64 characters of A-Z a-z 0-9 . _ -', (value) =>
-      REPLICA_ID.test(value),
+    replicaId: reader.optional(
+      'REPLICA_ID',
+      '1 to 64 characters of A-Z a-z 0-9 . _ -',
+      isReplicaId,
     ),
     migrationDatabaseUrl: reader.optional(
       'MIGRATION_DATABASE_URL',
@@ -390,6 +422,7 @@ export function loadConfig(env: Environment): Config {
   };
   // pg reads PGOPTIONS when the URL has no `options`, and sends it as the connection's options.
   reader.unset('PGOPTIONS', "unset, because pg would send it as the connection's options");
+  refuseDemoSecrets(reader, env, nodeEnv);
   checkBudget(reader, config);
   reader.finish();
   return config;

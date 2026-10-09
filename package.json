@@ -28,8 +28,9 @@
     "reconcile": "tsx --env-file-if-exists=.env scripts/reconcile.ts",
     "idempotency:cleanup": "tsx --env-file-if-exists=.env src/cli/idempotency-cleanup.ts",
     "token": "tsx --env-file-if-exists=.env scripts/token.ts",
-    "migrate:up": "node --env-file-if-exists=.env node_modules/node-pg-migrate/bin/node-pg-migrate.js up --migrations-dir migrations --migration-file-language sql --database-url-var MIGRATION_DATABASE_URL --check-order",
-    "migrate:down": "node --env-file-if-exists=.env node_modules/node-pg-migrate/bin/node-pg-migrate.js down --migrations-dir migrations --migration-file-language sql --database-url-var MIGRATION_DATABASE_URL --check-order",
+    "seed": "tsx --env-file-if-exists=.env scripts/seed.ts",
+    "migrate:up": "tsx --env-file-if-exists=.env src/cli/migrate.ts up",
+    "migrate:down": "tsx --env-file-if-exists=.env src/cli/migrate.ts down",
     "openapi:export": "tsx scripts/openapi-export.ts",
     "openapi:lint": "redocly lint docs/api/openapi.yaml"
   },
@@ -66,6 +67,7 @@
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.71.1",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.3",
+    "yaml": "^2.9.1"
   }
 }
