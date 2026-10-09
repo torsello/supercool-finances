@@ -166,6 +166,8 @@ describe('graceful shutdown of the production build', () => {
         '/problems/service-unavailable',
       );
       expect((await send(port, { path: '/health/live' })).status).toBe(200);
+      // Both answers came while the drain lasted: the process has not stopped accepting yet.
+      expect(output).not.toContain('stopped accepting connections');
 
       await until(() => output.includes('stopped accepting connections'), 'the stop line');
       expect(await refused(port)).toBe(true);

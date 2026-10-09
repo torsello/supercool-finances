@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { describe, expect, it } from 'vitest';
-import { buildProductionApp } from '../../support/app.js';
+import { buildProductionApp, SPEC_007_DEFAULTS } from '../../support/app.js';
 import { createCustomerAccount, withScratchDatabase } from '../../support/db.js';
 import { bearer, problemOf } from '../../support/http.js';
 import { tokenFor } from '../../support/tokens.js';
@@ -14,7 +14,9 @@ describe('statement_timeout', () => {
       const a1 = await createCustomerAccount({ currency: 'EUR', ownerId: c1Id, pool });
       await pool.end();
 
-      const built = buildProductionApp({ env: { DATABASE_URL: scratch.runtimeUrl } });
+      const built = buildProductionApp({
+        env: { ...SPEC_007_DEFAULTS, DATABASE_URL: scratch.runtimeUrl },
+      });
       const session = new pg.Client({ connectionString: scratch.ownerUrl });
       const clock = new pg.Client({ connectionString: scratch.ownerUrl });
       await session.connect();

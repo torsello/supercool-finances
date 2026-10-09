@@ -36,8 +36,28 @@ function repositoryFiles(directory: string = REPOSITORY_ROOT): string[] {
   });
 }
 
-/** Comment lines can name a command without running it; prose in Markdown runs nothing. */
+/** Comment lines can name a command without running it. */
 const COMMENT_LINE = /^\s*(#|\/\/|\/\*|\*)/;
+
+/**
+ * The code blocks of a Markdown file, which a reader or an agent following a skill would run;
+ * its prose only names commands.
+ */
+function markdownCode(text: string): string {
+  const code: string[] = [];
+  let fence: string | undefined;
+  for (const line of text.split('\n')) {
+    const marker = /^\s{0,3}(`{3,}|~{3,})/.exec(line)?.[1];
+    if (fence === undefined) {
+      if (marker !== undefined) fence = marker;
+    } else if (marker !== undefined && marker[0] === fence[0] && marker.length >= fence.length) {
+      fence = undefined;
+    } else {
+      code.push(line);
+    }
+  }
+  return code.join('\n');
+}
 
 /**
  * What a file could run. `.claude/settings.json` denies the commands to agents: its `deny` list is
@@ -45,13 +65,12 @@ const COMMENT_LINE = /^\s*(#|\/\/|\/\*|\*)/;
  */
 function executableText(path: string): string {
   const text = readFileSync(join(REPOSITORY_ROOT, path), 'utf8');
-  if (path.endsWith('.md')) return '';
   if (path === join('.claude', 'settings.json')) {
     const settings = JSON.parse(text) as { permissions?: { deny?: unknown } };
     delete settings.permissions?.deny;
     return JSON.stringify(settings);
   }
-  return text
+  return (path.endsWith('.md') ? markdownCode(text) : text)
     .split('\n')
     .filter((line) => !COMMENT_LINE.test(line))
     .join('\n');
@@ -99,9 +118,15 @@ describe('nothing applies the Terraform', () => {
   it('DEP-AC24 no file runs the Terraform subcommands apply, plan, destroy or import, and infra:validate passes Terraform only fmt, init and validate', () => {
     const files = repositoryFiles();
     expect(files).toContain(join('scripts', 'infra-validate.sh'));
+    expect(files).toEqual(expect.arrayContaining(['README.md', 'AGENTS.md']));
     for (const path of files) {
       expect(TERRAFORM_COMMAND.test(executableText(path)), path).toBe(false);
     }
+    // A command in a Markdown code block counts; the same words in its prose do not.
+    const command = ['terraform', 'apply'].join(' ');
+    const fenced = ['Never run it.', '', '```sh', command, '```', ''].join('\n');
+    expect(TERRAFORM_COMMAND.test(markdownCode(fenced))).toBe(true);
+    expect(TERRAFORM_COMMAND.test(markdownCode(`Never run ${command}.\n`))).toBe(false);
 
     // The script runs Terraform from its image, so the subcommand follows the `--` of docker_run.
     const script = readRepositoryFile('scripts/infra-validate.sh');

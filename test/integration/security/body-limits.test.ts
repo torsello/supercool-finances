@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { request as httpRequest } from 'node:http';
 import { connect, type AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { buildProductionApp, type BuiltApp } from '../../support/app.js';
+import { buildProductionApp, type BuiltApp, SPEC_007_DEFAULTS } from '../../support/app.js';
 import { balanceOf, closePools } from '../../support/db.js';
 import { bearer, changeStatus, createAccount, deposit, problemOf } from '../../support/http.js';
 import { tokenFor } from '../../support/tokens.js';
@@ -26,7 +26,7 @@ describe('request bodies', () => {
   let port: number;
 
   beforeAll(async () => {
-    built = buildProductionApp();
+    built = buildProductionApp({ env: SPEC_007_DEFAULTS });
     await built.app.listen({ port: 0, host: '127.0.0.1' });
     port = (built.app.server.address() as AddressInfo).port;
   });

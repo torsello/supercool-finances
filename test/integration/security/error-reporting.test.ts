@@ -2,10 +2,11 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Environment } from '../../../src/platform/config/config.js';
 import { applicationInfo } from '../../../src/platform/error-reporting/reporter.js';
-import { TEST_CURSOR_SECRET } from '../../support/app.js';
+import { SPEC_007_DEFAULTS, TEST_CURSOR_SECRET } from '../../support/app.js';
 import { closePools, ownerPool } from '../../support/db.js';
 import { requireEnv } from '../../support/env.js';
 import { FakeSentry } from '../../support/fake-sentry.js';
+import { LOG_LEVEL } from '../../support/logs.js';
 import { bearer, createAccount, deposit, problemOf, withdraw } from '../../support/http.js';
 import { openLockSession, type LockSession } from '../../support/sessions.js';
 import {
@@ -68,7 +69,7 @@ describe('error reporting', () => {
   const apps: BuiltTestApp[] = [];
 
   function appWith(env: Environment): BuiltTestApp {
-    const built = buildTestApp({ env });
+    const built = buildTestApp({ env: { ...SPEC_007_DEFAULTS, ...env } });
     apps.push(built);
     return built;
   }
@@ -234,7 +235,13 @@ describe('error reporting', () => {
       ]) {
         expect(body).not.toContain(forbidden);
       }
-      expect(body).not.toMatch(/(^|[^0-9])4321([^0-9]|$)/);
+      // "4321" nowhere, once the values that are not request data are taken out: the release and
+      // the replica id are asserted above and could hold those digits by chance.
+      const replicaId = String(event.tags?.['replicaId']);
+      const requestData = body
+        .replaceAll(JSON.stringify(applicationInfo().release), '')
+        .replaceAll(JSON.stringify(replicaId), '');
+      expect(requestData).not.toContain('4321');
       expect(built.logs.text()).not.toContain('pk-5521');
     } finally {
       await ownerPool().query(`DROP ROLE IF EXISTS ${role}`);
@@ -250,8 +257,11 @@ describe('error reporting', () => {
       const c1 = tokenFor(randomUUID(), 'customer');
       answers.push(await throwing(built, c1, 'err-4'));
       expect(
-        built.logs.lines().filter((line) => line.msg === 'error reporting is off'),
-      ).toHaveLength(1);
+        built.logs
+          .lines()
+          .filter((line) => line.msg === 'error reporting is off')
+          .map((line) => line.level),
+      ).toEqual([LOG_LEVEL.info]);
     }
     expect(fetchSpy).not.toHaveBeenCalled();
 

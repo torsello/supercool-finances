@@ -176,7 +176,14 @@ jobs:
           path: reports
           merge-multiple: true
 
-      - run: npm run trace -- --require unit,integration,e2e
+      # Also regenerates docs/traceability.md from the three reports.
+      - run: npm run trace -- --require unit,integration,e2e --write
+
+      # The committed file must be the one the reports of this run produce.
+      - name: Check that docs/traceability.md is committed and fresh
+        run: |
+          git ls-files --error-unmatch docs/traceability.md
+          git diff --exit-code -- docs/traceability.md
 
   secret-scan:
     runs-on: ubuntu-24.04

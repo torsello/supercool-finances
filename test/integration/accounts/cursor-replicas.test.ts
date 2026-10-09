@@ -5,7 +5,7 @@ import { bearer, createAccount, deposit, problemOf } from '../../support/http.js
 import { tokenFor } from '../../support/tokens.js';
 
 interface Page {
-  items: { id: string }[];
+  items: { id: string; transactionId: string }[];
   nextCursor?: string;
 }
 
@@ -33,8 +33,11 @@ describe('cursors across replicas', () => {
     const c1 = tokenFor(randomUUID(), 'customer');
     const o1 = tokenFor(randomUUID(), 'operator');
     const a1 = await createAccount(p1.app, c1);
+    const recorded: string[] = [];
     for (let index = 0; index < 3; index += 1) {
-      expect((await deposit(p1.app, o1, a1.id, '100')).statusCode).toBe(201);
+      const response = await deposit(p1.app, o1, a1.id, '100');
+      expect(response.statusCode).toBe(201);
+      recorded.push(response.json<{ id: string }>().id);
     }
     const url = `/v1/accounts/${a1.id}/entries?limit=1`;
     const all = await p1.app.inject({
@@ -42,7 +45,10 @@ describe('cursors across replicas', () => {
       url: `/v1/accounts/${a1.id}/entries`,
       headers: bearer(c1),
     });
-    const [e3, e2, e1] = all.json<Page>().items.map((entry) => entry.id);
+    const items = all.json<Page>().items;
+    // E1, E2 and E3 are the entries of the deposits, in the order they were recorded.
+    expect(items.map((entry) => entry.transactionId)).toEqual([...recorded].reverse());
+    const [e3, e2, e1] = items.map((entry) => entry.id);
 
     async function list(built: BuiltApp, cursor?: string) {
       return await built.app.inject({

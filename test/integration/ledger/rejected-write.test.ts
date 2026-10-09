@@ -67,6 +67,8 @@ describe('a ledger write the database rejects (LED-R28)', () => {
       .linesOf('req-led')
       .filter((line) => (line.level ?? 0) === LOG_LEVEL.error);
     expect(errors).toHaveLength(1);
-    expect(errors[0]?.['sqlstate']).toEqual(expect.stringMatching(/^[0-9A-Z]{5}$/));
+    // The deferred balance check of LED-R04 rejected the commit: check_violation.
+    expect(errors[0]?.['sqlstate']).toBe('23514');
+    expect(errors[0]?.['constraint']).toBe('ledger_transaction_balanced');
   });
 });

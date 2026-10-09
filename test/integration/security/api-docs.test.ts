@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { buildProductionApp, type BuiltApp } from '../../support/app.js';
+import { buildProductionApp, type BuiltApp, SPEC_007_DEFAULTS } from '../../support/app.js';
 import { problemOf } from '../../support/http.js';
 import { buildTestApp } from '../../support/test-app.js';
 
@@ -27,7 +27,7 @@ describe('API documentation (SEC-R44)', () => {
   let built: BuiltApp;
 
   beforeAll(async () => {
-    built = buildProductionApp();
+    built = buildProductionApp({ env: SPEC_007_DEFAULTS });
     await built.app.ready();
   });
 
@@ -54,7 +54,7 @@ describe('API documentation (SEC-R44)', () => {
   });
 
   it('SEC-R44 SYS-R37 the test app, with its seams, serves the same document without the throwing route', async () => {
-    const test = buildTestApp();
+    const test = buildTestApp({ env: SPEC_007_DEFAULTS });
     try {
       await test.app.ready();
       const json = await test.app.inject({ method: 'GET', url: '/docs/json' });

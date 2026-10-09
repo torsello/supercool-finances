@@ -26,7 +26,8 @@ describe('test seams (SYS-R37)', () => {
   const agent = new Agent({ keepAlive: true, maxSockets: 1 });
 
   beforeAll(async () => {
-    production = buildProductionApp();
+    // Production configuration: NODE_ENV production, so its stricter rules apply (DEP-R07).
+    production = buildProductionApp({ env: { NODE_ENV: 'production' } });
     testApp = buildTestApp();
     await production.app.listen({ host: '127.0.0.1', port: 0 });
     await testApp.app.ready();

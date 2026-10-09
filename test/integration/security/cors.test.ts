@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { LightMyRequestResponse } from 'fastify';
 import { afterAll, describe, expect, it } from 'vitest';
-import { buildProductionApp, type BuiltApp } from '../../support/app.js';
+import { buildProductionApp, type BuiltApp, SPEC_007_DEFAULTS } from '../../support/app.js';
 import { closePools } from '../../support/db.js';
 import { bearer, createAccount, problemOf } from '../../support/http.js';
 import { tokenFor } from '../../support/tokens.js';
@@ -33,7 +33,7 @@ describe('CORS', () => {
   });
 
   async function started(env: Record<string, string | undefined>): Promise<BuiltApp> {
-    const built = buildProductionApp({ env });
+    const built = buildProductionApp({ env: { ...SPEC_007_DEFAULTS, ...env } });
     apps.push(built);
     await built.app.ready();
     return built;

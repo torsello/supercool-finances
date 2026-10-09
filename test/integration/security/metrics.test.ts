@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { listen } from '../../../src/app.js';
-import { testConfig } from '../../support/app.js';
+import { SPEC_007_DEFAULTS, testConfig } from '../../support/app.js';
 import { closePools } from '../../support/db.js';
 import { createAccount, deposit, problemOf, transfer, withdraw } from '../../support/http.js';
 import { scrape, valueOf, type Sample } from '../../support/metrics.js';
@@ -28,6 +28,7 @@ describe('metrics', () => {
     port = await freePort();
     metricsPort = await freePort();
     const env = {
+      ...SPEC_007_DEFAULTS,
       ACCOUNT_LOCK_TIMEOUT_MS: '200',
       PORT: String(port),
       METRICS_PORT: String(metricsPort),

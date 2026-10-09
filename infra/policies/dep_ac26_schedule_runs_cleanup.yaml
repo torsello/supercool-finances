@@ -1,0 +1,21 @@
+# The task definition a schedule runs has the idempotency cleanup as its entry point, so
+# SCF_DEP_AC26_CLEANUP_TASK, keyed on that entry point, always applies to it.
+metadata:
+  id: 'SCF_DEP_AC26_SCHEDULE_RUNS_CLEANUP'
+  name: 'DEP-AC26: the task definition every schedule runs has the idempotency cleanup as its entry point'
+  category: 'GENERAL_SECURITY'
+definition:
+  and:
+    - cond_type: 'filter'
+      attribute: 'resource_type'
+      operator: 'within'
+      value: ['aws_scheduler_schedule']
+    - cond_type: 'connection'
+      resource_types: ['aws_scheduler_schedule']
+      connected_resource_types: ['aws_ecs_task_definition']
+      operator: 'exists'
+    - cond_type: 'attribute'
+      resource_types: ['aws_ecs_task_definition']
+      attribute: 'container_definitions'
+      operator: 'regex_match'
+      value: '.*''entryPoint'': [^:]{0,30}dist/cli/idempotency-cleanup\.js.*'

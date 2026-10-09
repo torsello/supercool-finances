@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, describe, expect, it } from 'vitest';
+import { SPEC_007_DEFAULTS } from '../../support/app.js';
 import { closePools } from '../../support/db.js';
 import { dsnFor, FakeSentry } from '../../support/fake-sentry.js';
 import { bearer, problemOf } from '../../support/http.js';
@@ -20,7 +21,7 @@ describe('error reporting with an unreachable or slow endpoint', () => {
   it('SEC-AC45 an unreachable or slow endpoint changes no answer, and only the transitions are logged', async () => {
     const port = await freePort();
     const dsn = dsnFor(port, 'pk-unavailable-3391');
-    const built = buildTestApp({ env: { SENTRY_DSN: dsn } });
+    const built = buildTestApp({ env: { ...SPEC_007_DEFAULTS, SENTRY_DSN: dsn } });
     const c1 = tokenFor(randomUUID(), 'customer');
     let fake: FakeSentry | undefined;
     const throwing = async () => {
@@ -44,11 +45,13 @@ describe('error reporting with an unreachable or slow endpoint', () => {
     };
 
     try {
-      for (let index = 0; index < 3; index += 1) await throwing();
+      const failing = [[LOG_LEVEL.warn, 'error reporting is failing']];
+      await throwing();
+      await settled('the first refused send');
+      expect(reporting().map((line) => [line.level, line.msg])).toEqual(failing);
+      for (let index = 0; index < 2; index += 1) await throwing();
       await settled('the three refused sends');
-      expect(reporting().map((line) => [line.level, line.msg])).toEqual([
-        [LOG_LEVEL.warn, 'error reporting is failing'],
-      ]);
+      expect(reporting().map((line) => [line.level, line.msg])).toEqual(failing);
 
       fake = await FakeSentry.start(port);
       fake.holdMs = 5000;
@@ -58,11 +61,17 @@ describe('error reporting with an unreachable or slow endpoint', () => {
       await fake.waitForEnvelopes(1);
       // The held send is abandoned at 2000 ms, while reporting is already failing.
       await settled('the held send to be abandoned');
+      expect(reporting().map((line) => [line.level, line.msg])).toEqual(failing);
 
       fake.holdMs = 0;
       await throwing();
       await fake.waitForEnvelopes(2);
       await settled('the fifth report');
+      expect(fake.envelopes[1]?.answered).toBe(200);
+      expect(reporting().map((line) => [line.level, line.msg])).toEqual([
+        ...failing,
+        [LOG_LEVEL.info, 'error reporting works again'],
+      ]);
       await throwing();
       await fake.waitForEnvelopes(3);
       await settled('the sixth report');

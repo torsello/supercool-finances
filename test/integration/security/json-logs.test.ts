@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { buildProductionApp, type BuiltApp } from '../../support/app.js';
+import { buildProductionApp, type BuiltApp, SPEC_007_DEFAULTS } from '../../support/app.js';
 import { closePools } from '../../support/db.js';
 import { bearer, createAccount, deposit, freshKey } from '../../support/http.js';
 import { tokenFor } from '../../support/tokens.js';
@@ -9,7 +9,7 @@ describe('JSON logs', () => {
   let built: BuiltApp;
 
   beforeAll(async () => {
-    built = buildProductionApp();
+    built = buildProductionApp({ env: SPEC_007_DEFAULTS });
     await built.app.ready();
   });
 
@@ -46,22 +46,27 @@ describe('JSON logs', () => {
       },
     ];
 
+    // Every line captured since startup: the app's start, the setup and both requests.
+    const captured = built.logs.lines();
     for (const { reqId, send } of requests) {
       built.logs.clear();
       await send();
       // Everything captured was written between receiving and answering this request.
       const lines = built.logs.lines();
-      for (const line of lines) {
-        expect(line).toEqual(
-          expect.objectContaining({
-            level: expect.any(Number) as unknown,
-            time: expect.any(Number) as unknown,
-            msg: expect.any(String) as unknown,
-          }),
-        );
-        expect(line.reqId, JSON.stringify(line)).toBe(reqId);
-      }
+      captured.push(...lines);
+      for (const line of lines) expect(line.reqId, JSON.stringify(line)).toBe(reqId);
       expect(lines.length, reqId).toBeGreaterThanOrEqual(2);
+    }
+
+    expect(captured.length).toBeGreaterThan(4);
+    for (const line of captured) {
+      expect(line).toEqual(
+        expect.objectContaining({
+          level: expect.any(Number) as unknown,
+          time: expect.any(Number) as unknown,
+          msg: expect.any(String) as unknown,
+        }),
+      );
     }
   });
 });
