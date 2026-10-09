@@ -11407,3 +11407,250 @@ completed (exit code 0)
     infra/terraform does not exist yet.
 
 ✻ Baked for 2m 14s · done 9:22 PM
+
+❯ /export docs/ai/transcripts/09-hardening.txt                                  
+  ⎿  Conversation exported to: /Users/matiastorsello/supercool-finances/docs/ai/
+     transcripts/09-hardening.txt
+
+❯ /ship add the final transcript of phase 09                                    
+
+⏺ Bash(git branch --show-current)
+  ⎿  phase/09-hardening
+
+⏺ Bash(npm run check 2>&1 | grep -E "error|✖|Test Files|Tests |problem")
+  ⎿   ✓ |unit| test/unit/http/error-handler.test.ts (39 tests) 7ms
+      Test Files  46 passed (46)
+           Tests  320 passed (320)
+  ⎿  (timeout 5m)
+
+⏺ Bash(npm run infra:up)
+  ⎿  > supercool-finances@0.1.0 infra:up
+     > docker compose up -d --wait postgres redis
+     … +6 lines (ctrl+o to expand)
+
+⏺ Bash(npm run test:integration 2>&1 | grep -E "×|FAIL|Test Files|Tests
+      |AssertionError")
+  ⎿       × SEC-R25 a second signal during the shutdown is logged at warn a
+     nd ignored: the shutdown runs to its end and exits 0 278ms
+     ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+     … +6 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ Stopping at the failed gate: nothing is staged, committed or pushed.
+
+  Failed gate: npm run test:integration. Of 323 tests, 322 pass and 1 fails, in
+  test/integration/security/shutdown.test.ts:
+
+  × SEC-R25 a second signal during the shutdown is logged at warn and ignored:
+    the shutdown runs to its end and exits 0   (278 ms)
+
+  That is the test I added for finding 3 of the second audit. My grep filtered
+  out the assertion text, so I can't yet say which line failed. The same test
+  passed in my own full run and in the two earlier /ship runs.
+
+  The test took only 278 ms, far short of its usual 1.3 s (the 1 s drain delay
+  plus the startup). That suggests it failed early, before the shutdown, for
+  example while waiting for the service to listen. A likely cause is a timing
+  race in the test between SIGTERM and the readiness polling; the production
+  code looks right.
+
+  I haven't diagnosed it. npm run trace was not run and checkov was skipped, as
+  there is no infra/terraform. The only change in the working tree is the
+  transcript, docs/ai/transcripts/09-hardening.txt, still unstaged.
+
+  The next step would be to rerun that test file a few times, with the full
+  assertion output, to see what failed and how often. Shall I?
+
+✻ Cogitated for 1m 59s · done 9:24 PM
+
+❯ I found the cause: main.ts installs the SIGTERM and SIGINT handlers only      
+  after listen() resolves (line 85 vs line 61). The test sends SIGTERM as soon  
+  as the API port accepts, which can land before the handlers exist, so Node's  
+  default action kills the process without the ordered shutdown, and the next   
+  readiness poll fails with a refused connection (hence 278 ms). That is a real 
+  race in the service, not only in the test. Install the signal handlers        
+  before listening. A signal that arrives during startup runs the shutdown once 
+  listen has finished; if listen fails, the startup failure path runs as        
+  today. Keep the rest of main.ts as it is. Run                                 
+  test/integration/security/shutdown.test.ts ten times in a row and show me it  
+  passes every time, then npm run check.                                        
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Confirmed: the signal handlers are registered after listen(), so a SIGTERM
+  during startup hits Node's default action. I'll move the handlers before
+  listen(), queuing early signals until listening succeeds and leaving the
+  startup-failure path intact if it fails.
+⏺ Update(src/main.ts)
+  ⎿  Added 26 lines, removed 15 lines
+       57      process.exitCode = 1;
+       58      return;
+       59    }
+       60 -  try {                                                       
+       61 -    await listen(app, config);                                
+       62 -  } catch (error) {                                           
+       63 -    // The app's logger keeps secrets out of the line (SEC-R22
+          -).                                                            
+       64 -    app.log.fatal({ err: error }, 'startup failed');          
+       65 -    process.exitCode = 1;                                     
+       66 -    await app.close();                                        
+       67 -    return;                                                   
+       68 -  }                                                           
+       69 -                                                              
+       60    const shutdown = createShutdown(app, config);
+       61    const limitMs = config.shutdownDrainDelayMs + config.shutdow
+           nTimeoutMs + SHUTDOWN_MARGIN_MS;
+       62 +  const runShutdown = (signal: NodeJS.Signals): void => {     
+       63 +    setTimeout(() => {                                        
+       64 +      app.log.error({ limitMs }, 'the shutdown did not end in 
+          +time: exiting');                                              
+       65 +      process.exit(1);                                        
+       66 +    }, limitMs).unref();                                      
+       67 +    void shutdown.shutdown(signal).then((code) => process.exit
+          +(code));                                                      
+       68 +  };                                                          
+       69 +  // Installed before listening, so a signal that arrives duri
+          +ng startup is never left to Node's                            
+       70 +  // default action: it is held, and runs the shutdown once li
+          +stening has finished.                                         
+       71    let started = false;
+       72 +  let listening = false;                                      
+       73 +  let pending: NodeJS.Signals | undefined;                    
+       74    const onSignal = (signal: NodeJS.Signals): void => {
+       75      if (started) {
+       76        app.log.warn({ signal }, 'signal received during the shu
+           tdown: ignored');
+       77        return;
+       78      }
+       79      started = true;
+       79 -    setTimeout(() => {                                        
+       80 -      app.log.error({ limitMs }, 'the shutdown did not end in 
+          -time: exiting');                                              
+       81 -      process.exit(1);                                        
+       82 -    }, limitMs).unref();                                      
+       83 -    void shutdown.shutdown(signal).then((code) => process.exit
+          -(code));                                                      
+       80 +    if (listening) runShutdown(signal);                       
+       81 +    else pending = signal;                                    
+       82    };
+       83    for (const signal of SHUTDOWN_SIGNALS) process.on(signal, on
+           Signal);
+       84  
+       85 +  try {                                                       
+       86 +    await listen(app, config);                                
+       87 +  } catch (error) {                                           
+       88 +    for (const signal of SHUTDOWN_SIGNALS) process.off(signal,
+          + onSignal);                                                   
+       89 +    // The app's logger keeps secrets out of the line (SEC-R22
+          +).                                                            
+       90 +    app.log.fatal({ err: error }, 'startup failed');          
+       91 +    process.exitCode = 1;                                     
+       92 +    await app.close();                                        
+       93 +    return;                                                   
+       94 +  }                                                           
+       95 +  listening = true;                                           
+       96 +  if (pending !== undefined) runShutdown(pending);            
+       97 +                                                              
+       98    closeWithGrace(
+       99      {
+      100        delay: limitMs,
+
+⏺ Bash(npx tsc -p tsconfig.json --noEmit && npx eslint src/main.ts && npx
+      prettier --check src/main.ts && for i in 1 2 3 4 5 6 7 8 9 10; do npx
+      vitest run --project in…)
+  ⎿  Checking formatting...
+     All matched files use Prettier code style!
+     run 1:       Tests  3 passed (3)
+     … +9 lines (ctrl+o to expand)
+  ⎿  (timeout 10m)
+
+⏺ Bash(npm run check 2>&1 | grep -E "error|✖|Test Files|Tests " | head)
+  ⎿   ✓ |unit| test/unit/http/error-handler.test.ts (39 tests) 7ms
+      Test Files  46 passed (46)
+           Tests  320 passed (320)
+  ⎿  (timeout 5m)
+
+⏺ I fixed the race in main.ts: SIGTERM and SIGINT now have their handlers
+  installed before the app starts listening.
+
+  - Signal during startup: the handler records the signal; once listening
+    finishes, it starts the ordered shutdown. A second signal is still logged at
+    warn and ignored.
+  - Listening fails: the handlers are removed and the startup-failure path runs
+    as before (fatal line, exit code 1, app.close()).
+  - Everything else in main.ts is unchanged, including close-with-grace for
+    uncaught errors.
+
+  test/integration/security/shutdown.test.ts passed 10 runs out of 10, all three
+  tests each time, and npm run check passes (320 unit tests). I did not rerun
+  the full integration suite or the trace. Nothing is committed; the changes are
+  src/main.ts and the unstaged transcript.
+
+✻ Sautéed for 1m 49s · done 9:27 PM
+
+❯ /ship install the signal handlers before listening                            
+
+⏺ Bash(git branch --show-current)
+  ⎿  phase/09-hardening
+
+⏺ Bash(npm run check 2>&1 | grep -E "error|✖|Test Files|Tests |problem")
+  ⎿   ✓ |unit| test/unit/http/error-handler.test.ts (39 tests) 7ms
+      Test Files  46 passed (46)
+           Tests  320 passed (320)
+  ⎿  (timeout 5m)
+
+⏺ Bash(npm run infra:up)
+  ⎿  > supercool-finances@0.1.0 infra:up
+     > docker compose up -d --wait postgres redis
+     … +6 lines (ctrl+o to expand)
+
+⏺ Bash(npm run test:integration 2>&1 | grep -E "×|FAIL|Test Files|Tests
+      |AssertionError")
+  ⎿   Test Files  133 passed (133)
+           Tests  323 passed (323)
+  ⎿  (timeout 10m)
+
+⏺ Bash(npm run trace -- --require unit,integration 2>&1 | tail -2)
+  ⎿  221 ACs in 9 specs: 182 covered, 21 pending, 0 missing, 18 unverified.
+      Test reports read: unit, integration.
+
+⏺ All three gates pass; no infra/terraform, so checkov is skipped, and the
+  transcript row already exists. Staging.
+
+⏺ Bash(git add -A)
+  ⎿  (No output)
+
+⏺ Bash(git status --short)
+  ⎿  M  docs/ai/transcripts/09-hardening.txt
+     M  src/main.ts
+
+⏺ Bash(git commit -F - <<'EOF'
+      fix(platform): install the signal handlers before listening…)
+  ⎿  [phase/09-hardening aa3450d] fix(platform): install the signal handler
+     s before listening
+      2 files changed, 219 insertions(+), 16 deletions(-)
+
+⏺ Bash(gitleaks git --no-banner --redact --log-opts="origin/main..HEAD")
+  ⎿  9:30PM INF 4 commits scanned.
+     9:30PM INF scanned ~1034331 bytes (1.03 MB) in 1.05s
+     9:30PM INF no leaks found
+
+⏺ Bash(git push -u origin HEAD)
+  ⎿  To https://github.com/torsello/supercool-finances.git
+        e67963d..aa3450d  HEAD -> phase/09-hardening
+     branch 'phase/09-hardening' set up to track 'origin/phase/09-hardening
+     '.
+
+⏺ - Commit: aa3450d fix(platform): install the signal handlers before listening.
+    It's pushed to phase/09-hardening, and gitleaks found no leaks.
+  - Gates: npm run check passed (320 unit tests), npm run test:integration
+    passed (323 tests), and npm run trace -- --require unit,integration passed
+    (182 ACs covered, 0 missing).
+  - AC IDs covered: SEC-AC20, plus SEC-R25 through its second-signal test.
+  - Pull request: none opened, since this isn't a "close phase" description. PR
+    #9 already covers the branch and now includes this commit.
+  - Also committed: the refreshed transcript
+    docs/ai/transcripts/09-hardening.txt. Checkov was skipped because
+    infra/terraform doesn't exist yet.
+
+✻ Sautéed for 2m 35s · done 9:30 PM
