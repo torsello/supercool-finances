@@ -2,7 +2,7 @@
 # configuration differs. Base images are pinned by version and digest (DEP-R22).
 
 # Build stage: every dependency, the sources and the compiled code.
-FROM node:24.21.0-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS build
+FROM node:24.22.0-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
@@ -14,7 +14,7 @@ RUN npm run build
 # Tools stage: the build stage's /app plus gitleaks, the tools image of compose.yaml, which runs
 # the seed, token and other npm scripts (DEP-R09) and the whole test suite of `make test`. The
 # runtime stage does not depend on it, so building the production image never downloads gitleaks.
-FROM node:24.21.0-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS tools
+FROM node:24.22.0-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS tools
 # gitleaks for the DEP-AC25 test: the version of the CI job secret-scan, checked against the
 # checksums of its official release.
 ARG GITLEAKS_VERSION=8.30.1
@@ -34,7 +34,7 @@ COPY --from=build /app ./
 
 # Runtime stage: the production dependencies and the compiled code only, no sources, tests or
 # development dependencies (DEP-R18). The last stage, so it is the image's default target.
-FROM node:24.21.0-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS runtime
+FROM node:24.22.0-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS runtime
 WORKDIR /app
 COPY package.json package-lock.json ./
 # Then npm, npx, corepack and yarn, which the base image ships and nothing in the container runs,
